@@ -182,6 +182,15 @@ jobs:
           Get-NetIPConfiguration | Format-List InterfaceAlias, IPv4Address, IPv4DefaultGateway, DNSServer
           Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' | Format-Table InterfaceAlias, NextHop, RouteMetric -AutoSize
           Resolve-DnsName vpn.guardianagroup.com -Type A -ErrorAction SilentlyContinue | Format-Table Name, Type, IPAddress -AutoSize
+      # What the Filtering Platform blocks, in Windows' own record (Security events 5157 and 5152; GUIDs from
+      # learn.microsoft.com, «WFP auditing and logging»): a UDP datagram it drops tells the program nothing, so the check
+      # reads it there (the first run, 3 Nov 2026, had no answer and no WSAEACCES for the DNS queries from the card).
+      - name: que Windows anote lo que corta el Filtering Platform
+        shell: cmd
+        run: |
+          auditpol /set /subcategory:"{0CCE9226-69AE-11D9-BED3-505054503030}" /failure:enable || exit /b 1
+          auditpol /set /subcategory:"{0CCE9225-69AE-11D9-BED3-505054503030}" /failure:enable || exit /b 1
+          auditpol /get /subcategory:"{0CCE9226-69AE-11D9-BED3-505054503030},{0CCE9225-69AE-11D9-BED3-505054503030}"
       - name: conectar, comprobar y desconectar
         timeout-minutes: 8
         shell: pwsh

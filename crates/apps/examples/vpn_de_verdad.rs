@@ -9,7 +9,10 @@
 //!    as it was);
 //! 3. with it: names answered by the tunnel's resolver; the public address an echo service sees over HTTPS is the
 //!    server's; the gateway, and a public resolver asked from the network card (outside the tunnel), get nothing out,
-//!    and Windows says the filter cut them (WSAEACCES, 10013);
+//!    and Windows says the filter cut them: to the program (WSAEACCES, 10013) for a TCP connection, and in its own
+//!    record for a UDP datagram, which it drops without telling the sender (Security events 5157 and 5152, which the
+//!    workflow turns on; the first run, 3 Nov 2026, saw no answer and no WSAEACCES for UDP, which proves nothing by
+//!    itself);
 //! 4. disconnected, always (also when a check fails or panics; and at the time limit a watchdog closes the tunnel and
 //!    ends the process), and the network is back: the public address is this computer's again and the adapter is gone.
 //!
@@ -192,14 +195,18 @@ mod de_verdad {
         loop {
             match hijo.try_wait() {
                 Ok(Some(estado)) => {
-                    let mut salida = String::new();
-                    let mut errores = String::new();
+                    // as bytes: PowerShell writes in the console's code page, and a line that is not UTF-8 must
+                    // not come back empty
+                    let mut salida = Vec::new();
+                    let mut errores = Vec::new();
                     if let Some(mut s) = hijo.stdout.take() {
-                        let _ = s.read_to_string(&mut salida);
+                        let _ = s.read_to_end(&mut salida);
                     }
                     if let Some(mut s) = hijo.stderr.take() {
-                        let _ = s.read_to_string(&mut errores);
+                        let _ = s.read_to_end(&mut errores);
                     }
+                    let salida = String::from_utf8_lossy(&salida).into_owned();
+                    let errores = String::from_utf8_lossy(&errores);
                     return if estado.success() {
                         Ok(salida)
                     } else {
@@ -358,6 +365,28 @@ mod de_verdad {
             }
         }
         Err(Fallo::Otro("solo contestaron otros".to_owned()))
+    }
+
+    /// What Windows recorded, in the last minute, of a connection or a packet the Filtering Platform blocked from
+    /// `origen` to `destino` (Security events 5157 and 5152, audited when the workflow turns «Filtering Platform
+    /// Connection» and «Packet Drop» on): direction, protocol, layer, filter and program, when there is one. Asked a few
+    /// times, because Windows writes the record a moment later.
+    fn bloqueo_anotado(origen: Ipv4Addr, destino: SocketAddr) -> Result<Option<String>, String> {
+        let orden = r#"$desde = (Get-Date).AddSeconds(-60); Get-WinEvent -FilterHashtable @{ LogName = 'Security'; Id = 5157, 5152; StartTime = $desde } -ErrorAction SilentlyContinue | ForEach-Object { $e = $_; $d = @{}; ([xml]$e.ToXml()).Event.EventData.Data | ForEach-Object { $d[$_.Name] = $_.'#text' }; if ($d.SourceAddress -eq '__ORIGEN__' -and $d.DestAddress -eq '__IP__' -and $d.DestPort -eq '__PUERTO__') { "suceso $($e.Id): direccion $($d.Direction), protocolo $($d.Protocol), capa $($d.LayerName), filtro $($d.FilterRTID), $($d.Application)" } } | Select-Object -First 1"#
+            .replace("__ORIGEN__", &origen.to_string())
+            .replace("__IP__", &destino.ip().to_string())
+            .replace("__PUERTO__", &destino.port().to_string());
+        for intento in 0..4 {
+            if intento > 0 {
+                std::thread::sleep(Duration::from_secs(1));
+            }
+            let salida = powershell(&orden)?;
+            let s = salida.trim();
+            if !s.is_empty() {
+                return Ok(Some(recorta(s)));
+            }
+        }
+        Ok(None)
     }
 
     /// A TCP connection to `a`, at most [`PLAZO_RED`].
@@ -555,6 +584,16 @@ mod de_verdad {
                 let a = SocketAddr::new(IpAddr::V4(p), 80);
                 let r = tcp(a);
                 let bien = r == Err(Fallo::Filtro);
+                // Windows' own record of it: the check that the record works, for the UDP ones below
+                if let Some(l) = antes.lan {
+                    match bloqueo_anotado(l, a) {
+                        Ok(Some(anotado)) => linea(format!("     Windows lo anotó: {anotado}")),
+                        Ok(None) => linea(
+                            "     Windows no anotó ningún bloqueo (¿está el registro puesto?)",
+                        ),
+                        Err(e) => linea(format!("     el registro de Windows: {e}")),
+                    }
+                }
                 informe.pon(
                     bien,
                     format!(
@@ -576,14 +615,36 @@ mod de_verdad {
         match antes.lan {
             Some(l) => {
                 for (r, antes_r) in &antes.dns_fuera {
-                    let x = pregunta_dns(l, SocketAddr::new(IpAddr::V4(*r), 53), NOMBRE)
-                        .map(|ips| lista(&ips));
-                    let bien = x == Err(Fallo::Filtro);
+                    let destino = SocketAddr::new(IpAddr::V4(*r), 53);
+                    let x = pregunta_dns(l, destino, NOMBRE).map(|ips| lista(&ips));
+                    // UDP: Windows drops the datagram without telling the program, so «cut by the filter» is read
+                    // in its own record; no answer alone proves nothing (the query could have left and its answer
+                    // been lost)
+                    let (bien, como) = match &x {
+                        Err(Fallo::Filtro) => (true, como_texto(&x)),
+                        Err(Fallo::Plazo) => match bloqueo_anotado(l, destino) {
+                            Ok(Some(anotado)) => (
+                                true,
+                                format!(
+                                    "{}; Windows anotó que lo cortó el filtro: {anotado}",
+                                    como_texto(&x)
+                                ),
+                            ),
+                            Ok(None) => (
+                                false,
+                                format!("{}, y Windows no anotó ningún bloqueo", como_texto(&x)),
+                            ),
+                            Err(e) => (
+                                false,
+                                format!("{}; el registro de Windows: {e}", como_texto(&x)),
+                            ),
+                        },
+                        _ => (false, como_texto(&x)),
+                    };
                     informe.pon(
                         bien,
                         format!(
-                            "DNS a {r}:53 desde la tarjeta ({l}), fuera del túnel: {} (antes: {})",
-                            como_texto(&x),
+                            "DNS a {r}:53 desde la tarjeta ({l}), fuera del túnel: {como} (antes: {})",
                             como_texto(antes_r)
                         ),
                     );

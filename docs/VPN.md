@@ -155,9 +155,19 @@ Hecho y probado en un Windows real (la integración continua de GitHub, como adm
   `vpn.guardianagroup.com` con `tunel_win::conecta` (todo dentro y el corte puesto) y comprueba, con un plazo en cada
   paso: el saludo del servidor; que el resolutor del túnel contesta; que la dirección pública que ve un servicio de eco
   por HTTPS es la del servidor (la que da su nombre antes de conectar); que la puerta de enlace y un DNS público
-  preguntado desde la tarjeta, fuera del túnel, se cortan antes de salir (Windows lo dice: WSAEACCES); y, ya
-  desconectado, que la red vuelve. Desconecta siempre: en cada camino, y a los 150 s un vigilante cierra el túnel y
-  sale; si el proceso muere, Windows quita los filtros y el adaptador con él.
+  preguntado desde la tarjeta, fuera del túnel, se cortan antes de salir, y que Windows lo dice: al programa (WSAEACCES)
+  en una conexión TCP, y en su propio registro (sucesos 5157 y 5152) en un datagrama UDP, que tira sin avisar a quien lo
+  manda; y, ya desconectado, que la red vuelve. Desconecta siempre: en cada camino, y a los 150 s un vigilante cierra el
+  túnel y sale; si el proceso muere, Windows quita los filtros y el adaptador con él. Para el corte, el programa de la
+  prueba es «el servicio» (su archivo es el que tiene el permiso hacia el servidor): lo que se le corta fuera del túnel
+  es lo que la 1.0.55 quitó al servicio.
+  - La primera vez (3 nov 2026, 00:19 UTC): conectada en 3,6 s, el servidor contestó con el corte puesto (el permiso
+    estrecho casa con los paquetes de verdad de WireGuardNT); el resolutor del túnel contesta; la dirección pública que
+    ve el eco es la del servidor (`62.238.17.121`, la de `vpn.guardianagroup.com`) y no la del equipo; la puerta de
+    enlace, cortada por el filtro (WSAEACCES); y al desconectar, la red vuelve entera. El DNS a 1.1.1.1 y 8.8.8.8
+    desde la tarjeta no tuvo respuesta, pero sin aviso de Windows al programa: no prueba por sí solo que lo cortara el
+    filtro, y por eso la prueba lee ahora el registro de Windows. El enlace del equipo de pruebas con GitHub no se
+    cortó (unos 11 s con el túnel puesto).
 - La prueba de extremo a extremo en Linux (`.github/workflows/vpn.yml`, «extremo»): el servidor de GUARDIANA con el
   WireGuard del núcleo en un espacio de red, el lado del equipo (`crates/tunel/examples/alta_prueba.rs`) en otro, el
   alta postcuántica por la red y tráfico de verdad por el túnel (solo pasa si los dos lados sacaron la misma llave).
