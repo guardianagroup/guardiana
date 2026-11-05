@@ -231,8 +231,9 @@ function pantalla(nombre) {
   // 2 Nov 2026 (the owner, 08:01: no doors between sections): the bar has no products' selector, only «Inicio» (back to
   // the main cover, Órbita's tab), and nothing else that leads to another section.
   comprueba(await barra.evaluate(() => { const b = [...document.querySelectorAll('#productos [data-producto]')]; return b.length === 1 && b[0].dataset.producto === 'orbita'; }), 'la barra solo tiene «Inicio», que vuelve a la portada');
-  // Beside a web, the glass strip of 56 px; the summary opens to 360 px.
-  comprueba(await hasta(() => panel.evaluate(() => document.body.classList.contains('plegado') || document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'junto a la web, la franja de cristal (o la vista que estaba abierta)');
+  // Beside a web, the shield open (384 px) since 5 Nov 2026, or folded into its rail of 152 if the person folded it, or the
+  // view that was open. A click on the web no longer folds it.
+  comprueba(await hasta(() => panel.evaluate(() => document.body.classList.contains('en-escudo') || document.body.classList.contains('plegado') || document.querySelector('#v-licencia').classList.contains('vista-activa'))), 'junto a la web, el escudo abierto (o plegado en su carril, o la vista que estaba abierta)');
   comprueba(await hasta(async () => (await barra.textContent('#aviso-corte')).includes('Google')), 'la barra dice a quién cortó');
   await abreVista('b-escudo');
   comprueba(await hasta(async () => (await panel.locator('#e-terceros li.cortado').count()) >= 1), 'el panel lista lo cortado');

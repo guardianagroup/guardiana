@@ -479,18 +479,6 @@ const GUION: &str = r#"(() => {
     });
   }
   /*</programa>*/
-  // 1.0.46 (Z1-b): a click on the web itself folds ZERO's side summary («clic fuera»). Only the
-  // fact of a click, never where or on what.
-  if (!marco && location.origin !== 'http://127.0.0.1:7443') {
-    let ultimo = 0;
-    document.addEventListener('pointerdown', (e) => {
-      if (!e.isTrusted) return;
-      const ahora = Date.now();
-      if (ahora - ultimo < 400) return;
-      ultimo = ahora;
-      manda({ tipo: 'zg_toque' });
-    }, { capture: true, passive: true });
-  }
   const ficha = new Uint32Array(4);
   crypto.getRandomValues(ficha);
   const yo = Array.from(ficha, (x) => x.toString(16)).join('');
@@ -1593,7 +1581,6 @@ mod tests {
             "zg_huella",
             "zg_cookies_pide",
             "HTMLFormElement.prototype",
-            "zg_toque",
             "zg_subasta",
             "const programa = false;",
         ] {
