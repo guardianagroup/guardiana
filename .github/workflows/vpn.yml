@@ -118,8 +118,11 @@ jobs:
   # the service killed, and then stopped as an update stops it: the block stays (persistent filters, outliving the
   # process); «Desconectar» (POST /api/vpn/desconecta) takes it all away and the network is back; a block left with
   # strict mode off in what is kept is removed by the service's start; and `guardiana vpn apaga`, with the service
-  # stopped, removes it too. The runner's network is cut for those moments (its link with GitHub may pause), and
-  # whatever happens, the last step takes the block and the service away.
+  # stopped, removes it too. Review of the 1.0.56 VPN: the service starts after Windows' filtering service (BFE), also
+  # one registered before without it; the panel says when «Desconectar» is needed and what of «what a website sees» was
+  # really measured; and with wireguard.dll gone, the start does not put the block again, the panel says why, and
+  # «Desconectar» still takes away the block left. The runner's network is cut for those moments (its link with GitHub
+  # may pause), and whatever happens, the last step takes the block and the service away.
   estricto:
     name: el modo estricto con el servicio de verdad y un servidor que no contesta
     runs-on: windows-latest
@@ -192,11 +195,14 @@ jobs:
           function Arranca { & $g service start | Out-Null; Espera 60 { (Get-Service guardiana).Status -eq 'Running' } }
           function Bloqueado { $e = Estado; $e.persistentes -gt 0 }
           function Limpio { $e = Estado; $e.persistentes -eq 0 -and $e.arranque -eq 0 -and -not $e.objetos }
+          # the service starts after Windows' filtering service (BFE)
+          function Depende { (& sc.exe qc guardiana | Out-String) -match 'DEPENDENCIES\s*:\s*BFE' }
           try {
             Bien ((Fuera) -eq 'conecta') 'antes, la red sale'
             # 1. the VPN on in strict mode, with a server that never answers: the service's start puts the block
             Pon $true $true
             & $g service install | Out-Null
+            Bien (Depende) 'el servicio depende del servicio de filtrado de Windows (BFE)'
             Bien (Espera 60 { Bloqueado }) 'al arrancar, el servicio pone el bloqueo del modo estricto'
             Linea "estado: $(Estado | ConvertTo-Json -Compress)"
             Bien ((Estado).arranque -gt 0) 'con sus filtros de arranque'
@@ -205,6 +211,10 @@ jobs:
             $v = Panel 'GET' '/api/vpn'
             Linea "GET /api/vpn: $($v | ConvertTo-Json -Compress)"
             Bien ($v.estricto -eq $true -and $v.bloqueado -eq $true -and "$($v.aviso)".StartsWith('La VPN no conecta')) 'con el modo estricto, el bloqueo y el aviso'
+            Bien ($v.desconectar -eq $true) 'y «Desconectar» a la vista'
+            $c = Panel 'GET' '/api/vpn/comprueba'
+            Linea "GET /api/vpn/comprueba: $($c | ConvertTo-Json -Compress)"
+            Bien ($null -ne $c.comprobado -and $c.comprobado.ip -eq $false -and $c.comprobado.dns -eq $false -and $c.comprobado.ipv6 -eq $false) 'lo que una web verá: nada dado por medido con el bloqueo puesto'
             # 2. the service killed: the block stays, and Windows starts it again
             $proceso = (Get-CimInstance Win32_Service -Filter "Name='guardiana'").ProcessId
             Stop-Process -Id $proceso -Force
@@ -216,8 +226,12 @@ jobs:
             Bien (Para) 'parado'
             Bien (Bloqueado) 'parado (una actualización): el bloqueo sigue'
             Bien ((Fuera) -eq 'cortada') 'parado: nada sale'
-            # 4. «Desconectar»: everything goes, the normal connection is back
+            # 4. «Desconectar»: everything goes, the normal connection is back. Before, a service registered without BFE
+            # (as an older installer did) gets it at its start
+            & sc.exe config guardiana depend= / | Out-Null
+            Bien (-not (Depende)) 'un servicio de antes, sin depender de BFE'
             Bien (Arranca) 'arrancado otra vez'
+            Bien (Espera 30 { Depende }) 'al arrancar, el servicio vuelve a depender de BFE'
             Bien (Espera 60 { try { $null -ne (Panel 'GET' '/api/vpn').fase } catch { $false } }) 'el panel contesta'
             $r = Panel 'POST' '/api/vpn/desconecta'
             Bien ($r.ok -eq $true) "Desconectar: $($r | ConvertTo-Json -Compress)"
@@ -241,6 +255,27 @@ jobs:
             Bien (Limpio) 'guardiana vpn apaga, con el servicio parado, lo quita todo'
             Bien (-not (Estado).encendida) 'y deja la VPN apagada en lo guardado'
             Bien (Espera 30 { (Fuera) -eq 'conecta' }) 'y la red sale'
+            # 7. without wireguard.dll the VPN cannot come back: the start does not put the block again, the panel says
+            # why and shows «Desconectar», which takes away the block left from before
+            Pon $true $true
+            Bien ((Arranca) -and (Espera 60 { Bloqueado })) 'otra vez el bloqueo'
+            Bien ((Para) -and (Bloqueado)) 'con el servicio parado, el bloqueo queda'
+            $dll = Join-Path (Split-Path $g) 'wireguard.dll'
+            Move-Item $dll "$dll.aparte" -Force
+            try {
+              Bien (Arranca) 'arrancado sin wireguard.dll'
+              Bien (Espera 60 { try { (Panel 'GET' '/api/vpn').fase -eq 'error' } catch { $false } }) 'sin wireguard.dll, el panel dice «error»'
+              $v = Panel 'GET' '/api/vpn'
+              Linea "GET /api/vpn: $($v | ConvertTo-Json -Compress)"
+              Bien ($v.disponible -eq $false -and $v.desconectar -eq $true -and "$($v.error)".Contains('wireguard.dll')) 'con el motivo y «Desconectar»'
+              Bien ((Bloqueado) -and (Fuera) -eq 'cortada') 'el bloqueo de antes sigue, y nada sale'
+              $r = Panel 'POST' '/api/vpn/desconecta'
+              Bien ($r.ok -eq $true) "Desconectar sin wireguard.dll: $($r | ConvertTo-Json -Compress)"
+              Bien (Limpio) 'y quita el bloqueo entero'
+              Bien (Espera 30 { (Fuera) -eq 'conecta' }) 'y la red sale'
+            } finally {
+              Move-Item "$dll.aparte" $dll -Force
+            }
           } finally {
             & $g vpn apaga | Out-Null
             & $g service uninstall | Out-Null
