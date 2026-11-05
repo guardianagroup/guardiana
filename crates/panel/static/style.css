@@ -136,7 +136,8 @@ tbody tr:last-child td { border-bottom: 0; }
 
 /* the labels: outlined pills, like the language buttons on the site, so a row of them
    reads as information and not as a row of coloured sweets */
-.tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-family: var(--texto); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; font-weight: 500; white-space: nowrap; background: transparent; border: 1px solid currentColor; }
+/* Ninguna letra por debajo de 11 px (apiñamientos, 5 nov 2026): las etiquetas iban a 10 y 10,5 px. */
+.tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-family: var(--texto); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; font-weight: 500; white-space: nowrap; background: transparent; border: 1px solid currentColor; }
 .tag.rastreador { color: var(--rastreador); }
 .tag.publicidad { color: var(--publicidad); }
 .tag.telemetria { color: var(--telemetria); }
@@ -157,8 +158,8 @@ tbody tr:last-child td { border-bottom: 0; }
 a.tag { text-decoration: none; cursor: pointer; }
 a.tag:hover { text-decoration: underline; }
 .nivel-pt { font-weight: 600; white-space: nowrap; }
-.tag.ia { color: var(--accent); font-size: 10px; margin-inline-start: 5px; }
-.tag.empresa { color: var(--muted); border-color: var(--line); font-size: 10px; margin-inline-start: 5px; }
+.tag.ia { color: var(--accent); font-size: 11px; margin-inline-start: 5px; }
+.tag.empresa { color: var(--muted); border-color: var(--line); font-size: 11px; margin-inline-start: 5px; }
 /* El país de la empresa dueña del nombre. Se distingue de la empresa con un punto delante,
    para que se lean como dos datos y no como un nombre largo. */
 /* La columna de país: en gris y sin envolver, para que no compita con el nombre del
@@ -167,7 +168,7 @@ td.pais { color: var(--muted); }
 td.empresa-col { color: var(--fg); }
 .tag.app { border-color: var(--accent); color: var(--accent); font-family: var(--mono); }
 .tag.trampa { border-color: var(--cortado); color: var(--cortado); font-weight: 600; letter-spacing: 0.04em; }
-.tag.corredor { color: var(--rastreador); font-size: 10px; display: block; width: max-content; margin-top: 4px; }
+.tag.corredor { color: var(--rastreador); font-size: 11px; display: block; width: max-content; margin-top: 4px; }
 .verdict.cortado { color: var(--cortado); font-weight: 600; }
 .verdict.levantado { color: var(--esperado); font-weight: 600; }
 .muted.small { font-size: 11px; }
@@ -242,7 +243,7 @@ ul.recibo li:first-child { border-top: 0; }
 form.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin: 10px 0 18px; }
 /* Los tres botones de llevarse el extracto, en fila y siempre juntos. */
 p.exportar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 18px; }
-form.filters label { display: flex; flex-direction: column; gap: 4px; font-family: var(--texto); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+form.filters label { display: flex; flex-direction: column; gap: 4px; font-family: var(--texto); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 /* The declared scope is a textarea: without it here it came out white with black text at night
    and without the rounded border (review of 10 Oct 2026, panel 24). */
 input, select, textarea { font: 400 14px/1.4 var(--texto); padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); }
@@ -323,7 +324,7 @@ body { transition: opacity .18s ease-out; }
 .phrase.servidor{font-size:12.5px}
 /* Decision 205: a name dressed as another, and the weekly measurements. Same type, same rows. */
 .phrase.disfraz{color:var(--fg)}
-.phrase.disfraz b{font-family:var(--texto);font-size:10.5px;letter-spacing: .05em;text-transform:uppercase;font-weight:500;margin-inline-end:4px}
+.phrase.disfraz b{font-family:var(--texto);font-size:11px;letter-spacing: .05em;text-transform:uppercase;font-weight:500;margin-inline-end:4px}
 table.medidas td{vertical-align:top;font-variant-numeric:tabular-nums}
 table.medidas .horas{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
 .fuente-red a{color:inherit}
@@ -876,14 +877,17 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 .rd-cifras dt{font:600 11px var(--texto);letter-spacing: .05em;text-transform:uppercase;color:var(--rd-muted)}
 .rd-cifras dd{margin:0;font:600 22px var(--texto);font-variant-numeric:tabular-nums;color:#fff}
 .rd-cifras dd span{color:var(--rd-dim)}
-.rd-barra{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:4px}
+/* Doce secciones (desde 1.0.51) en una rejilla de once columnas dejaban la última sola en otra fila, y a 1366 px cada
+   nombre salía cortado con «…»: tantas columnas como quepan de 96 px, y el nombre en dos líneas si hace falta
+   (apiñamientos, 5 nov 2026). */
+.rd-barra{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:4px}
 .rd-barra li{display:grid;gap:5px;min-width:0}
 .rd-barra i{height:6px;border-radius:3px;background:var(--rd-line);transition:background .4s}
 .rd-barra li.hecha i{background:var(--rd-verde)}
 .rd-barra li.ahora i{background:var(--rd-azul);animation:rd-late 1.2s ease-in-out infinite}
-.rd-barra span{font:500 10px/1.25 var(--texto);color:var(--rd-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-barra span{font:500 11px/1.25 var(--texto);color:var(--rd-dim);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
 .rd-barra li.hecha span{color:#AEB7CF}.rd-barra li.ahora span{color:#fff}
-.rd-barra small{font:10px var(--texto);color:var(--rd-muted);min-height:12px}
+.rd-barra small{font:11px var(--texto);color:var(--rd-muted);min-height:12px}
 .rd-cuerpo{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:14px;min-height:0}
 .rd-lado{display:grid;gap:12px;align-content:start}
 .rd-mod{display:grid;gap:8px;padding:16px;border:1px solid var(--rd-line);border-radius:14px;background:var(--rd-card)}
