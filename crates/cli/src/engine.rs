@@ -55,10 +55,15 @@ pub struct EngineConfig {
     pub canary: bool,
     /// Print lines for every query (foreground) or stay quiet (service).
     pub print_events: bool,
+    /// Whether this is GUARDIANA's service (`guardiana service run`), the one that owns the VPN's strict mode: only it
+    /// reconciles what is kept with what Windows has at its start, and tries again every minute until it works. Not
+    /// `guardiana observe` (review of the 1.0.56 VPN): run beside the service, it removed the service's block or brought
+    /// up a second tunnel.
+    pub servicio: bool,
 }
 
 impl EngineConfig {
-    /// Defaults: port 53 on loopback, detect upstream, panel on, quiet off.
+    /// Defaults: port 53 on loopback, detect upstream, panel on, quiet off, as the service.
     #[must_use]
     pub fn default_service() -> Self {
         Self {
@@ -75,6 +80,7 @@ impl EngineConfig {
             self_test: false,
             canary: false,
             print_events: false,
+            servicio: true,
         }
     }
 }
@@ -959,8 +965,11 @@ pub async fn run<F: Future<Output = ()>>(
     tokio::pin!(shutdown);
     // Strict mode (ronda 91; docs/VPN.md): before anything else, what is left of its block in Windows and nobody wants
     // any more is removed, and a VPN meant to be on in strict mode is brought back, its block held meanwhile. First, so a
-    // pass that fails later has done it already. Off the runtime's threads: it asks Windows' filter engine.
-    let _ = tokio::task::spawn_blocking(guardiana_panel::vpn_al_arrancar).await;
+    // pass that fails later has done it already. Off the runtime's threads: it asks Windows' filter engine. Only the
+    // service (review of the 1.0.56 VPN); if it does not work, the minute's look of each pass tries again.
+    if cfg.servicio {
+        let _ = tokio::task::spawn_blocking(guardiana_panel::vpn_al_arrancar).await;
+    }
     contrastar_lectura_nativa(&cfg.db);
     let mut first = true;
     let result = loop {
@@ -2409,6 +2418,7 @@ async fn run_once<F: Future<Output = ()>>(
     let keep_salud = Arc::clone(&salud);
     let mut aparte = Aparte::default();
     let keep_block_mode = block_mode;
+    let keep_servicio = cfg.servicio;
     let (reconfigure_tx, mut reconfigure) = tokio::sync::oneshot::channel::<()>();
     let (caducado_tx, mut caducado) = tokio::sync::oneshot::channel::<()>();
     let housekeeping = tokio::spawn(async move {
@@ -2472,6 +2482,13 @@ async fn run_once<F: Future<Output = ()>>(
                     // filtering service they waited for the next panel start, maybe for hours. A few
                     // calls to the filter engine, and none while nothing is cut.
                     aparte_del_resolutor(guardiana_panel::comprueba_los_cortes);
+                    // The VPN's strict mode (review of the 1.0.56 VPN): what the start could not do (Windows did not
+                    // let what was left be removed, or wireguard.dll was missing), or a «Desconectar» that could not be
+                    // written down, tried again until it works. Only the service, and nothing at all while nothing is
+                    // left to do.
+                    if keep_servicio {
+                        aparte_del_resolutor(guardiana_panel::comprueba_la_vpn);
+                    }
                     if let Ok(l) = Ledger::open(&keep_db, identity::genesis()) {
                         // Se mira cada minuto, no cada hora: el día que termina la prueba, el
                         // programa tiene que apartarse ese día, no hasta una hora después.

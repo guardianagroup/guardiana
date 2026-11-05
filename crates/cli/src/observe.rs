@@ -38,6 +38,8 @@ pub fn config_from(opts: &Opts) -> Result<EngineConfig, Box<dyn Error>> {
     cfg.self_test = opts.has("self-test");
     cfg.canary = opts.has("canary");
     cfg.print_events = true;
+    // not the service: the VPN's strict mode is the service's to bring back or remove (review of the 1.0.56 VPN)
+    cfg.servicio = false;
     Ok(cfg)
 }
 
@@ -48,4 +50,21 @@ pub fn run(opts: &Opts) -> Result<(), Box<dyn Error>> {
     rt.block_on(engine::run(cfg, async {
         let _ = tokio::signal::ctrl_c().await;
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Review of the 1.0.56 VPN: `guardiana observe` runs the same engine, but it is not the service, so it does not
+    /// touch the VPN's strict mode (only the service brings it back or removes it); the service's settings are.
+    #[test]
+    fn observe_is_not_the_service() {
+        let argv: Vec<String> = ["observe", "--no-panel"].map(String::from).to_vec();
+        let (_, opts) = crate::args::parse(&argv);
+        let cfg = config_from(&opts).unwrap_or_else(|_| EngineConfig::default_service());
+        assert!(!cfg.servicio);
+        assert!(cfg.print_events);
+        assert!(EngineConfig::default_service().servicio);
+    }
 }
