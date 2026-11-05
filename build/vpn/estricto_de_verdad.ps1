@@ -342,16 +342,17 @@ function Wfp([string]$cuando, [switch]$Detalle) {
             $estricto = ($clave -like "*$PERSISTENTES*") -or ($clave -like "*$ARRANQUE*") -or ($prov -like "*$PROVEEDOR*") -or ($sub -like "*$SUBCAPA*")
             $vpn = $estricto -or ($nombre -like 'GUARDIANA VPN*')
             if (-not ($vpn -or ($nombre -like 'GUARDIANA*'))) { continue }
-            $persistente = $banderas -like '*FWPM_FILTER_FLAG_PERSISTENT*'
-            $arranque = $banderas -like '*FWPM_FILTER_FLAG_BOOTTIME*'
+            # (no $arranque: PowerShell no distingue mayúsculas, y taparía la constante $ARRANQUE)
+            $esPersistente = $banderas -like '*FWPM_FILTER_FLAG_PERSISTENT*'
+            $esDeArranque = $banderas -like '*FWPM_FILTER_FLAG_BOOTTIME*'
             if ($vpn) {
                 $r.Vpn++
-                $tipo = if ($persistente) { 'P' } elseif ($arranque) { 'A' } else { 'D' }
+                $tipo = if ($esPersistente) { 'P' } elseif ($esDeArranque) { 'A' } else { 'D' }
                 if ($tipo -eq 'P') { $r.Persistentes++ } elseif ($tipo -eq 'A') { $r.Arranque++ } else { $r.Dinamicos++ }
                 if (-not $porNombre.Contains($nombre)) { $porNombre[$nombre] = @{ P = 0; A = 0; D = 0 } }
                 $porNombre[$nombre][$tipo]++
                 $claves.Add($clave)
-            } elseif ($persistente -or $arranque) {
+            } elseif ($esPersistente -or $esDeArranque) {
                 $r.OtrosFijos++
             }
         }
@@ -381,28 +382,26 @@ function Wfp([string]$cuando, [switch]$Detalle) {
             $r.VerboseP = Sitios $tv $PERSISTENTES
             $r.VerboseA = Sitios $tv $ARRANQUE
         }
-        # Para entender lo que netsh enseña y lo que no: unos filtros, tal como salen en cada volcado
-        try {
-            $tf = [System.IO.File]::ReadAllText($f)
-            Linea ('     tamaños: show filters {0:N0} bytes, show state {1:N0} bytes' -f $tf.Length, $(if ($texto) { $texto.Length } else { 0 }))
-            foreach ($caso in @(
-                    @{ Que = 'show state, el persistente del sitio 32 (todo lo demás)'; Texto = $texto; Busca = "$($PERSISTENTES)0020" }
-                    @{ Que = 'show state, el persistente del sitio 24 (DNS fuera del túnel)'; Texto = $texto; Busca = "$($PERSISTENTES)0018" }
-                    @{ Que = 'show filters, uno de «todo lo demás»'; Texto = $tf; Busca = 'GUARDIANA VPN: todo lo demás' }
-                    @{ Que = 'show filters, el persistente del sitio 24 (DNS fuera del túnel)'; Texto = $tf; Busca = "$($PERSISTENTES)0018" })) {
-                $t = [string]$caso.Texto
-                $en = $t.IndexOf($caso.Busca, [System.StringComparison]::OrdinalIgnoreCase)
-                if ($en -lt 0) {
-                    Linea "     XML, $($caso.Que): no está"
-                    continue
+        # Para ver lo que netsh enseña y lo que no: los «todo lo demás» (los únicos sin condiciones) de cada volcado
+        foreach ($caso in @(@{ Que = 'show state'; Archivo = $s }, @{ Que = 'show filters'; Archivo = $f })) {
+            try {
+                $d = [System.Xml.XmlDocument]::new()
+                $d.Load($caso.Archivo)
+                $vistos = foreach ($i in $d.SelectNodes("//*[local-name()='item'][*[local-name()='filterKey']]")) {
+                    $nombre = "$($i.SelectSingleNode("*[local-name()='displayData']/*[local-name()='name']").InnerText)"
+                    if ($nombre -ne 'GUARDIANA VPN: todo lo demás') { continue }
+                    $clave = "$($i.SelectSingleNode("*[local-name()='filterKey']").InnerText)"
+                    $capa = "$($i.SelectSingleNode("*[local-name()='layerKey']").InnerText)" -replace '^FWPM_LAYER_ALE_AUTH_', ''
+                    $id = "$($i.SelectSingleNode("*[local-name()='filterId']").InnerText)"
+                    $peso = "$($i.SelectSingleNode("*[local-name()='effectiveWeight']/*[local-name()='uint64']").InnerText)"
+                    $m = [regex]::Match($clave, '([0-9a-fA-F]{4})\}?$')
+                    $quien = if ($clave -match $PERSISTENTES) { 'P' } elseif ($clave -match $ARRANQUE) { 'A' } else { '?' }
+                    '{0}{1} {2} id {3} peso {4}' -f $quien, $(if ($m.Success) { [Convert]::ToInt32($m.Groups[1].Value, 16) } else { '?' }), $capa, $id, $peso
                 }
-                $desde = $t.LastIndexOf('<item>', $en)
-                if ($desde -lt 0) { $desde = [math]::Max(0, $en - 400) }
-                $trozo = $t.Substring($desde, [math]::Min(2600, $t.Length - $desde))
-                Linea "     XML, $($caso.Que): $((($trozo -replace '\s+', ' ') -replace '> <', '><'))"
+                Linea "     «todo lo demás» en $($caso.Que): $(@($vistos) -join '; ')"
+            } catch {
+                Linea "     «todo lo demás» en $($caso.Que): $($_.Exception.Message)"
             }
-        } catch {
-            Linea "     XML: $($_.Exception.Message)"
         }
     }
     $segundos = ((Get-Date) - $t0).TotalSeconds
@@ -596,26 +595,58 @@ function NadaEnWindows([string]$cuando) {
     }
 }
 
-# Con el bloqueo puesto: lo que `guardiana vpn estado` dice que hay (`$e`), visto por fuera del programa. Así las
-# comprobaciones de «no queda nada» saben ver lo que buscan.
+# Con el bloqueo puesto: lo que `guardiana vpn estado` dice que hay (`$e`), visto por fuera del programa, sitio por
+# sitio de cada conjunto (su orden en crates/tunel/src/corte.rs, función estricto). Así las comprobaciones de «no queda
+# nada» saben ver lo que buscan.
 function ElBloqueoPorFuera($e) {
     $w = Wfp 'con el bloqueo puesto' -Detalle
     $np = [int]$e.persistentes
     $na = [int]$e.arranque
-    # los de arranque salen en netsh con otra clave que la que les puso el programa: se cuentan por sus banderas
-    $faltanP = Faltan $w.SitiosP $np
-    Bien ($w.Leido -and ($np -gt 0) -and -not $faltanP -and ($w.Arranque -eq $na)) ('netsh wfp show filters ve el bloqueo entero que dice el programa: {0} de {1} persistentes (por su clave) y {2} de {3} de arranque (por sus banderas)' -f @($w.SitiosP).Count, $np, $w.Arranque, $na) $(if ($faltanP) { "no salen en show filters los persistentes de los sitios [$faltanP] (el sitio es su orden en el conjunto persistente de crates/tunel/src/corte.rs, función estricto)" } else { '' })
     $faltanEP = Faltan $w.EstadoP $np
-    Bien ($w.EstadoLeido -and -not $faltanEP -and $w.Proveedor -and $w.Subcapa) ('netsh wfp show state ve los {0} persistentes por su clave, el proveedor y la subcapa del modo estricto' -f $np) $(if ($faltanEP) { "no salen en show state los persistentes de los sitios [$faltanEP]" } else { '' })
-    if ($null -ne $w.VerboseP) {
-        Linea ('     show filters verbose=on: faltan los sitios persistentes [{0}] y los de arranque [{1}]' -f (Faltan $w.VerboseP $np), (Faltan $w.VerboseA $na))
-    }
+    $faltanEA = Faltan $w.EstadoA $na
+    Bien ($w.EstadoLeido -and ($np -gt 0) -and ($na -gt 0) -and -not $faltanEP -and -not $faltanEA -and $w.Proveedor -and $w.Subcapa) ('netsh wfp show state ve el bloqueo entero que dice el programa: {0} persistentes y {1} de arranque por su clave, el proveedor y la subcapa del modo estricto' -f $np, $na) $(if ($faltanEP -or $faltanEA) { "faltan los persistentes de los sitios [$faltanEP] y los de arranque de los sitios [$faltanEA]" } else { '' })
+    # show filters no lista todos: lo que no lista, dicho (lo que cuenta es lo que hay, y eso lo dicen show state y el
+    # registro)
+    $faltanP = Faltan $w.SitiosP $np
+    $faltanA = Faltan $w.SitiosA $na
+    Linea ('     show filters lista {0} de {1} persistentes y {2} de {3} de arranque{4}' -f @($w.SitiosP).Count, $np, @($w.SitiosA).Count, $na, $(if ($faltanP -or $faltanA) { "; no lista los persistentes de los sitios [$faltanP] ni los de arranque de los sitios [$faltanA]" } else { '' }))
     $pg = PoliticaGuardada
     if ($pg.Leido) {
         $faltanGP = Faltan $pg.P $np
         $faltanGA = Faltan $pg.A $na
-        Bien (-not $faltanGP -and -not $faltanGA -and $pg.Proveedor -and $pg.Subcapa) ('lo guardado para el próximo arranque del equipo: el bloqueo entero ({0} persistentes y {1} de arranque), su proveedor y su subcapa' -f @($pg.P).Count, @($pg.A).Count) $(if ($faltanGP -or $faltanGA) { "faltan los sitios persistentes [$faltanGP] y los de arranque [$faltanGA]" } else { '' })
+        Bien (-not $faltanGP -and -not $faltanGA -and $pg.Proveedor -and $pg.Subcapa) ('lo guardado para el próximo arranque del equipo: el bloqueo entero ({0} persistentes y {1} de arranque), su proveedor y su subcapa' -f @($pg.P).Count, @($pg.A).Count) $(if ($faltanGP -or $faltanGA) { "faltan los persistentes de los sitios [$faltanGP] y los de arranque de los sitios [$faltanGA]" } else { '' })
     }
+}
+
+# Quita de Windows los filtros de arranque del modo estricto, por sus claves fijas (solo la prueba, con el servicio
+# muerto): así queda lo que está en vigor tras arrancar el equipo, cuando el servicio de filtrado ya cargó los
+# persistentes y los de arranque dejan de valer, y GUARDIANA aún no ha arrancado. El servicio los vuelve a poner al
+# arrancar. Cuántos quitó, y lo que Windows dijo de otros.
+function QuitaLosDeArranque {
+    if (-not ('Guardiana.PruebaWfp' -as [type])) {
+        Add-Type -Namespace Guardiana -Name PruebaWfp -MemberDefinition @'
+[DllImport("fwpuclnt.dll")] public static extern uint FwpmEngineOpen0(System.IntPtr serverName, uint authnService, System.IntPtr authIdentity, System.IntPtr session, out System.IntPtr engineHandle);
+[DllImport("fwpuclnt.dll")] public static extern uint FwpmFilterDeleteByKey0(System.IntPtr engineHandle, ref System.Guid key);
+[DllImport("fwpuclnt.dll")] public static extern uint FwpmEngineClose0(System.IntPtr engineHandle);
+'@
+    }
+    $motor = [IntPtr]::Zero
+    # RPC_C_AUTHN_WINNT, como el programa (crates/apps/src/corte_vpn.rs)
+    $r = [Guardiana.PruebaWfp]::FwpmEngineOpen0([IntPtr]::Zero, 10, [IntPtr]::Zero, [IntPtr]::Zero, [ref]$motor)
+    if ($r -ne 0) { return [pscustomobject]@{ Quitados = 0; Fallo = ('FwpmEngineOpen0 = 0x{0:x8}' -f $r) } }
+    $quitados = 0
+    $otros = [System.Collections.Generic.List[string]]::new()
+    try {
+        for ($i = 0; $i -lt 64; $i++) {
+            $clave = [Guid]::Parse(('{0}{1:x4}' -f $ARRANQUE, $i))
+            $r = [Guardiana.PruebaWfp]::FwpmFilterDeleteByKey0($motor, [ref]$clave)
+            # FWP_E_FILTER_NOT_FOUND (0x80320003): ese sitio no lo usa el conjunto
+            if ($r -eq 0) { $quitados++ } elseif ($r -ne [uint32]2150760451) { $otros.Add(('{0}: 0x{1:x8}' -f $i, $r)) }
+        }
+    } finally {
+        $null = [Guardiana.PruebaWfp]::FwpmEngineClose0($motor)
+    }
+    return [pscustomobject]@{ Quitados = $quitados; Fallo = ($otros -join '; ') }
 }
 
 # ---- La prueba.
@@ -749,6 +780,19 @@ try {
                 Start-Sleep -Milliseconds 700
             }
             Bien ($fugas.Count -eq 0) ('durante {0:N0} s con el servicio muerto, nada sale: {1} intentos, todos cortados por el filtro' -f ((Get-Date) - $muere).TotalSeconds, $vueltas) $(if ($fugas.Count) { "no cortados: $($fugas -join '; ')" } else { '' })
+            # Tras arrancar el equipo, los filtros de arranque dejan de valer cuando el servicio de filtrado carga los
+            # persistentes, y GUARDIANA aún no ha arrancado: entonces el bloqueo es solo el persistente. Para verlo sin
+            # reiniciar, la prueba quita los de arranque (el servicio los vuelve a poner al arrancar).
+            $q = QuitaLosDeArranque
+            $e = Estado
+            Bien (($q.Quitados -gt 0) -and -not $q.Fallo -and ($null -ne $e) -and ($e.arranque -eq 0) -and ($e.persistentes -gt 0)) ('la prueba quita los {0} filtros de arranque: queda solo el bloqueo persistente ({1} filtros), como tras arrancar el equipo' -f $q.Quitados, $e.persistentes) $(if ($q.Fallo) { "Windows dijo: $($q.Fallo)" } else { '' })
+            $script:t3 = ''
+            $ok = Espera 3 { $script:t3 = Tcp '1.1.1.1' 443 '' 1500; $script:t3 -ne 'cortada' } 300
+            Bien (-not $ok) "solo con los filtros persistentes, nada sale: TCP a 1.1.1.1:443 $($script:t3)" $(if ($ok) { 'el bloqueo persistente no corta el tráfico general: tras reiniciar el equipo, hasta que arranque el servicio, saldría todo menos el DNS (los persistentes «todo lo demás», sitios 32 a 35, no bastan)' } else { '' })
+            if ($script:tarjeta -and $script:tarjeta.Ip) {
+                $t = Tcp '1.1.1.1' 443 $script:tarjeta.Ip 1500
+                Bien ($t -eq 'cortada') "solo con los persistentes, ni por la tarjeta: TCP a 1.1.1.1:443 $t"
+            }
             $sigueMuerto = $null -eq (Get-Process -Id $pidS -ErrorAction SilentlyContinue) -and (Servicio) -ne 'Running'
             Bien $sigueMuerto ('todo eso, con el servicio aún muerto ({0:N1} s desde taskkill; el servicio: {1})' -f ((Get-Date) - $muere).TotalSeconds, (Servicio))
             # Arrancado otra vez: vuelve solo
@@ -757,6 +801,8 @@ try {
             $c = EsperaConectada $hel 60 -VigilaBloqueo
             Bien ($c.Bien -and ("$($c.Vista.salida.id)" -eq $hel.Id)) "vuelve a conectar solo a Helsinki, en $($c.Segundos) s desde que arrancó" "fases: $($c.Fases); GET /api/vpn: $(Json $c.Vista)"
             Bien ($c.SinBloqueo -eq 0) 'el bloqueo, en Windows todo el rato' "vistazos sin bloqueo: $($c.SinBloqueo)"
+            $e = Estado
+            Bien (($null -ne $e) -and ($e.persistentes -gt 0) -and ($e.arranque -gt 0)) ('al arrancar, el servicio vuelve a poner el bloqueo entero: {0} persistentes y {1} de arranque' -f $e.persistentes, $e.arranque) (Json $e)
             $eco = LaDireccion $hel
             Linea ('     sin red: {0:N1} s, de taskkill a ver otra vez la dirección del servidor' -f ((Get-Date) - $muere).TotalSeconds)
             Linea "     acciones de recuperación, otra vez las del servicio: $(Recorta ((& sc.exe qfailure guardiana 2>&1) -join ' ') 300)"
