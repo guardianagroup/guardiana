@@ -2146,7 +2146,7 @@
         : `<span class="tag av-nodoc">${esc(t('av_no_documentado'))}</span>`
           + (d.empresa ? ` <span class="muted">${esc(t('av_nombre_de').replace('{empresa}', d.empresa))}</span>` : '')
           + (d.categoria !== 'desconocido' && d.categoria !== 'esperado' ? ` <span class="tag ${esc(d.categoria)}">${esc(catNombre(d.categoria))}</span>` : ''));
-      const firma = (p) => `<span class="tag app">${esc(p.nombre)} ×${num(p.consultas)}</span> <span class="muted">${esc(p.firma ? t('av_firmado_por').replace('{firma}', p.firma) : t('av_sin_firma'))}</span>`;
+      const firma = (p) => `<span class="tag app">${esc(p.nombre)}&nbsp;×${num(p.consultas)}</span> <span class="muted">${esc(p.firma ? t('av_firmado_por').replace('{firma}', p.firma) : t('av_sin_firma'))}</span>`;
       // El corte limpio (1.0.22): solo en este equipo, siempre decisión de la persona, siempre
       // reversible. Si no está disponible, se dice por qué en vez de esconder el botón.
       let corte = { disponible: false, cortados: [] };
@@ -2387,7 +2387,7 @@
         // Quién habló con ese servicio, si el sistema lo dijo: en esta pantalla es la pregunta
         // que importa —que hablara el agente y no el navegador—, así que va pegado al aparato.
         const quien = (x) => (x.programas && x.programas.length
-          ? '<br>' + x.programas.map((p) => `<span class="tag app" title="${esc(t('ia_programa_titulo'))}">${esc(p[0])} ×${p[1]}</span>`).join(' ')
+          ? '<br>' + x.programas.map((p) => `<span class="tag app" title="${esc(t('ia_programa_titulo'))}">${esc(p[0])}&nbsp;×${p[1]}</span>`).join(' ')
           : '');
         $('ia-servicios').innerHTML = r.servicios.map((x) => `<tr>
           <td><span class="tag ia">${esc(x.servicio)}</span></td>

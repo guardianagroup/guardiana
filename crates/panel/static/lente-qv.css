@@ -72,6 +72,12 @@ body:has(main.lente) > footer { max-width: calc(var(--s-pagina) + 2 * var(--s-ma
 .lente-tarjeta > .lente-tb + .lente-tb { border-top: 1px solid var(--line); }
 .lente-tarjeta .lente-tabla { overflow-x: auto; }
 .lente-tarjeta > .lente-tb.sin-margen { padding: 0; }
+/* Las franjas de la prueba, de la licencia caducada y de los expedientes, en una sola línea cada una y con menos
+   relleno, como en lente.css (apiñamientos, 5 nov 2026; revisión: Audita y Quién vende tus datos cargan esta hoja y no aquella). */
+.lente > .card.prueba, .lente > .card.caducado, .lente > .card.franja-exp { padding: var(--e3) var(--e5); }
+.lente > .card.prueba strong, .lente > .card.caducado strong { display: inline; margin: 0 var(--e2) 0 0; }
+.lente > .card.caducado p { margin: var(--e2) 0 0; }
+.lente > .card + .card:not(.hidden) { margin-top: var(--e3); }
 /* Older cards inside the pattern take the same paper and the same spacing. */
 .lente .card, .lente .tarjeta { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-tarjeta); padding: var(--e5); margin: 0; box-shadow: none; }
 .lente .card.wrap { padding: 0; overflow-x: auto; }
