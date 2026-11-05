@@ -120,9 +120,10 @@ jobs:
   # process); «Desconectar» (POST /api/vpn/desconecta) takes it all away and the network is back; a block left with
   # strict mode off in what is kept is removed by the service's start; and `guardiana vpn apaga`, with the service
   # stopped, removes it too. The block on what Windows forwards (WSL2, Hyper-V, Docker, ICS; 1.0.56) is read in
-  # Windows' own list of filters (netsh wfp show filters): in both forwarding layers, persistent and boot-time, through
-  # the service's death and stop, and gone with each way out. The runner's network is cut for those moments (its link
-  # with GitHub may pause), and whatever happens, the last step takes the block and the service away.
+  # Windows' own list (netsh wfp show state), in both forwarding layers, and counted filter by filter by `guardiana vpn
+  # estado` (2 persistent and 2 boot-time), through the service's death and stop, and gone with each way out. The
+  # runner's network is cut for those moments (its link with GitHub may pause), and whatever happens, the last step
+  # takes the block and the service away.
   estricto:
     name: el modo estricto con el servicio de verdad y un servidor que no contesta
     runs-on: windows-latest
@@ -195,26 +196,50 @@ jobs:
           function Arranca { & $g service start | Out-Null; Espera 60 { (Get-Service guardiana).Status -eq 'Running' } }
           function Bloqueado { $e = Estado; $e.persistentes -gt 0 }
           function Limpio { $e = Estado; $e.persistentes -eq 0 -and $e.arranque -eq 0 -and -not $e.objetos }
-          # GUARDIANA's filters in the forwarding layers (FWPM_LAYER_IPFORWARD_V4 and _V6) in Windows' own list of filters:
-          # how many in each layer, how many persistent and boot-time, and how many of others there. verbose=on: without
-          # it netsh leaves out what it deems unlikely to affect connectivity, and of strict mode's twin blocks (the
-          # persistent one and the boot-time one, alike) it showed one (first run, 5 Nov 2026). -Detalle names the others.
-          function Reenvio([switch]$Detalle) {
+          # Windows' filters as XML: its whole filtering state (netsh wfp show state; the file holds more than one
+          # document, so they go under one root) or, if that cannot be read, `netsh wfp show filters verbose=on`, which of
+          # the forwarding layers lists only the boot-time filters (5 Nov 2026: ours and the firewall's «Boot Time Filter»,
+          # not the persistent ones).
+          function ListaWfp {
+            $s = Join-Path $env:RUNNER_TEMP 'estado-wfp.xml'
+            Remove-Item $s -ErrorAction SilentlyContinue
+            netsh wfp show state file="$s" | Out-Null
+            try {
+              $t = (Get-Content -Path $s -Raw -ErrorAction Stop) -replace '<\?xml[^>]*\?>', ''
+              $x = New-Object System.Xml.XmlDocument
+              $x.LoadXml("<raiz>$t</raiz>")
+              return @{ xml = $x; de = 'show state' }
+            } catch { Write-Host "  sin el estado de WFP ($_): la lista de filtros" }
             $f = Join-Path $env:RUNNER_TEMP 'filtros-wfp.xml'
             Remove-Item $f -ErrorAction SilentlyContinue
             netsh wfp show filters file="$f" verbose=on | Out-Null
-            $n = [ordered]@{ v4 = 0; v6 = 0; persistentes = 0; arranque = 0; otros = 0; lista = $true }
-            if (-not (Test-Path $f)) { $n.lista = $false; return [pscustomobject]$n }
-            $x = New-Object System.Xml.XmlDocument
-            $x.Load($f)
+            try {
+              $x = New-Object System.Xml.XmlDocument
+              $x.Load($f)
+              return @{ xml = $x; de = 'show filters' }
+            } catch { Write-Host "  sin la lista de filtros: $_"; return $null }
+          }
+          # GUARDIANA's filters in the forwarding layers (FWPM_LAYER_IPFORWARD_V4 and _V6) as Windows lists them: how many in
+          # each layer, how many persistent and boot-time, and how many others there. -Detalle names the others and gives
+          # the weight of each sublayer with filters there (strict mode's is 0xFFFF), for the record.
+          function Reenvio([switch]$Detalle) {
+            $n = [ordered]@{ v4 = 0; v6 = 0; persistentes = 0; arranque = 0; otros = 0; de = '' }
+            $l = ListaWfp
+            if (-not $l) { return [pscustomobject]$n }
+            $n.de = $l.de
             $capas = @{ 'FWPM_LAYER_IPFORWARD_V4' = 'v4'; '{a82acc24-4ee1-4ee1-b465-fd1d25cb10a4}' = 'v4'; 'FWPM_LAYER_IPFORWARD_V6' = 'v6'; '{7b964818-19c7-493a-b71f-832c3684d28c}' = 'v6' }
-            foreach ($i in $x.SelectNodes('//item[layerKey]')) {
-              $capa = $capas["$($i.SelectSingleNode('layerKey').InnerText)".Trim()]
+            $subcapas = @{}
+            foreach ($i in $l.xml.SelectNodes('//item[filterKey]')) {
+              $k = $i.SelectSingleNode('layerKey')
+              if (-not $k) { $k = $i.SelectSingleNode('ancestor::item[layer][1]/layer/layerKey') }
+              $capa = $capas["$($k.InnerText)".Trim()]
               if (-not $capa) { continue }
+              $sub = "$($i.SelectSingleNode('subLayerKey').InnerText)".Trim()
+              $subcapas[$sub.ToLower()] = $true
               $nombre = "$($i.SelectSingleNode('displayData/name').InnerText)"
               if (-not $nombre.StartsWith('GUARDIANA VPN')) {
                 $n.otros++
-                if ($Detalle) { Linea "  otro filtro en la capa de reenvío ${capa}: «$nombre», $($i.SelectSingleNode('action/type').InnerText), subcapa $($i.SelectSingleNode('subLayerKey').InnerText)" }
+                if ($Detalle) { Write-Host "  otro filtro en la capa de reenvío ${capa}: «$nombre», $($i.SelectSingleNode('action/type').InnerText), subcapa $sub" }
                 continue
               }
               $n[$capa]++
@@ -222,27 +247,15 @@ jobs:
               if ($marcas -match 'PERSISTENT') { $n.persistentes++ }
               if ($marcas -match 'BOOTTIME') { $n.arranque++ }
             }
+            if ($Detalle) {
+              foreach ($i in $l.xml.SelectNodes('//item[subLayerKey and weight and not(filterKey)]')) {
+                $sub = "$($i.SelectSingleNode('subLayerKey').InnerText)".Trim()
+                if ($subcapas.ContainsKey($sub.ToLower())) { Write-Host "  subcapa con filtros de reenvío: «$($i.SelectSingleNode('displayData/name').InnerText)» $sub, peso $($i.SelectSingleNode('weight').InnerText)" }
+              }
+            }
             [pscustomobject]$n
           }
-          function SinReenvio { $r = Reenvio; $r.lista -and $r.v4 -eq 0 -and $r.v6 -eq 0 }
-          # For the record: the weight of each sublayer with filters in the forwarding layers (ours is 0xFFFF; another one
-          # of the same weight or more, such as WinNAT's, would be weighed before or alongside it). Never a failure.
-          function Subcapas {
-            try {
-              $s = Join-Path $env:RUNNER_TEMP 'estado-wfp.xml'
-              netsh wfp show state file="$s" | Out-Null
-              $x = New-Object System.Xml.XmlDocument
-              $x.Load($s)
-              $usadas = @{}
-              foreach ($i in $x.SelectNodes('//item[layerKey]')) {
-                if ("$($i.SelectSingleNode('layerKey').InnerText)" -match 'IPFORWARD_V[46]$|a82acc24|7b964818') { $usadas["$($i.SelectSingleNode('subLayerKey').InnerText)".Trim().ToLower()] = $true }
-              }
-              foreach ($i in $x.SelectNodes('//item[subLayerKey and weight and not(layerKey)]')) {
-                $k = "$($i.SelectSingleNode('subLayerKey').InnerText)".Trim().ToLower()
-                if ($usadas.ContainsKey($k)) { Linea "  subcapa con filtros de reenvío: «$($i.SelectSingleNode('displayData/name').InnerText)» $k, peso $($i.SelectSingleNode('weight').InnerText)" }
-              }
-            } catch { Linea "  sin el estado de WFP: $_" }
-          }
+          function SinReenvio { $r = Reenvio; $r.de -ne '' -and $r.v4 -eq 0 -and $r.v6 -eq 0 }
           try {
             Bien ((Fuera) -eq 'conecta') 'antes, la red sale'
             # 1. the VPN on in strict mode, with a server that never answers: the service's start puts the block
@@ -252,8 +265,7 @@ jobs:
             Linea "estado: $(Estado | ConvertTo-Json -Compress)"
             Bien ((Estado).arranque -gt 0) 'con sus filtros de arranque'
             $r = Reenvio -Detalle
-            Linea "capas de reenvío en la lista de Windows (netsh wfp show filters verbose=on): $($r | ConvertTo-Json -Compress)"
-            Subcapas
+            Linea "capas de reenvío en la lista de Windows: $($r | ConvertTo-Json -Compress)"
             Bien ($r.v4 -ge 1 -and $r.v6 -ge 1) 'el bloqueo de lo que Windows reenvía, en la lista de Windows, en sus dos capas de reenvío (IPv4 e IPv6)'
             Bien ((Estado).reenvio -eq 4) 'y Windows, filtro a filtro: 4 en las capas de reenvío (persistente y de arranque, en cada una)'
             Bien ((Fuera) -eq 'cortada') 'con el servidor sin contestar, nada sale por la tarjeta (WSAEACCES)'
