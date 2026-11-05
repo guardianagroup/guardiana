@@ -195,12 +195,14 @@ jobs:
           function Arranca { & $g service start | Out-Null; Espera 60 { (Get-Service guardiana).Status -eq 'Running' } }
           function Bloqueado { $e = Estado; $e.persistentes -gt 0 }
           function Limpio { $e = Estado; $e.persistentes -eq 0 -and $e.arranque -eq 0 -and -not $e.objetos }
-          # GUARDIANA's filters in the forwarding layers (FWPM_LAYER_IPFORWARD_V4 and _V6), as Windows itself lists them:
-          # how many in each layer, how many persistent and boot-time; and how many of others there, for the record
-          function Reenvio {
+          # GUARDIANA's filters in the forwarding layers (FWPM_LAYER_IPFORWARD_V4 and _V6) in Windows' own list of filters:
+          # how many in each layer, how many persistent and boot-time, and how many of others there. verbose=on: without
+          # it netsh leaves out what it deems unlikely to affect connectivity, and of strict mode's twin blocks (the
+          # persistent one and the boot-time one, alike) it showed one (first run, 5 Nov 2026). -Detalle names the others.
+          function Reenvio([switch]$Detalle) {
             $f = Join-Path $env:RUNNER_TEMP 'filtros-wfp.xml'
             Remove-Item $f -ErrorAction SilentlyContinue
-            netsh wfp show filters file="$f" | Out-Null
+            netsh wfp show filters file="$f" verbose=on | Out-Null
             $n = [ordered]@{ v4 = 0; v6 = 0; persistentes = 0; arranque = 0; otros = 0; lista = $true }
             if (-not (Test-Path $f)) { $n.lista = $false; return [pscustomobject]$n }
             $x = New-Object System.Xml.XmlDocument
@@ -209,7 +211,12 @@ jobs:
             foreach ($i in $x.SelectNodes('//item[layerKey]')) {
               $capa = $capas["$($i.SelectSingleNode('layerKey').InnerText)".Trim()]
               if (-not $capa) { continue }
-              if (-not "$($i.SelectSingleNode('displayData/name').InnerText)".StartsWith('GUARDIANA VPN')) { $n.otros++; continue }
+              $nombre = "$($i.SelectSingleNode('displayData/name').InnerText)"
+              if (-not $nombre.StartsWith('GUARDIANA VPN')) {
+                $n.otros++
+                if ($Detalle) { Linea "  otro filtro en la capa de reenvío ${capa}: «$nombre», $($i.SelectSingleNode('action/type').InnerText), subcapa $($i.SelectSingleNode('subLayerKey').InnerText)" }
+                continue
+              }
               $n[$capa]++
               $marcas = "$($i.SelectSingleNode('flags').InnerText)"
               if ($marcas -match 'PERSISTENT') { $n.persistentes++ }
@@ -218,6 +225,24 @@ jobs:
             [pscustomobject]$n
           }
           function SinReenvio { $r = Reenvio; $r.lista -and $r.v4 -eq 0 -and $r.v6 -eq 0 }
+          # For the record: the weight of each sublayer with filters in the forwarding layers (ours is 0xFFFF; another one
+          # of the same weight or more, such as WinNAT's, would be weighed before or alongside it). Never a failure.
+          function Subcapas {
+            try {
+              $s = Join-Path $env:RUNNER_TEMP 'estado-wfp.xml'
+              netsh wfp show state file="$s" | Out-Null
+              $x = New-Object System.Xml.XmlDocument
+              $x.Load($s)
+              $usadas = @{}
+              foreach ($i in $x.SelectNodes('//item[layerKey]')) {
+                if ("$($i.SelectSingleNode('layerKey').InnerText)" -match 'IPFORWARD_V[46]$|a82acc24|7b964818') { $usadas["$($i.SelectSingleNode('subLayerKey').InnerText)".Trim().ToLower()] = $true }
+              }
+              foreach ($i in $x.SelectNodes('//item[subLayerKey and weight and not(layerKey)]')) {
+                $k = "$($i.SelectSingleNode('subLayerKey').InnerText)".Trim().ToLower()
+                if ($usadas.ContainsKey($k)) { Linea "  subcapa con filtros de reenvío: «$($i.SelectSingleNode('displayData/name').InnerText)» $k, peso $($i.SelectSingleNode('weight').InnerText)" }
+              }
+            } catch { Linea "  sin el estado de WFP: $_" }
+          }
           try {
             Bien ((Fuera) -eq 'conecta') 'antes, la red sale'
             # 1. the VPN on in strict mode, with a server that never answers: the service's start puts the block
@@ -226,10 +251,11 @@ jobs:
             Bien (Espera 60 { Bloqueado }) 'al arrancar, el servicio pone el bloqueo del modo estricto'
             Linea "estado: $(Estado | ConvertTo-Json -Compress)"
             Bien ((Estado).arranque -gt 0) 'con sus filtros de arranque'
-            $r = Reenvio
-            Linea "capas de reenvío de Windows (netsh wfp show filters): $($r | ConvertTo-Json -Compress)"
-            Bien ($r.v4 -ge 2 -and $r.v6 -ge 2) 'el bloqueo de lo que Windows reenvía, en sus dos capas de reenvío (IPv4 e IPv6)'
-            Bien ($r.persistentes -ge 2 -and $r.arranque -ge 2) 'el bloqueo de lo reenviado, persistente y de arranque'
+            $r = Reenvio -Detalle
+            Linea "capas de reenvío en la lista de Windows (netsh wfp show filters verbose=on): $($r | ConvertTo-Json -Compress)"
+            Subcapas
+            Bien ($r.v4 -ge 1 -and $r.v6 -ge 1) 'el bloqueo de lo que Windows reenvía, en la lista de Windows, en sus dos capas de reenvío (IPv4 e IPv6)'
+            Bien ((Estado).reenvio -eq 4) 'y Windows, filtro a filtro: 4 en las capas de reenvío (persistente y de arranque, en cada una)'
             Bien ((Fuera) -eq 'cortada') 'con el servidor sin contestar, nada sale por la tarjeta (WSAEACCES)'
             Bien (Espera 90 { try { (Panel 'GET' '/api/vpn').fase -eq 'reconectando' } catch { $false } }) 'el panel dice «reconectando»'
             $v = Panel 'GET' '/api/vpn'
@@ -242,14 +268,14 @@ jobs:
             Bien (Bloqueado) 'el servicio muerto: el bloqueo sigue'
             Bien ((Fuera) -eq 'cortada') 'el servicio muerto: nada sale'
             $r = Reenvio
-            Bien ($r.v4 -ge 1 -and $r.v6 -ge 1) "el servicio muerto: el bloqueo de lo reenviado sigue ($($r | ConvertTo-Json -Compress))"
+            Bien ($r.v4 -ge 1 -and $r.v6 -ge 1 -and (Estado).reenvio -eq 4) "el servicio muerto: el bloqueo de lo reenviado sigue ($($r | ConvertTo-Json -Compress))"
             Bien (Espera 90 { (Get-Service guardiana).Status -eq 'Running' }) 'Windows vuelve a arrancar el servicio'
             # 3. stopped, as an update stops it: the block stays
             Bien (Para) 'parado'
             Bien (Bloqueado) 'parado (una actualización): el bloqueo sigue'
             Bien ((Fuera) -eq 'cortada') 'parado: nada sale'
             $r = Reenvio
-            Bien ($r.v4 -ge 1 -and $r.v6 -ge 1) "parado: el bloqueo de lo reenviado sigue ($($r | ConvertTo-Json -Compress))"
+            Bien ($r.v4 -ge 1 -and $r.v6 -ge 1 -and (Estado).reenvio -eq 4) "parado: el bloqueo de lo reenviado sigue ($($r | ConvertTo-Json -Compress))"
             # 4. «Desconectar»: everything goes, the normal connection is back
             Bien (Arranca) 'arrancado otra vez'
             Bien (Espera 60 { try { $null -ne (Panel 'GET' '/api/vpn').fase } catch { $false } }) 'el panel contesta'

@@ -220,9 +220,9 @@ VPN debe estar encendida, nada sale del equipo fuera del túnel, también cuando
   persistentes; y los bloqueos, con lo que mantiene viva la red de debajo, otra vez como **filtros de arranque**
   (`FWPM_FILTER_FLAG_BOOTTIME`: desde que arranca el equipo hasta que el servicio de filtrado carga los persistentes;
   Microsoft no deja que un filtro sea las dos cosas). Windows los acepta en la subcapa propia (prueba real en `vpn.yml`,
-  3 nov 2026: 24 persistentes y 15 de arranque con solo los permisos; 36 y 27 con el bloqueo entero); si no los aceptara
-  allí, irían a su subcapa universal. Cada conjunto se cambia en una transacción, que quita el de antes y pone el nuevo:
-  nunca hay un momento sin bloqueo.
+  5 nov 2026: 26 persistentes y 17 de arranque con los permisos y el bloqueo de lo reenviado; 38 y 29 con el bloqueo
+  entero, dos de cada conjunto en las capas de reenvío); si no los aceptara allí, irían a su subcapa universal. Cada
+  conjunto se cambia en una transacción, que quita el de antes y pone el nuevo: nunca hay un momento sin bloqueo.
 - **Lo que dura lo que el túnel**: el permiso de la interfaz del túnel (con lo que se reenvía hacia el túnel y desde él)
   va a la misma subcapa desde una sesión dinámica del servicio (`PermisoTunel`), así que se va con el adaptador, que se
   va con el proceso: sin túnel, nada reenviado sale. Con el túnel abierto, el modo
