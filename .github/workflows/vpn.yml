@@ -483,3 +483,13 @@ jobs:
           netsh wfp show filters "file=$filtros" | Out-Null
           if (Test-Path $filtros) { "filtros con nombre de GUARDIANA en Windows: $(([regex]::Matches((Get-Content -Raw $filtros), '<name>GUARDIANA[^<]*</name>')).Count)" }
           try { "dirección pública: " + (Invoke-RestMethod -Uri 'https://api.ipify.org' -TimeoutSec 15) } catch { "sin dirección pública: $_" }
+      # What netsh showed at each moment (show filters and show state), and the watchdog's log, to look at afterwards.
+      - name: lo que vio netsh, para mirarlo después (siempre)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: estricto-de-verdad
+          path: ${{ runner.temp }}/estricto-de-verdad/
+          retention-days: 7
+          if-no-files-found: ignore

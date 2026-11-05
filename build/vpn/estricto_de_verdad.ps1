@@ -298,10 +298,24 @@ function Resuelve([string]$nombre) {
     return ''
 }
 
+# Los sitios (los cuatro últimos dígitos de la clave, en hexadecimal) de las claves del modo estricto con el principio
+# `$prefijo` que aparecen en `$texto`, sin repetir y en orden. Siempre una lista, también vacía (la coma: si no,
+# PowerShell no devuelve nada y `@($null).Count` es 1).
+function Sitios([string]$texto, [string]$prefijo) {
+    return , @([regex]::Matches($texto, "(?i)$prefijo([0-9a-f]{4})") | ForEach-Object { [Convert]::ToInt32($_.Groups[1].Value, 16) } | Sort-Object -Unique)
+}
+
+# Los sitios de 0 a `$n` - 1 que no están en `$hay`, como texto («» si no falta ninguno).
+function Faltan($hay, [int]$n) {
+    if ($n -le 0) { return '' }
+    return ((0..($n - 1) | Where-Object { @($hay) -notcontains $_ }) -join ',')
+}
+
 # Lo que el Filtering Platform de Windows tiene de GUARDIANA, leído por fuera del programa: `netsh wfp show filters`
 # (cada filtro, con sus banderas) y `netsh wfp show state` (también los proveedores y las subcapas). De la VPN es todo
-# filtro con las claves o el proveedor o la subcapa del modo estricto, o con un nombre «GUARDIANA VPN…».
-function Wfp([string]$cuando) {
+# filtro con las claves o el proveedor o la subcapa del modo estricto, o con un nombre «GUARDIANA VPN…». Con -Detalle,
+# también `show filters verbose=on`, para comparar.
+function Wfp([string]$cuando, [switch]$Detalle) {
     $script:nWfp++
     $f = Join-Path $Trabajo ('filtros-{0}.xml' -f $script:nWfp)
     $s = Join-Path $Trabajo ('estado-{0}.xml' -f $script:nWfp)
@@ -311,11 +325,13 @@ function Wfp([string]$cuando) {
     $r = [pscustomobject]@{
         Leido = $false; Vpn = 0; Persistentes = 0; Arranque = 0; Dinamicos = 0; OtrosFijos = 0
         Proveedor = $false; Subcapa = $false; EstadoLeido = $false; Nombres = ''; Fallo = ''
+        SitiosP = @(); SitiosA = @(); EstadoP = @(); EstadoA = @(); VerboseP = $null; VerboseA = $null
     }
     try {
         $x = [System.Xml.XmlDocument]::new()
         $x.Load($f)
-        $nombres = [ordered]@{}
+        $porNombre = [ordered]@{}
+        $claves = [System.Collections.Generic.List[string]]::new()
         # por el nombre local de cada elemento: igual si el archivo trae un espacio de nombres
         foreach ($i in $x.SelectNodes("//*[local-name()='item'][*[local-name()='filterKey']]")) {
             $clave = "$($i.SelectSingleNode("*[local-name()='filterKey']").InnerText)"
@@ -330,13 +346,19 @@ function Wfp([string]$cuando) {
             $arranque = $banderas -like '*FWPM_FILTER_FLAG_BOOTTIME*'
             if ($vpn) {
                 $r.Vpn++
-                if ($persistente) { $r.Persistentes++ } elseif ($arranque) { $r.Arranque++ } else { $r.Dinamicos++ }
-                $nombres[$nombre] = 1 + [int]$nombres[$nombre]
+                $tipo = if ($persistente) { 'P' } elseif ($arranque) { 'A' } else { 'D' }
+                if ($tipo -eq 'P') { $r.Persistentes++ } elseif ($tipo -eq 'A') { $r.Arranque++ } else { $r.Dinamicos++ }
+                if (-not $porNombre.Contains($nombre)) { $porNombre[$nombre] = @{ P = 0; A = 0; D = 0 } }
+                $porNombre[$nombre][$tipo]++
+                $claves.Add($clave)
             } elseif ($persistente -or $arranque) {
                 $r.OtrosFijos++
             }
         }
-        $r.Nombres = (@($nombres.Keys | ForEach-Object { '{0} ×{1}' -f $_, $nombres[$_] }) -join '; ')
+        $todas = $claves -join ' '
+        $r.SitiosP = Sitios $todas $PERSISTENTES
+        $r.SitiosA = Sitios $todas $ARRANQUE
+        $r.Nombres = (@($porNombre.Keys | ForEach-Object { $n = $porNombre[$_]; '{0} [{1} P, {2} A, {3} D]' -f $_, $n.P, $n.A, $n.D }) -join '; ')
         $r.Leido = $true
     } catch {
         $r.Fallo = "show filters: $($_.Exception.Message)"
@@ -345,23 +367,74 @@ function Wfp([string]$cuando) {
         $texto = [System.IO.File]::ReadAllText($s)
         $r.Proveedor = $texto -match $PROVEEDOR
         $r.Subcapa = $texto -match $SUBCAPA
+        $r.EstadoP = Sitios $texto $PERSISTENTES
+        $r.EstadoA = Sitios $texto $ARRANQUE
         $r.EstadoLeido = $texto.Length -gt 0
     } catch {
         $r.Fallo = ("$($r.Fallo) show state: $($_.Exception.Message)").Trim()
+    }
+    if ($Detalle) {
+        $fv = Join-Path $Trabajo ('filtros-{0}-verbose.xml' -f $script:nWfp)
+        $null = & netsh wfp show filters verbose=on "file=$fv" 2>&1
+        if (Test-Path -LiteralPath $fv) {
+            $tv = [System.IO.File]::ReadAllText($fv)
+            $r.VerboseP = Sitios $tv $PERSISTENTES
+            $r.VerboseA = Sitios $tv $ARRANQUE
+        }
     }
     $segundos = ((Get-Date) - $t0).TotalSeconds
     $prov = if ($r.Proveedor) { 'sí' } else { 'no' }
     $sub = if ($r.Subcapa) { 'sí' } else { 'no' }
     $fallo = if ($r.Fallo) { "; no se pudo leer: $($r.Fallo)" } else { '' }
     Linea ('     netsh wfp, {0} ({1:N1} s): {2} filtros de la VPN ({3} persistentes, {4} de arranque, {5} dinámicos); el proveedor del modo estricto: {6}; su subcapa: {7}; otros filtros fijos de GUARDIANA: {8}{9}' -f $cuando, $segundos, $r.Vpn, $r.Persistentes, $r.Arranque, $r.Dinamicos, $prov, $sub, $r.OtrosFijos, $fallo)
-    if ($r.Nombres) { Linea "     filtros: $($r.Nombres)" }
+    if ($r.Nombres) { Linea "     por nombre: $($r.Nombres)" }
+    Linea ('     claves del modo estricto: en show filters {0} persistentes y {1} de arranque; en show state {2} y {3}{4}' -f @($r.SitiosP).Count, @($r.SitiosA).Count, @($r.EstadoP).Count, @($r.EstadoA).Count, $(if ($null -ne $r.VerboseP) { "; en show filters verbose=on $(@($r.VerboseP).Count) y $(@($r.VerboseA).Count)" } elseif ($Detalle) { '; show filters verbose=on no dejó archivo' } else { '' }))
+    return $r
+}
+
+# Lo que Windows guarda para el próximo arranque del equipo (la política persistente y la de arranque del servicio de
+# filtrado, en el registro: HKLM\SYSTEM\CurrentControlSet\Services\BFE\Parameters\Policy), buscado por las claves del
+# modo estricto en los nombres de sus claves y de sus valores.
+function PoliticaGuardada {
+    $raiz = 'HKLM:\SYSTEM\CurrentControlSet\Services\BFE\Parameters\Policy'
+    $r = [pscustomobject]@{ Leido = $false; P = @(); A = @(); Proveedor = $false; Subcapa = $false; Donde = ''; Fallo = '' }
+    try {
+        $todas = @(Get-Item -LiteralPath $raiz -ErrorAction Stop) + @(Get-ChildItem -LiteralPath $raiz -Recurse -ErrorAction SilentlyContinue)
+        $nombres = [System.Collections.Generic.List[string]]::new()
+        $donde = [ordered]@{}
+        foreach ($k in $todas) {
+            foreach ($n in @($k.PSChildName) + @($k.GetValueNames())) {
+                $t = "$n"
+                if ($t -match "(?i)$PERSISTENTES|$ARRANQUE|$PROVEEDOR|$SUBCAPA") {
+                    $nombres.Add($t)
+                    $donde[($k.Name -replace '^HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\BFE\\Parameters\\Policy\\?', '')] = 1
+                }
+            }
+        }
+        $junto = $nombres -join ' '
+        $r.P = Sitios $junto $PERSISTENTES
+        $r.A = Sitios $junto $ARRANQUE
+        $r.Proveedor = $junto -match $PROVEEDOR
+        $r.Subcapa = $junto -match $SUBCAPA
+        $r.Donde = (@($donde.Keys) -join '; ')
+        $r.Leido = $true
+    } catch {
+        $r.Fallo = $_.Exception.Message
+    }
+    if ($r.Leido) {
+        Linea ('     lo guardado para el próximo arranque (registro de BFE): {0} filtros persistentes y {1} de arranque del modo estricto, proveedor {2}, subcapa {3}{4}' -f @($r.P).Count, @($r.A).Count, $(if ($r.Proveedor) { 'sí' } else { 'no' }), $(if ($r.Subcapa) { 'sí' } else { 'no' }), $(if ($r.Donde) { " (en: $($r.Donde))" } else { '' }))
+    } else {
+        Linea "     lo guardado para el próximo arranque (registro de BFE): no se pudo leer ($($r.Fallo))"
+    }
     return $r
 }
 
 # ---- La VPN, por el panel.
 
-# Espera a que el panel diga «conectada» con el servidor de `$salida`, como mucho `$plazo` segundos. Con
-# -VigilaBloqueo, mira también en cada vuelta que el bloqueo siga en Windows.
+# Espera a que el panel diga «conectada», como mucho `$plazo` segundos. Tras `POST /api/vpn/conecta` el panel dice
+# «conectando» antes de contestar, así que «conectada» es ya la conexión nueva; su servidor es el nombre del extremo que
+# dio el alta, y en qué salida está lo comprueba ConTunel. Con -VigilaBloqueo, mira también en cada vuelta que el
+# bloqueo siga en Windows.
 function EsperaConectada($salida, [int]$plazo, [switch]$VigilaBloqueo) {
     $t0 = Get-Date
     $fases = [System.Collections.Generic.List[string]]::new()
@@ -374,10 +447,10 @@ function EsperaConectada($salida, [int]$plazo, [switch]$VigilaBloqueo) {
             $e = Estado
             if ($null -ne $e -and $e.persistentes -eq 0) { $sinBloqueo++ }
         }
-        if ($v -and $v.fase -eq 'conectada' -and $v.servidor -eq $salida.Nombre) { break }
+        if ($v -and $v.fase -eq 'conectada') { break }
         Start-Sleep -Milliseconds 400
     } while (((Get-Date) - $t0).TotalSeconds -lt $plazo)
-    $bien = ($null -ne $v) -and ($v.fase -eq 'conectada') -and ($v.servidor -eq $salida.Nombre)
+    $bien = ($null -ne $v) -and ($v.fase -eq 'conectada')
     return [pscustomobject]@{ Vista = $v; Segundos = [math]::Round(((Get-Date) - $t0).TotalSeconds, 1); Fases = ($fases -join ' → '); SinBloqueo = $sinBloqueo; Bien = $bien }
 }
 
@@ -389,7 +462,7 @@ function Conecta($salida, [int]$plazo = 60, [switch]$VigilaBloqueo) {
     Bien (($null -ne $r) -and ($r.ok -eq $true)) $pedido $dijo
     if ($null -eq $r -or $r.ok -ne $true) { return $null }
     $c = EsperaConectada $salida $plazo -VigilaBloqueo:$VigilaBloqueo
-    Bien $c.Bien ('conectada a {0} ({1}) en {2} s' -f $salida.Ciudad, $salida.Nombre, $c.Segundos) "fases: $($c.Fases); GET /api/vpn: $(Json $c.Vista)"
+    Bien $c.Bien ('conectada, pedida {0} ({1}), en {2} s; el panel dice el servidor {3}' -f $salida.Ciudad, $salida.Nombre, $c.Segundos, $c.Vista.servidor) "fases: $($c.Fases); GET /api/vpn: $(Json $c.Vista)"
     if ($VigilaBloqueo) {
         Bien ($c.SinBloqueo -eq 0) 'el bloqueo, en Windows durante todo el cambio' "vistazos sin bloqueo: $($c.SinBloqueo)"
     }
@@ -417,6 +490,8 @@ function ConTunel($salida, $v, [switch]$Propia) {
     Bien (($v.estricto -eq $true) -and ($v.bloqueado -eq $true)) 'el panel dice: modo estricto y bloqueo puestos'
     Bien (("$($v.salida.id)" -eq $salida.Id) -and ("$($v.salida.ip)" -eq $salida.Ip)) ('el panel dice la salida: {0}, {1}, {2}' -f $v.salida.id, $v.salida.ciudad, $v.salida.ip)
     Bien (($v.dns_tunel -eq $true) -and ($v.postcuantica -eq $true)) 'el panel dice: los nombres por el túnel y el alta postcuántica'
+    $saludo = if ($null -ne $v.saludo) { ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() - [long]$v.saludo) / 1000 } else { $null }
+    Bien ($null -ne $saludo) ('el túnel, arriba: el servidor saludó {0}' -f $(if ($null -ne $saludo) { 'hace {0:N1} s' -f $saludo } else { 'nunca' })) ('{0} bytes enviados y {1} recibidos' -f $v.subidos, $v.bajados)
     $e = Estado
     Bien (($null -ne $e) -and $e.estricto -and $e.encendida -and ($e.servidor -eq $salida.Nombre) -and ($e.persistentes -gt 0) -and ($e.arranque -gt 0) -and $e.objetos) ('el bloqueo en Windows: {0} filtros persistentes y {1} de arranque' -f $e.persistentes, $e.arranque) "guardiana vpn estado --json: $(Json $e)"
     $ad = Adaptador
@@ -458,6 +533,8 @@ function ConTunel($salida, $v, [switch]$Propia) {
             Linea '     el panel no da la dirección (ninguna otra salida contesta a su eco): no se comprueba'
         }
     }
+    $despues = Panel 'GET' '/api/vpn'
+    if ($despues) { Linea ('     por el túnel, desde que se abrió: {0} bytes enviados y {1} recibidos' -f $despues.subidos, $despues.bajados) }
 }
 
 # `guardiana vpn apaga --menu`, como lo lanza la entrada «Apagar la VPN de GUARDIANA» del menú Inicio, con la Intro que
@@ -484,11 +561,39 @@ function Apaga {
     return [pscustomobject]@{ Termino = $termino; Codigo = $codigo; Salida = (Recorta ($o.Result + ' ' + $er.Result) 300) }
 }
 
-# Lo que netsh ve tras apagar: nada de la VPN de GUARDIANA, nada fijo de GUARDIANA, ni el proveedor ni la subcapa.
+# Lo que Windows tiene tras apagar, leído por fuera del programa: nada de la VPN de GUARDIANA en el Filtering Platform
+# (ni filtros, ni el proveedor ni la subcapa del modo estricto) y nada guardado para el próximo arranque del equipo.
 function NadaEnWindows([string]$cuando) {
     $w = Wfp $cuando
     Bien ($w.Leido -and ($w.Vpn -eq 0) -and ($w.OtrosFijos -eq 0)) "netsh wfp show filters, $($cuando): ningún filtro de la VPN de GUARDIANA (ni persistente, ni de arranque, ni dinámico) ni otro fijo de GUARDIANA"
-    Bien ($w.EstadoLeido -and -not $w.Proveedor -and -not $w.Subcapa) "netsh wfp show state, $($cuando): ni el proveedor ni la subcapa del modo estricto"
+    Bien ($w.EstadoLeido -and -not $w.Proveedor -and -not $w.Subcapa -and (@($w.EstadoP).Count -eq 0) -and (@($w.EstadoA).Count -eq 0)) "netsh wfp show state, $($cuando): ni el proveedor, ni la subcapa, ni ninguna clave de filtro del modo estricto"
+    $pg = PoliticaGuardada
+    if ($pg.Leido) {
+        Bien ((@($pg.P).Count -eq 0) -and (@($pg.A).Count -eq 0) -and -not $pg.Proveedor -and -not $pg.Subcapa) "nada del modo estricto guardado para el próximo arranque del equipo, $($cuando)"
+    }
+}
+
+# Con el bloqueo puesto: lo que `guardiana vpn estado` dice que hay (`$e`), visto por fuera del programa. Así las
+# comprobaciones de «no queda nada» saben ver lo que buscan.
+function ElBloqueoPorFuera($e) {
+    $w = Wfp 'con el bloqueo puesto' -Detalle
+    $np = [int]$e.persistentes
+    $na = [int]$e.arranque
+    $faltanP = Faltan $w.SitiosP $np
+    $faltanA = Faltan $w.SitiosA $na
+    Bien ($w.Leido -and ($np -gt 0) -and -not $faltanP -and -not $faltanA -and $w.Proveedor -and $w.Subcapa) ('netsh wfp show filters ve el bloqueo entero que dice el programa ({0} persistentes y {1} de arranque), con su proveedor y su subcapa' -f $np, $na) $(if ($faltanP -or $faltanA) { "no salen en show filters los sitios persistentes [$faltanP] ni los de arranque [$faltanA] (el sitio es el orden en cada conjunto de crates/tunel/src/corte.rs, función estricto)" } else { '' })
+    $faltanEP = Faltan $w.EstadoP $np
+    $faltanEA = Faltan $w.EstadoA $na
+    Bien ($w.EstadoLeido -and -not $faltanEP -and -not $faltanEA) 'netsh wfp show state ve las mismas claves' $(if ($faltanEP -or $faltanEA) { "no salen en show state los sitios persistentes [$faltanEP] ni los de arranque [$faltanEA]" } else { '' })
+    if ($null -ne $w.VerboseP) {
+        Linea ('     show filters verbose=on: faltan los sitios persistentes [{0}] y los de arranque [{1}]' -f (Faltan $w.VerboseP $np), (Faltan $w.VerboseA $na))
+    }
+    $pg = PoliticaGuardada
+    if ($pg.Leido) {
+        $faltanGP = Faltan $pg.P $np
+        $faltanGA = Faltan $pg.A $na
+        Bien (-not $faltanGP -and -not $faltanGA -and $pg.Proveedor -and $pg.Subcapa) ('lo guardado para el próximo arranque del equipo: el bloqueo entero ({0} persistentes y {1} de arranque), su proveedor y su subcapa' -f @($pg.P).Count, @($pg.A).Count) $(if ($faltanGP -or $faltanGA) { "faltan los sitios persistentes [$faltanGP] y los de arranque [$faltanGA]" } else { '' })
+    }
 }
 
 # ---- La prueba.
@@ -552,8 +657,7 @@ try {
         $conectada = $null -ne $v
         if ($conectada) {
             ConTunel $hel $v -Propia
-            $w = Wfp 'con el bloqueo puesto'
-            Bien ($w.Leido -and ($w.Persistentes -gt 0) -and $w.Proveedor -and $w.Subcapa) ('netsh wfp ve el bloqueo: {0} filtros persistentes, {1} de arranque, el proveedor y la subcapa del modo estricto' -f $w.Persistentes, $w.Arranque)
+            ElBloqueoPorFuera (Estado)
         }
 
         # 2. Las otras salidas, solo si su alta contestó al principio, y vuelta a Helsinki
@@ -608,15 +712,28 @@ try {
                 $t = Tcp '1.1.1.1' 443 $script:tarjeta.Ip 2000
                 Bien ($t -eq 'cortada') "ni por la tarjeta ($($script:tarjeta.Ip)): TCP a 1.1.1.1:443 $t"
             }
+            # el permiso hacia el alta del servidor es solo del programa del servicio: otro programa no llega
+            $t = Tcp $hel.Ip 443 '' 2000
+            Bien ($t -eq 'cortada') "ni al HTTPS del servidor desde otro programa (TCP a $($hel.Ip):443): $t"
             $h = Https 'https://1.1.1.1/cdn-cgi/trace' 5
             Bien ($h.Codigo -eq 0) 'ni HTTPS a internet' $(if ($h.Codigo) { "contestó HTTP $($h.Codigo): $(Recorta $h.Cuerpo 80)" } else { $h.Fallo })
+            # unos segundos muerto (como tarda Windows en arrancarlo tras una caída), mirando cada poco que nada salga
+            $vueltas = 0
+            $fugas = [System.Collections.Generic.List[string]]::new()
+            while (((Get-Date) - $muere).TotalSeconds -lt 12) {
+                $vueltas++
+                $t = Tcp '1.1.1.1' 443 '' 1500
+                if ($t -ne 'cortada') { $fugas.Add(('{0:N1} s: {1}' -f ((Get-Date) - $muere).TotalSeconds, $t)) }
+                Start-Sleep -Milliseconds 700
+            }
+            Bien ($fugas.Count -eq 0) ('durante {0:N0} s con el servicio muerto, nada sale: {1} intentos, todos cortados por el filtro' -f ((Get-Date) - $muere).TotalSeconds, $vueltas) $(if ($fugas.Count) { "no cortados: $($fugas -join '; ')" } else { '' })
             $sigueMuerto = $null -eq (Get-Process -Id $pidS -ErrorAction SilentlyContinue) -and (Servicio) -ne 'Running'
             Bien $sigueMuerto ('todo eso, con el servicio aún muerto ({0:N1} s desde taskkill; el servicio: {1})' -f ((Get-Date) - $muere).TotalSeconds, (Servicio))
             # Arrancado otra vez: vuelve solo
             $arranca = (& $g service start 2>&1) -join ' '
             Bien (Espera 30 { (Servicio) -eq 'Running' }) ('el servicio, arrancado otra vez ({0:N1} s muerto)' -f ((Get-Date) - $muere).TotalSeconds) (Recorta $arranca)
             $c = EsperaConectada $hel 60 -VigilaBloqueo
-            Bien $c.Bien "vuelve a conectar solo a Helsinki, en $($c.Segundos) s desde que arrancó" "fases: $($c.Fases); GET /api/vpn: $(Json $c.Vista)"
+            Bien ($c.Bien -and ("$($c.Vista.salida.id)" -eq $hel.Id)) "vuelve a conectar solo a Helsinki, en $($c.Segundos) s desde que arrancó" "fases: $($c.Fases); GET /api/vpn: $(Json $c.Vista)"
             Bien ($c.SinBloqueo -eq 0) 'el bloqueo, en Windows todo el rato' "vistazos sin bloqueo: $($c.SinBloqueo)"
             $eco = LaDireccion $hel
             Linea ('     sin red: {0:N1} s, de taskkill a ver otra vez la dirección del servidor' -f ((Get-Date) - $muere).TotalSeconds)
