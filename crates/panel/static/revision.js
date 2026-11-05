@@ -12,7 +12,7 @@
   const TOTAL_SECCIONES = 12; // 1.0.51: «endurecimiento» (defensas avanzadas, arranque oculto y red)
 
   async function iniciar(ctx) {
-    const { api, t, esc, LOC } = ctx;
+    const { api, t, tn, esc, LOC, LANG } = ctx;
     const $ = (id) => document.getElementById(id);
     let ultimo = null;
     const fecha = (ms) => (ms ? new Date(ms).toLocaleString(LOC, { dateStyle: 'medium', timeStyle: 'short' }) : '');
@@ -20,8 +20,16 @@
     const frase = (c) => rellena(c.frase, c.datos);
     const conclusion = (r) => {
       const s = r.resumen || {};
-      const clave = s.alerta ? 'rv_conclusion_alerta' : s.aviso ? 'rv_conclusion_aviso' : 'rv_conclusion_ok';
-      return rellena(clave, { alerta: s.alerta || 0, aviso: s.aviso || 0, ok: s.ok || 0, info: s.info || 0 });
+      const alerta = s.alerta || 0, aviso = s.aviso || 0;
+      // 1.0.56: «1 problema», «1 cosa» and no «0 cosas» in the languages whose file has the pieces (es, en, pt); the
+      // others keep their one sentence until they are translated (a missing key would read in English, not as a key)
+      if (['es', 'en', 'pt'].includes(LANG)) {
+        if (alerta) return rellena(aviso ? 'rv_conclusion_alerta_y' : 'rv_conclusion_alerta_sola', { problemas: tn('rv_n_problemas', alerta), cosas: tn('rv_n_cosas', aviso) });
+        if (aviso) return rellena('rv_conclusion_aviso_n', { cosas: tn('rv_n_cosas', aviso) });
+        return t('rv_conclusion_ok');
+      }
+      const clave = alerta ? 'rv_conclusion_alerta' : aviso ? 'rv_conclusion_aviso' : 'rv_conclusion_ok';
+      return rellena(clave, { alerta, aviso, ok: s.ok || 0, info: s.info || 0 });
     };
     const marca = (m) => `<span class="rv-marca${FUERTES.has(m) ? ' fuerte' : ''}">${esc(t('rv_marca_' + m))}</span>`;
     let empezo = 0, reloj = null;
