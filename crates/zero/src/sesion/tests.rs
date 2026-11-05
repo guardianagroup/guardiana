@@ -3530,7 +3530,11 @@ fn the_vpn_orders_carry_only_their_own_body() {
         ("/api/vpn/conecta", json!("{}"), None),
         ("/api/vpn/conecta", json!(""), None),
         ("/api/vpn/estricto", Value::Null, None),
+        ("/api/vpn/estricto", json!(" { } "), None),
         ("/api/vpn/desconecta", Value::Null, None),
+        // review of the 1.0.56 VPN: «desconectar» with {} is no body too (it was refused with 400)
+        ("/api/vpn/desconecta", json!("{}"), None),
+        ("/api/vpn/desconecta", json!("  "), None),
     ] {
         let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, cuerpo.clone()));
         let v = al_panel(&o).unwrap_or_default();
@@ -3554,9 +3558,10 @@ fn the_vpn_orders_carry_only_their_own_body() {
         ),
         ("/api/vpn/conecta", json!({ "salida": "nbg" })),
         ("/api/vpn/estricto", json!("{\"estricto\":\"si\"}")),
-        // no other order carries a body
+        // no other order carries a body, nor an empty object outside the VPN's orders
         ("/api/vpn/desconecta", json!("{\"salida\":\"nbg\"}")),
         ("/api/revision/ahora", json!("{\"x\":1}")),
+        ("/api/revision/ahora", json!("{}")),
     ] {
         let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, cuerpo.clone()));
         assert!(al_panel(&o).is_none(), "{ruta} {cuerpo}");

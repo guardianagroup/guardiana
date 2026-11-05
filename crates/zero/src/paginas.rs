@@ -324,7 +324,8 @@ const GUION: &str = r#"(() => {
     LIMPIA['/api/vigilancia/resumen'] = LIMPIA['/api/vigilancia'];
     // 5 Nov 2026, the VPN's screen: field by field what it shows, and nothing else. The exit's address and the one a
     // website sees are the point of these readings (the web's own server already sees the latter when the page loads),
-    // so they pass whole; the tunnel's inner address does not.
+    // so they pass whole; the tunnel's inner address (`direccion`) never does. Review of the 1.0.56 VPN: whether
+    // «Desconectar» is needed, the boot-time filters' notice, and what of «what a website sees» was really measured.
     const ipVpn = (x) => (typeof x === 'string' && (/^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$/.test(x) || /^[0-9a-f:]{2,39}$/i.test(x)) ? x : null);
     const tx = (x, k) => (typeof x === 'string' ? x.slice(0, k) : null);
     const nu = (x) => (typeof x === 'number' && isFinite(x) ? x : null);
@@ -337,12 +338,15 @@ const GUION: &str = r#"(() => {
         desde_ms: nu(j.desde_ms), enviados: nu(j.enviados), recibidos: nu(j.recibidos), ultimo_saludo_ms: nu(j.ultimo_saludo_ms),
         error: typeof j.error === 'string' ? limpiaTexto(j.error) : '', estricto: si(j.estricto), bloqueado: si(j.bloqueado),
         aviso: tx(j.aviso, 300), estricto_titulo: tx(j.estricto_titulo, 80), estricto_linea: tx(j.estricto_linea, 400),
+        desconectar: si(j.desconectar), aviso_arranque: tx(j.aviso_arranque, 300),
       }),
       '/api/vpn/salidas': (j) => ({ salidas: Array.isArray(j.salidas) ? j.salidas.slice(0, 60).map(salidaVpn) : [], mas_rapida: tx(j.mas_rapida, 24), medido: nu(j.medido) }),
       '/api/vpn/comprueba': (j) => {
         const z = j.zona && typeof j.zona === 'object' ? j.zona : {};
+        const c = j.comprobado && typeof j.comprobado === 'object' ? j.comprobado : {};
         return {
           ip_vista: ipVpn(j.ip_vista), pais_ip: tx(j.pais_ip, 2), dns: tx(j.dns, 20), ipv6: tx(j.ipv6, 20),
+          comprobado: { ip: si(c.ip), dns: si(c.dns), ipv6: si(c.ipv6) },
           zona: { equipo: tx(z.equipo, 60), salida: tx(z.salida, 40), desfase_equipo: nu(z.desfase_equipo), desfase_salida: nu(z.desfase_salida), coincide: si(z.coincide) },
           idioma: tx(j.idioma, 40), ubicacion_windows: tx(j.ubicacion_windows, 20),
         };
@@ -1644,6 +1648,101 @@ mod tests {
         assert!(marcos < g.find("'zg_subasta'").unwrap_or(0));
         assert!(g.contains("if (m.adstxt === true) { leeAdsTxt(); return; }"));
         assert!(!g.contains("__zg"));
+    }
+
+    /// What the program's script runs on the panel's answers about the VPN, with a test of its own: the tunnel's inner
+    /// address and a stray field, everywhere they could hide, must not come out; what the web uses must.
+    const PRUEBA_VPN_JS: &str = r#"
+const casos = [
+  ['/api/vpn', { fase: 'conectada', direccion: '10.66.0.7', servidor: 'vpn.guardianagroup.com', desconectar: true,
+    aviso_arranque: 'aviso', error: 'el túnel 10.66.0.7 no contesta', otro: '10.66.0.7',
+    salida: { id: 'hel', ip: '62.238.17.121', direccion: '10.66.0.7', disponible: null } }],
+  ['/api/vpn/salidas', { salidas: [{ id: 'hel', ip: '62.238.17.121', direccion: '10.66.0.7' }], mas_rapida: 'hel',
+    direccion: '10.66.0.7' }],
+  ['/api/vpn/comprueba', { ip_vista: '62.238.17.121', direccion: '10.66.0.7',
+    comprobado: { ip: true, dns: false, ipv6: false, direccion: '10.66.0.7' },
+    zona: { salida: 'Europe/Helsinki', direccion: '10.66.0.7' } }],
+];
+const mal = (que) => { console.log('MAL ' + que); process.exit(1); };
+const vistos = {};
+for (const [ruta, j] of casos) {
+  const s = paraLaWeb(ruta, JSON.stringify(j));
+  if (!s) mal(ruta + ': nada');
+  if (s.includes('direccion') || s.includes('10.66.0.7') || s.includes('otro')) mal(ruta + ': ' + s);
+  vistos[ruta] = JSON.parse(s);
+}
+const v = vistos['/api/vpn'];
+if (v.desconectar !== true || v.aviso_arranque !== 'aviso' || v.salida.ip !== '62.238.17.121') mal('/api/vpn: ' + JSON.stringify(v));
+const c = vistos['/api/vpn/comprueba'];
+if (c.ip_vista !== '62.238.17.121' || c.comprobado.ip !== true || c.comprobado.dns !== false || c.comprobado.ipv6 !== false) mal('/api/vpn/comprueba: ' + JSON.stringify(c));
+console.log('bien');
+"#;
+
+    /// Review of the 1.0.56 VPN: what the program hands GUARDIANA's web of the VPN is built field by field, and the
+    /// tunnel's inner address (`direccion`) is never one of the fields, whatever the panel answers. On the script's text
+    /// always; and by running it with node where there is one (GitHub's runners have it).
+    #[test]
+    fn the_vpn_readings_never_hand_the_web_the_tunnel_address() {
+        let g = guion(Opciones {
+            programa: true,
+            ..Opciones::default()
+        });
+        let desde = g.find("const limpiaTexto = (s) =>").unwrap_or(usize::MAX);
+        let vpn = g.find("const VPN = {").unwrap_or(usize::MAX);
+        let tras = g.find("LIMPIA['/vigia'] =").unwrap_or(0);
+        let hasta = g.find("const RUTA_OK").unwrap_or(0);
+        assert!(
+            desde < vpn && vpn < tras && tras < hasta,
+            "the script's VPN readings moved: {desde} {vpn} {tras} {hasta}"
+        );
+        let filtro = &g[vpn..tras];
+        for ruta in ["'/api/vpn'", "'/api/vpn/salidas'", "'/api/vpn/comprueba'"] {
+            assert!(filtro.contains(ruta), "{ruta}");
+        }
+        // a new object, field by field: nothing of the panel's answer passes whole, and the tunnel's address is no field
+        for nunca in [
+            "direccion",
+            "...j",
+            "Object.assign",
+            "return j",
+            "limpiaTodo",
+        ] {
+            assert!(!filtro.contains(nunca), "{nunca}");
+        }
+        // and a VPN reading never falls through to the general cleaning, which keeps the fields it does not know
+        let para_la_web = &g[g.find("const paraLaWeb").unwrap_or(hasta)..hasta];
+        let por_vpn = para_la_web
+            .find("if (VPN[ruta]) { try { return JSON.stringify(VPN[ruta](j)); } catch (_) { return ''; } }")
+            .unwrap_or(usize::MAX);
+        let general = para_la_web.find("LIMPIA[ruta]").unwrap_or(0);
+        assert!(por_vpn < general, "{por_vpn} {general}");
+        // run, where node is
+        let programa = format!("{}\n{PRUEBA_VPN_JS}", &g[desde..hasta]);
+        let Ok(mut node) = std::process::Command::new("node")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+        else {
+            eprintln!("node is not here: the script's VPN readings were checked on its text only");
+            return;
+        };
+        if let Some(mut entrada) = node.stdin.take() {
+            use std::io::Write as _;
+            let _ = entrada.write_all(programa.as_bytes());
+        }
+        let salida = node.wait_with_output();
+        assert!(
+            salida.as_ref().is_ok_and(|s| s.status.success()
+                && String::from_utf8_lossy(&s.stdout)
+                    .trim_end()
+                    .ends_with("bien")),
+            "{:?}",
+            salida.map(|s| (
+                String::from_utf8_lossy(&s.stdout).into_owned(),
+                String::from_utf8_lossy(&s.stderr).into_owned()
+            ))
+        );
     }
 
     #[test]

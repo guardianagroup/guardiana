@@ -60,8 +60,8 @@ use tokio::sync::Notify;
 pub use antivirus::comprueba_los_cortes;
 pub use auth::{constant_time_eq, load_or_create_token, origin_es_este_panel, TOKEN_FILE};
 pub use vpn::{
-    cierra_la_vpn, estado_del_modo_estricto, quita_el_bloqueo, vpn_al_arrancar, BloqueoQuitado,
-    EstadoEstricto, NoSeQuito,
+    cierra_la_vpn, comprueba_la_vpn, estado_del_modo_estricto, quita_el_bloqueo, vpn_al_arrancar,
+    BloqueoQuitado, EstadoEstricto, NoSeQuito,
 };
 
 /// Default panel port (brief §0).
