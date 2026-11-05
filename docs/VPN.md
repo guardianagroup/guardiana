@@ -23,8 +23,8 @@ Una VPN que es a la vez el DNS de la casa, el antivirus y el cortafuegos del mis
 1. **Túnel y escudo en Windows.** WireGuard en Rust (GotaTun, de Mullvad, o boringtun) con el adaptador Wintun;
    el cortafuegos de Windows (WFP, `crates/apps/src/cortafuegos.rs`) como interruptor de corte: nada sale si no es por el
    túnel, salvo hacia el propio servidor; el DNS de la casa dentro del túnel; IPv6 y WebRTC cerrados fuera del túnel.
-   Servidores: los actuales (Núremberg, Helsinki y Miami) con WireGuard, y un alta anónima de la llave pública del equipo
-   (sin cuenta y sin guardar a quién pertenece).
+   Servidores: los actuales (Núremberg, Helsinki y Miami) con WireGuard, y un alta de la llave pública del equipo sin
+   cuenta y sin guardar a quién pertenece.
 2. **Postcuántico y doble salto**; el aviso en vivo de lo que sale fuera del túnel.
 3. **Anticensura** (AmneziaWG; el túnel dentro de los relés de llamadas que ya existen), defensa contra el análisis de
    tráfico (relleno y paquetes señuelo, bajo demanda) y servidores sin disco.
@@ -33,7 +33,7 @@ Una VPN que es a la vez el DNS de la casa, el antivirus y el cortafuegos del mis
 ## Lo que ya está (rama `antivirus-vpn`, 1 nov 2026)
 
 `crates/tunel`: las llaves de WireGuard del equipo, la llave precompartida postcuántica (ML-KEM-768 + HKDF-SHA256, nueva
-en cada alta) y el alta anónima con la comprobación de todo lo que dice el servidor (la dirección y el DNS del túnel
+en cada alta) y el alta, sin cuenta, con la comprobación de todo lo que dice el servidor (la dirección y el DNS del túnel
 tienen que ser privados y el servidor, un nombre de guardianagroup.com). Probado en Linux, Windows y macOS.
 
 ## El adaptador de Windows: WireGuardNT (licencias comprobadas el 1 nov 2026)
@@ -215,20 +215,36 @@ VPN debe estar encendida, nada sale del equipo fuera del túnel, también cuando
 - **Lo que la persona quiere, guardado**: `sistema/vpn.json` en la carpeta de datos (solo el sistema y los
   administradores escriben ahí): el modo estricto, si la VPN está encendida, su servidor y las direcciones del servidor
   (con el bloqueo puesto no se resuelve ningún nombre fuera del túnel, así que el alta nueva va a la dirección que ya se
-  sabe; su certificado se sigue comprobando con su nombre). Ni llaves ni a dónde se va. Sin el modo estricto no se guarda
-  la VPN encendida: acaba con el servicio, como siempre.
-- **Al arrancar, el servicio reconcilia** (`estricto::al_arrancar`, lo primero de `engine::run`): si la VPN debe seguir
-  encendida en el modo estricto, el bloqueo vuelve a ponerse en el acto (con el archivo del programa como esté, también
-  tras una actualización) y el túnel se levanta otra vez; si ya no se quiere, lo que quedó en Windows se quita. Así pasan
-  el fallo y el reinicio del servicio, la actualización (que para el servicio, lo cambia y lo arranca) y el reinicio del
-  equipo, hasta que el servicio levanta el túnel. Al parar, el servicio cierra el túnel y deja el bloqueo.
+  sabe; su certificado se sigue comprobando con su nombre). Mientras la VPN está encendida, también la última dirección
+  conocida de cada servidor de GUARDIANA (`conocidas`, como mucho 16, solo nombres de guardianagroup.com): los servidores
+  a los que fue y lo medido de las salidas con la VPN apagada, para poder cambiar de salida, o volver a la de antes, con
+  el túnel caído (revisión de la 1.0.56). Ni llaves ni a dónde se va; al apagar la VPN, nada de esto se queda. Sin el
+  modo estricto no se guarda la VPN encendida: acaba con el servicio, como siempre.
+- **Al arrancar, el servicio reconcilia** (`estricto::al_arrancar`, lo primero de `engine::run`, y solo en el servicio:
+  `guardiana observe` no toca la VPN de nadie): si la VPN debe seguir encendida en el modo estricto, el bloqueo vuelve a
+  ponerse en el acto (con el archivo del programa como esté, también tras una actualización) y el túnel se levanta otra
+  vez; si ya no se quiere, lo que quedó en Windows se quita. Así pasan el fallo y el reinicio del servicio, la
+  actualización (que para el servicio, lo cambia y lo arranca) y el reinicio del equipo, hasta que el servicio levanta
+  el túnel. Al parar, el servicio cierra el túnel y deja el bloqueo. Desde la revisión de la 1.0.56: el servicio depende
+  del servicio de filtrado de Windows (BFE), así que arranca después de él (el instalador lo registra así, y el propio
+  servicio lo deja así al arrancar, con `sc.exe config guardiana depend= BFE`, si el servicio ya existía sin ello); si
+  la reconciliación no sale bien (Windows no deja quitar lo que sobra), se repite cada minuto hasta que salga, como la
+  mirada a los cortes del antivirus (`guardiana_panel::comprueba_la_vpn`); y si falta `wireguard.dll`, la VPN no puede
+  volver: no se pone otra vez el bloqueo (el que Windows ya tenga sigue, y «Desconectar» lo quita), el estado lo dice
+  (`"fase": "error"` con el motivo) y se vuelve a mirar cada minuto. Si Windows no acepta los filtros de arranque, el
+  bloqueo vale desde que arranca su servicio de filtrado: se anota y `GET /api/vpn` lo dice (`"aviso_arranque"`).
 - **Sin vuelta a la conexión normal.** Si el servidor no contesta al primer saludo (los 8 s de siempre), el túnel se
-  cierra, el bloqueo sigue y se vuelve a intentar (alta nueva, túnel nuevo: a los 5 s, a los 15 y luego cada 30); si deja
-  de contestar con el túnel abierto (200 s sin saludo), igual. Si el primer alta no contesta, el bloqueo se pone ya con lo
-  que se sabe del servidor. La página dice «reconectando» y el aviso: «La VPN no conecta: no sale nada hasta que vuelva o
-  la apagues tú». Tras un reposo del equipo, el servidor tiene su margen entero otra vez antes de darlo por caído.
-  Cambiar de servidor (`POST /api/vpn/conecta` con otro) mantiene el bloqueo todo el rato; con el túnel caído, el nombre
-  del servidor nuevo no resuelve y se sigue con el de antes.
+  cierra, el bloqueo sigue y se vuelve a intentar (alta nueva, túnel nuevo; entre un intento fallido y el siguiente, 5 s,
+  luego 15 s dos veces y después 30 s cada vez: `estricto::espera_tras`, contando el fallo antes de esperar); si deja de
+  contestar con el túnel abierto (200 s sin saludo), igual. Si el primer alta no contesta, el bloqueo se pone ya con lo
+  que se sabe del servidor. La página dice «reconectando» y el aviso: «La VPN no conecta: no sale nada de tus programas
+  fuera del túnel hasta que vuelva o la apagues tú». Tras un reposo del equipo, el servidor tiene su margen entero otra
+  vez antes de darlo por caído. El vigía de la conexión lee lo guardado en cada vistazo: si `guardiana vpn apaga` apagó
+  la VPN sin el servicio, el túnel se cierra (un archivo que en ese momento no se puede leer no cuenta como apagada).
+  Cambiar de servidor (`POST /api/vpn/conecta` con otro) mantiene el bloqueo todo el rato; con el túnel caído ningún
+  nombre resuelve, así que va a la dirección que ya se sabe de esa salida (lo guardado o lo medido con la VPN apagada) y,
+  si no se sabe ninguna, la respuesta lo dice (`{"ok": false, "motivo": …}`) y nada cambia. Hasta la revisión de la
+  1.0.56 contestaba que sí y seguía en silencio con el servidor de antes, aunque estuviera caído.
 - **El DNS y el IPv6**, como siempre: cada salida con su resolutor (Unbound en `10.66.0.1`, por el túnel), ningún DNS
   fuera del túnel, nada de IPv6 fuera de él salvo lo del enlace.
 - **La licencia**: conectar sigue siendo de Plus; la VPN que el servicio levanta al arrancar es la que la persona ya tenía
@@ -239,16 +255,27 @@ Las salidas, siempre (tan importantes como el bloqueo):
 1. **«Desconectar»** (el botón de Órbita, el chip de la barra de ZERO, `POST /api/vpn/desconecta`), en cualquier fase,
    también conectando o reconectando: la VPN apagada en lo guardado (primero, para que el próximo arranque quite lo que
    quede si algo falla), el túnel cerrado y todo lo del modo estricto fuera de Windows. Con el candado de los cambios y la
-   generación: una conexión a medias nunca vuelve a poner el bloqueo después.
+   generación: una conexión a medias nunca vuelve a poner el bloqueo después. Si lo guardado no se puede escribir
+   (revisión de la 1.0.56), se quita el archivo (sin él, la VPN está apagada); si tampoco, la respuesta lo dice y se
+   vuelve a intentar cada minuto mientras el servicio siga. Es lo más seguro: un arranque que encuentra la VPN encendida
+   en lo guardado no puede distinguir un «Desconectar» que no se pudo guardar de un bloqueo que otro programa quitó de
+   Windows o de un cierre a mitad de la primera conexión, y en esos casos dejarla apagada sería que los programas
+   salieran fuera del túnel sin que la persona lo pidiera; así que la vuelve a levantar con su bloqueo, y es al apagar
+   donde se hace todo para que quede escrito. Solo si ni se escribe ni se quita el archivo y el servicio se reinicia antes
+   de conseguirlo, la VPN vuelve con su bloqueo, y «Desconectar» ya lo había dicho. Lo mismo al apagar el modo estricto.
 2. **`guardiana vpn apaga`**, también con el servicio parado: le pide al servicio que desconecte (con la llave del panel) y,
-   siempre, lo quita directamente por sus claves fijas y deja la VPN apagada en lo guardado. Necesita administrador; **la
-   entrada «Apagar la VPN de GUARDIANA» del menú Inicio** lo ejecuta y, sin permisos, se los pide a Windows ella misma.
-   `guardiana vpn estado [--json]` dice lo guardado y lo que Windows tiene.
+   siempre, lo quita directamente por sus claves fijas y deja la VPN apagada en lo guardado. La llave solo va al servicio
+   de GUARDIANA: antes de mandarla se pregunta al gestor de servicios de Windows si el servicio «guardiana» está en marcha,
+   y si no, se va directamente por el otro camino (revisión de la 1.0.56: con el servicio parado, cualquier programa de
+   cualquier cuenta podría escuchar en 127.0.0.1:7443 y llevarse la llave que manda un administrador). Necesita
+   administrador; **la entrada «Apagar la VPN de GUARDIANA» del menú Inicio** lo ejecuta y, sin permisos, se los pide a
+   Windows ella misma. `guardiana vpn estado [--json]` dice lo guardado y lo que Windows tiene.
 3. **El arranque del servicio**, cuando el modo estricto ya no se quiere (lo apagaron, o la VPN quedó apagada): quita lo
    que quedó.
 4. **El interruptor**: apagar el modo estricto con el servidor sin contestar es volver a la conexión normal, como haría la
    VPN sin él; con el túnel abierto, el cambio no deja ni un momento sin corte (primero el corte nuevo, luego se va el
-   viejo).
+   viejo). Si en ese momento Windows no deja quitar el bloqueo, el estado lo dice (sin decir que la conexión del equipo
+   sigue como estaba) y `"desconectar": true` deja a la página enseñar «Desconectar», que lo vuelve a intentar.
 5. **La desinstalación**: el instalador ejecuta `guardiana vpn apaga --desinstalando` después de parar el servicio (no al
    actualizar ni al reparar), y `guardiana service uninstall` lo hace también. Si algo fallara, el proveedor nombra el
    servicio: sin él, Windows no carga los filtros persistentes en el siguiente arranque.
@@ -272,30 +299,46 @@ volver a ponerlos no los duplica, que el permiso del túnel va en la misma subca
 puesto ni al cerrarse, y que al quitar el bloqueo la red vuelve (`tunel_win`); y el trabajo «estricto», con el servicio de
 verdad: el bloqueo al arrancar, nada por la tarjeta (WSAEACCES), «reconectando» con el aviso en `GET /api/vpn`, el bloqueo
 que sigue con el servicio muerto y con el servicio parado, «Desconectar» que lo quita todo y devuelve la red, el arranque
-que quita lo que quedó con el modo estricto apagado, y `guardiana vpn apaga` con el servicio parado. Lo que la integración
-continua no puede probar: el efecto de los filtros de arranque en un reinicio de verdad, ni el instalador entero.
+que quita lo que quedó con el modo estricto apagado, y `guardiana vpn apaga` con el servicio parado; y, desde la revisión
+de la 1.0.56, que el servicio depende de BFE (también uno registrado antes sin ello, que lo recibe al arrancar),
+`"desconectar"` y `"comprobado"` en la API, y sin `wireguard.dll` el arranque que no vuelve a poner el bloqueo, lo dice y
+deja que «Desconectar» quite el que quedó. Lo que la integración continua no puede probar: el efecto de los filtros de
+arranque en un reinicio de verdad, el instalador entero, ni la reconciliación que se repite cada minuto (haría falta que
+el servicio de filtrado de Windows fallara); de esta, lo pendiente y su generación se prueban en `crates/panel/src/vpn.rs`.
 
 La API (para la web): `GET /api/vpn` añade `"estricto"` (bool, el interruptor), `"bloqueado"` (bool, el bloqueo está en
 Windows), `"aviso"` (el aviso en el idioma de la persona, o vacío), `"estricto_titulo"` y `"estricto_linea"` (el nombre
-del interruptor y su línea, en su idioma), y la fase `"reconectando"`. `POST /api/vpn/estricto` con
+del interruptor y su línea, en su idioma), y la fase `"reconectando"`. Desde la revisión de la 1.0.56, también
+`"desconectar"` (bool: hace falta «Desconectar», porque la VPN está encendida o el bloqueo sigue en Windows, también en
+`"error"`; la página enseña el botón con él) y `"aviso_arranque"` (en su idioma, o vacío: Windows no aceptó los filtros
+de arranque del bloqueo, y tras un reinicio el bloqueo vale desde que arranca su servicio de filtrado). `POST /api/vpn/estricto` con
 `{"activo": true|false}` (o sin cuerpo: lo contrario de lo que está) contesta `{"ok": true, "estricto": bool}` o
 `{"ok": false, "motivo": "…"}`; no es de Plus, y por ZERO solo tras un clic de verdad, como `conecta`.
 
 Las salidas, en la API (5 nov 2026; el dueño, 3 nov, 09:25: «Todas las VPN te dicen a dónde»):
 
 - `GET /api/vpn` añade `"salida"` (la salida en la que está o a la que iba: `id`, `pais`, `ciudad`, `continente`,
-  `proveedor`, `nombre`, `zona`, `ip` —la del túnel abierto, o la medida—, `disponible` y `ms`; `null` sin VPN),
+  `proveedor`, `nombre`, `zona`, `ip` —la del túnel abierto, la medida o la que se sabe—, `disponible` —`true` solo
+  conectada; si no, lo medido con la VPN apagada, o `null` si no se sabe— y `ms`; `null` sin VPN),
   `"desde"`, `"saludo"`, `"subidos"`, `"bajados"` (siguen también `desde_ms`, `ultimo_saludo_ms`, `enviados` y
   `recibidos`), `"postcuantica"` (con el túnel: el alta siempre lleva su mitad de ML-KEM) y `"dns_tunel"`.
 - `GET /api/vpn/salidas`: `{"salidas": [cada salida, como arriba], "mas_rapida": id | null, "medido": ms | null}`. Se
-  miden (el nombre, tres conexiones TCP a su HTTPS y su alta, todas a la vez) solo con la VPN apagada y sin el bloqueo
-  —encendida, la medida iría por el túnel—, y lo medido vale un minuto. Con la VPN encendida y nada medido, solo si su
-  nombre resuelve. La salida en la que está, siempre disponible.
+  miden todas las salidas a la vez, cada una en su hilo, y de cada una: su nombre resuelto, tres conexiones TCP a su
+  HTTPS una detrás de otra (la mediana) y su alta. Solo con la VPN apagada y sin el bloqueo —encendida, la medida iría
+  por el túnel—, y lo medido vale un minuto; una medida durante la que se encendió la VPN no se guarda ni vale como
+  medida. Con la VPN encendida y nada medido, de cada salida solo su dirección (su nombre resuelto por el túnel, o la que
+  se sabe), con `"disponible": null` y sin `ms`, ni `"mas_rapida"` ni `"medido"` (revisión de la 1.0.56: antes salía
+  disponible solo porque su nombre resolvía). La salida en la que está, disponible si está conectada.
 - `POST /api/vpn/conecta` acepta `{"salida": "<id>" | "rapida"}` (la más rápida de lo medido; sin medida, Helsinki);
-  `POST /api/vpn/estricto`, también `{"estricto": bool}`.
+  con el bloqueo del modo estricto puesto y sin túnel, solo a una salida cuya dirección se sabe (si no,
+  `{"ok": false, "motivo": …}`). `POST /api/vpn/estricto`, también `{"estricto": bool}`.
 - `GET /api/vpn/comprueba`: `{"ip_vista", "pais_ip", "dns": "tunel" | "fuera" | "desconocido", "ipv6": "bloqueado" |
-  "sin_ipv6" | "fuga" | null, "zona": {"equipo": null, "desfase_equipo", "salida", "desfase_salida", "coincide"},
-  "idioma": null, "ubicacion_windows": "permitida" | "denegada" | "desconocida"}`. La dirección es la que ve llegar el
+  "sin_ipv6" | "fuga" | null, "comprobado": {"ip": bool, "dns": false, "ipv6": false}, "zona": {"equipo": null,
+  "desfase_equipo", "salida", "desfase_salida", "coincide"}, "idioma": null, "ubicacion_windows": "permitida" |
+  "denegada" | "desconocida"}`. `"comprobado"` (revisión de la 1.0.56) dice qué se midió de verdad: la dirección, cuando
+  un eco contestó (`"ip": true`); el DNS y el IPv6 nunca, porque salen de lo que el túnel tiene puesto, así que la página
+  los da «según la configuración». Lo que se pregunta fuera (el eco y el permiso de ubicación, con `reg.exe`) vale 15 s
+  para el mismo estado de la VPN. La dirección es la que ve llegar el
   eco (`GET /vpn/alta`) de un servidor de GUARDIANA, nunca un tercero: con el túnel abierto, el de otra salida (la propia
   no contesta a lo que llega por su túnel: sus reglas solo dejan el resolutor), así que es la dirección con la que sale el
   tráfico del túnel; sin VPN, la de este equipo. Sin otro servidor que conteste, no hay dirección y la página no la da
@@ -303,9 +346,11 @@ Las salidas, en la API (5 nov 2026; el dueño, 3 nov, 09:25: «Todas las VPN te 
   (el resolutor solo hacia el del túnel; el corte). La hora del equipo llega del navegador (`X-Guardiana-Tz`); su zona y
   su idioma los pone la página, que los lee ella misma.
 - Por ZERO (`crates/zero/src/sesion.rs`, `PANEL_LECTURAS`) pasan las tres lecturas, y el cuerpo de `conecta` y de
-  `estricto` comprobado y reescrito (`cuerpo_para_el_panel`: un id de salida, o el lado del interruptor; cualquier otro
-  cuerpo, 400). El guion del programa (`paginas.rs`) deja pasar, campo a campo, la dirección de la salida y la que ve una
-  web (el servidor de la web ya ve esta al cargar la página), y nunca la del túnel.
+  `estricto` comprobado y reescrito (`cuerpo_para_el_panel`: un id de salida, o el lado del interruptor; sin cuerpo,
+  vacío o `{}`, también en `desconecta`, ninguno; cualquier otro cuerpo, 400). El guion del programa (`paginas.rs`) deja
+  pasar, campo a campo, la dirección de la salida y la que ve una web (el servidor de la web ya ve esta al cargar la
+  página), `"desconectar"`, `"aviso_arranque"` y `"comprobado"`, y nunca la del túnel (`"direccion"`; una prueba lo
+  comprueba ejecutando el guion con node cuando está).
 
 Pendiente, en este orden:
 
