@@ -233,8 +233,12 @@ VPN debe estar encendida, nada sale del equipo fuera del túnel, también cuando
   la reconciliación no sale bien (Windows no deja quitar lo que sobra), se repite cada minuto hasta que salga, como la
   mirada a los cortes del antivirus (`guardiana_panel::comprueba_la_vpn`); y si falta `wireguard.dll`, la VPN no puede
   volver: no se pone otra vez el bloqueo (el que Windows ya tenga sigue, y «Desconectar» lo quita), el estado lo dice
-  (`"fase": "error"` con el motivo) y se vuelve a mirar cada minuto. Si Windows no acepta los filtros de arranque, el
-  bloqueo vale desde que arranca su servicio de filtrado: se anota y `GET /api/vpn` lo dice (`"aviso_arranque"`).
+  (`"fase": "error"` con el motivo) y se vuelve a mirar cada minuto. Si en ese momento lo guardado no se puede leer
+  (otro programa tiene el archivo), no se toma por la VPN apagada: ni se quita ni se pone nada y se vuelve a mirar cada
+  minuto (segunda revisión, con «N2»: hasta entonces se leía como apagada y se quitaba un bloqueo que la persona quería;
+  un archivo que se lee pero no se entiende sigue contando como la VPN apagada). Si Windows no acepta los filtros de
+  arranque, el bloqueo vale desde que arranca su servicio de filtrado: se anota y `GET /api/vpn` lo dice
+  (`"aviso_arranque"`).
 - **Sin vuelta a la conexión normal.** Si el servidor no contesta al primer saludo (los 8 s de siempre), el túnel se
   cierra, el bloqueo sigue y se vuelve a intentar (alta nueva, túnel nuevo; entre un intento fallido y el siguiente, 5 s,
   luego 15 s dos veces y después 30 s cada vez: `estricto::espera_tras`, contando el fallo antes de esperar); si deja de
@@ -246,7 +250,11 @@ VPN debe estar encendida, nada sale del equipo fuera del túnel, también cuando
   Cambiar de servidor (`POST /api/vpn/conecta` con otro) mantiene el bloqueo todo el rato; con el túnel caído ningún
   nombre resuelve, así que va a la dirección que ya se sabe de esa salida (lo guardado o lo medido con la VPN apagada) y,
   si no se sabe ninguna, la respuesta lo dice (`{"ok": false, "motivo": …}`) y nada cambia. Hasta la revisión de la
-  1.0.56 contestaba que sí y seguía en silencio con el servidor de antes, aunque estuviera caído.
+  1.0.56 contestaba que sí y seguía en silencio con el servidor de antes, aunque estuviera caído. Si el cambio ya empezado
+  no puede seguir con el túnel caído (no hay dirección, o no se puede guardar), la VPN sigue reconectando con la salida
+  de antes, la que dice lo guardado, con el bloqueo puesto como estaba; si en ese momento lo guardado no se puede leer,
+  el bloqueo sigue y lo hace la mirada de cada minuto, en cuanto se pueda leer (segunda revisión, «N2»: hasta entonces el
+  bloqueo se quedaba sin nadie que reconectara).
 - **El DNS y el IPv6**, como siempre: cada salida con su resolutor (Unbound en `10.66.0.1`, por el túnel), ningún DNS
   fuera del túnel, nada de IPv6 fuera de él salvo lo del enlace.
 - **La licencia**: conectar sigue siendo de Plus; la VPN que el servicio levanta al arrancar es la que la persona ya tenía

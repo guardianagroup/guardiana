@@ -697,10 +697,19 @@ impl Vpn {
 
     /// La reconciliación del arranque ([`vpn_al_arrancar`]) para la generación `gen`: si mientras tanto la persona
     /// conectó o desconectó, ya no hace falta y no se toca nada. Dice si quedó hecha.
+    ///
+    /// Lo guardado que ahora no se puede leer no cuenta como la VPN apagada (segunda revisión de la 1.0.56, con «N2»):
+    /// ni se quita ni se pone nada, y se vuelve a mirar en un minuto ([`guardado_para_reconciliar`]). Hasta entonces se
+    /// leía como apagada y se quitaba un bloqueo que la persona quería.
     fn reconcilia(&'static self, gen: u64) -> bool {
         #[cfg(windows)]
         {
-            let d = self.deseo();
+            let Some(d) = guardado_para_reconciliar(estricto::lee_si_se_puede(&datos())) else {
+                eprintln!(
+                    "guardiana: lo guardado de la VPN no se puede leer ahora; se vuelve a mirar en un minuto"
+                );
+                return false;
+            };
             // si Windows no se deja preguntar, como si quedara algo: quitar lo que no está no cuesta nada
             let quedan = match guardiana_apps::corte_vpn::en_windows() {
                 Ok(en) => en.alguno(),
@@ -1046,6 +1055,45 @@ fn a_quien_preguntar(
         .collect()
 }
 
+/// Qué hace una conexión del modo estricto que no pudo seguir (sin dirección, o sin poder guardarla) y no tiene túnel
+/// abierto (segunda revisión de la 1.0.56, «N2»): quien pidió el cambio ya subió la generación, así que el bucle que
+/// reconectaba con la salida de antes se acabó.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(not(windows), allow(dead_code))]
+enum TrasNoCambiar {
+    /// Lo guardado aún quiere la VPN encendida en el modo estricto: el bloqueo sigue, y se vuelve a intentar con su
+    /// servidor (su nombre y la dirección de su alta).
+    Sigue(String, SocketAddr),
+    /// Lo guardado no se puede leer ahora: lo hace la mirada de cada minuto, como la reconciliación del arranque.
+    Luego,
+    /// Nada que seguir: la VPN no estaba encendida en el modo estricto.
+    Nada,
+}
+
+/// [`TrasNoCambiar`] con lo guardado, como se pudo leer (`lee_si_se_puede`).
+#[cfg_attr(not(windows), allow(dead_code))]
+fn tras_no_cambiar(guardado: std::io::Result<Deseo>) -> TrasNoCambiar {
+    match guardado {
+        Ok(d) if d.quiere_bloqueo() => d.alta.map_or(TrasNoCambiar::Nada, |alta| {
+            TrasNoCambiar::Sigue(d.servidor, alta)
+        }),
+        Ok(_) => TrasNoCambiar::Nada,
+        Err(_) => TrasNoCambiar::Luego,
+    }
+}
+
+/// Lo guardado para la reconciliación ([`Vpn::reconcilia`]), como se pudo leer (`lee_si_se_puede`): un archivo que ahora
+/// no se puede leer (otro programa lo tiene un momento) no es la VPN apagada, y se vuelve a mirar en un minuto
+/// (`None`); uno que se lee pero no es texto, sí, como el texto que no se entiende ([`Deseo::de_texto`]).
+#[cfg_attr(not(windows), allow(dead_code))]
+fn guardado_para_reconciliar(leido: std::io::Result<Deseo>) -> Option<Deseo> {
+    match leido {
+        Ok(d) => Some(d),
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidData => Some(Deseo::default()),
+        Err(_) => None,
+    }
+}
+
 /// Una salida para la página, con lo que se sabe de ella: su dirección, si está (`None`: no se sabe) y a cuánto.
 fn salida_json(s: &Salida, ip: Option<IpAddr>, disponible: Option<bool>, ms: Option<u32>) -> Value {
     json!({
@@ -1306,7 +1354,9 @@ impl Vpn {
                 self.no_cambia(
                     &host,
                     gen,
-                    format!("no se pudo guardar la VPN encendida ({e}): la VPN no cambió"),
+                    format!(
+                        "no se pudo guardar la VPN encendida ({e}): la VPN no cambió de salida"
+                    ),
                 );
                 return;
             }
@@ -1333,6 +1383,12 @@ impl Vpn {
     /// Conectar con `host`, de la generación `gen`, no puede seguir (no hay dirección a la que ir, o no se pudo guardar):
     /// se dice (`error`), y nada cambia, ni el bloqueo ni lo guardado (revisión de la 1.0.56). El túnel de antes, si sigue
     /// abierto, sigue con su vigía (el de antes se acabó al empezar esta conexión).
+    ///
+    /// Sin túnel abierto (la VPN reconectando con la salida de antes), el bucle que lo intentaba también se acabó al
+    /// empezar esta conexión: si lo guardado aún quiere la VPN encendida en el modo estricto, vuelve a intentarlo con su
+    /// servidor, con el bloqueo puesto como estaba; si lo guardado no se puede leer ahora, lo hace la mirada de cada
+    /// minuto ([`tras_no_cambiar`]; segunda revisión de la 1.0.56, «N2»: hasta entonces el bloqueo se quedaba sin nadie
+    /// que reconectara, y la página decía que la VPN no había cambiado).
     fn no_cambia(&'static self, host: &str, gen: u64, error: String) {
         let g = self.conexion.lock().unwrap_or_else(PoisonError::into_inner);
         if self.generacion.load(Ordering::SeqCst) != gen {
@@ -1345,13 +1401,30 @@ impl Vpn {
             });
             drop(g);
             std::thread::spawn(move || self.vigila(gen));
-        } else {
-            self.pon(Estado {
-                fase: Fase::Error,
-                servidor: host.to_owned(),
-                error,
-                ..Estado::default()
-            });
+            return;
+        }
+        match tras_no_cambiar(estricto::lee_si_se_puede(&datos())) {
+            TrasNoCambiar::Sigue(servidor, alta) => {
+                self.pon(Estado {
+                    fase: Fase::Reconectando,
+                    servidor: servidor.clone(),
+                    error,
+                    ..Estado::default()
+                });
+                drop(g);
+                self.bucle_estricto(&servidor, alta, gen);
+            }
+            que => {
+                if que == TrasNoCambiar::Luego {
+                    self.queda_pendiente(gen, Pendiente::Arranque);
+                }
+                self.pon(Estado {
+                    fase: Fase::Error,
+                    servidor: host.to_owned(),
+                    error,
+                    ..Estado::default()
+                });
+            }
         }
     }
 
@@ -2492,6 +2565,84 @@ mod tests {
         v.generacion.fetch_add(1, Ordering::SeqCst);
         assert_eq!(v.pendiente_ahora(), None);
         assert_eq!(*v.pendiente.lock().unwrap(), None);
+    }
+
+    /// Second review of the 1.0.56 VPN («N2»): a change of exit that cannot go on, with no tunnel open, carries on with
+    /// what is kept when the VPN is meant to be on in strict mode (the loop that was reconnecting ended when the change
+    /// began); when what is kept cannot be read now, the minute's look does it; otherwise there is nothing to carry on.
+    #[test]
+    fn un_cambio_de_salida_que_no_sigue_vuelve_a_lo_guardado() {
+        let hel: SocketAddr = "62.238.17.121:443".parse().unwrap();
+        let encendida = Deseo::default().encendida_con("vpn.guardianagroup.com", hel);
+        assert_eq!(
+            tras_no_cambiar(Ok(encendida.clone())),
+            TrasNoCambiar::Sigue("vpn.guardianagroup.com".into(), hel)
+        );
+        // strict mode off, or the VPN off: nothing to carry on with
+        let sin_estricto = Deseo {
+            estricto: false,
+            ..encendida.clone()
+        };
+        assert_eq!(tras_no_cambiar(Ok(sin_estricto)), TrasNoCambiar::Nada);
+        assert_eq!(
+            tras_no_cambiar(Ok(encendida.apagada())),
+            TrasNoCambiar::Nada
+        );
+        assert_eq!(tras_no_cambiar(Ok(Deseo::default())), TrasNoCambiar::Nada);
+        // what is kept cannot be read now: the minute's look
+        assert_eq!(
+            tras_no_cambiar(Err(std::io::Error::other("ocupado"))),
+            TrasNoCambiar::Luego
+        );
+    }
+
+    /// Second review of the 1.0.56 VPN (with «N2», whose minute's look is the reconciliation): what is kept that cannot be
+    /// read now is not the VPN off (it would remove a block the person wants); a file read whole that is not text is,
+    /// as text that cannot be understood is.
+    #[test]
+    fn lo_que_no_se_puede_leer_no_es_la_vpn_apagada() {
+        let hel: SocketAddr = "62.238.17.121:443".parse().unwrap();
+        let encendida = Deseo::default().encendida_con("vpn.guardianagroup.com", hel);
+        assert_eq!(
+            guardado_para_reconciliar(Ok(encendida.clone())),
+            Some(encendida.clone())
+        );
+        assert_eq!(
+            guardado_para_reconciliar(Err(std::io::Error::other("ocupado"))),
+            None
+        );
+        let dir = std::env::temp_dir().join(format!(
+            "guardiana-vpn-reconcilia-{}-{}",
+            std::process::id(),
+            ahora_ms()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        // no file: the VPN off
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(
+            guardado_para_reconciliar(estricto::lee_si_se_puede(&dir)),
+            Some(Deseo::default())
+        );
+        // a file that cannot be read (a folder where it goes): not now
+        std::fs::create_dir_all(dir.join(estricto::ARCHIVO)).unwrap();
+        assert_eq!(
+            guardado_para_reconciliar(estricto::lee_si_se_puede(&dir)),
+            None
+        );
+        // read, but not text: the VPN off, as for text that cannot be understood
+        std::fs::remove_dir_all(dir.join(estricto::ARCHIVO)).unwrap();
+        std::fs::write(dir.join(estricto::ARCHIVO), [0xff, 0xfe, 0x00, 0x7b]).unwrap();
+        assert_eq!(
+            guardado_para_reconciliar(estricto::lee_si_se_puede(&dir)),
+            Some(Deseo::default())
+        );
+        // read: as kept
+        estricto::guarda_en(&dir, &encendida).unwrap();
+        assert_eq!(
+            guardado_para_reconciliar(estricto::lee_si_se_puede(&dir)),
+            Some(encendida)
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Review of the 1.0.56 VPN: «Desconectar» that cannot write what is kept removes the file (no file is the VPN off);
