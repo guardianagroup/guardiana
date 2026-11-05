@@ -7,6 +7,9 @@
 # Escrito el 2 Nov 2026 para la 1.0.54 (dueño: «una pantalla profesional mientras se está instalando… nada de
 # tirón ni cosas raras»; y, a las 13:16, «primero me aparece la página de órbita y luego me aparece la que tiene
 # que aparecer»).
+# Desde el 3 nov 2026 cada caso sale bien solo si, sin pulsar nada al final, el instalador se cierra solo y se abre
+# GUARDIANA (dueño: «hay que darle a la tecla finalizar, si no, no funciona… quiero que lo quites»); si no, el trabajo
+# falla. Con «zero» (una ejecución de zero.yml) se prueba igual el instalador propio de GUARDIANA ZERO.
 name: instalador
 
 on:
@@ -14,6 +17,10 @@ on:
     inputs:
       candidato:
         description: 'Número de una ejecución de «candidato»: se prueba su instalador (desde cero, y actualizando desde lo publicado)'
+        required: false
+        default: ''
+      zero:
+        description: 'Número de una ejecución de «zero»: se prueba también el instalador propio de GUARDIANA ZERO (desde cero)'
         required: false
         default: ''
   push:
@@ -83,3 +90,28 @@ jobs:
           $argumentos = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "build/cliente/fotos_instalador.ps1", "-Instalador", (Resolve-Path inst/nueva.msi).Path, "-Nombre", "${{ matrix.caso }}")
           if ("${{ matrix.caso }}" -eq "actualiza") { $argumentos += @("-Antes", (Resolve-Path inst/antes.msi).Path) }
           & powershell @argumentos
+          exit $LASTEXITCODE
+
+  zero:
+    name: fotos (instalador de GUARDIANA ZERO)
+    if: ${{ inputs.zero != '' }}
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: el instalador de ZERO de esa ejecución
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: guardiana-zero-windows
+          path: zero-msi
+          run-id: ${{ inputs.zero }}
+          github-token: ${{ github.token }}
+      - name: instalar como una persona, foto a foto
+        shell: powershell
+        run: |
+          # el de español (los otros dos terminan en -en.msi y -pt.msi)
+          $m = Get-ChildItem zero-msi -Filter "guardiana-zero-*-windows-x64.msi" | Select-Object -First 1
+          if (-not $m) { throw "la ejecución ${{ inputs.zero }} de zero no trae el instalador en español" }
+          Write-Output "ZERO: $($m.Name) · $((Get-FileHash $m.FullName -Algorithm SHA256).Hash.ToLower())"
+          & powershell -NoProfile -ExecutionPolicy Bypass -File build/cliente/fotos_instalador.ps1 -Instalador $m.FullName -Nombre zero
+          exit $LASTEXITCODE

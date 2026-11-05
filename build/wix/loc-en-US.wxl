@@ -20,6 +20,23 @@
   <String Id="ProgresoQuitarVigilante" Value="Removing the DNS watcher…" />
   <String Id="WelcomeEulaDlgTitle" Value="{\WixUI_Font_Title}Before installing GUARDIANA" />
   <String Id="WelcomeEulaDlgLicenseAcceptedCheckBox" Value="I have read what the installation will do and I accept the Terms of use" />
-  <String Id="ExitDialogTitle" Value="{\WixUI_Font_Bigger}GUARDIANA is installed" />
-  <String Id="ExitDialogDescription" Value="The GUARDIANA service is already running. Click “Finish” to close." />
+  <!-- 3 Nov 2026: the last screen no longer shows when installing (GUARDIANA opens by itself and the window closes),
+       so ExitDialogTitle and ExitDialogDescription, with their «Click “Finish” to close», are gone: only «msiexec /a»
+       would show it, with WixUI's own words. The page while installing (InstalandoDlg) and what each step says: -->
+  <String Id="InstalandoTitulo" Value="Installing GUARDIANA on your PC" />
+  <String Id="InstalandoProteccion" Value="Starting the protection" />
+  <String Id="InstalandoZero" Value="Getting the GUARDIANA ZERO browser ready" />
+  <String Id="InstalandoDns" Value="Making GUARDIANA this PC’s DNS" />
+  <String Id="ProgresoAbrir" Value="Opening GUARDIANA…" />
+  <String Id="PasoPreparar" Value="Preparing the changes…" />
+  <String Id="PasoWindows" Value="Recording the changes in Windows…" />
+  <String Id="PasoParaServicio" Value="Stopping the GUARDIANA service…" />
+  <String Id="PasoQuitaServicio" Value="Removing the GUARDIANA service…" />
+  <String Id="PasoRegistraServicio" Value="Registering the GUARDIANA service…" />
+  <String Id="PasoArrancaServicio" Value="Starting the GUARDIANA service…" />
+  <String Id="PasoQuitaArchivos" Value="Removing GUARDIANA’s files…" />
+  <String Id="PasoCopiaArchivos" Value="Copying GUARDIANA’s files…" />
+  <String Id="PasoAccesos" Value="Creating GUARDIANA’s shortcuts…" />
+  <String Id="PasoTerminar" Value="Finishing…" />
+  <String Id="PasoDeshacer" Value="Undoing the changes…" />
 </WixLocalization>

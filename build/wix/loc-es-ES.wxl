@@ -21,6 +21,23 @@
   <String Id="ProgresoQuitarVigilante" Value="Quitando el vigilante del DNS…" />
   <String Id="WelcomeEulaDlgTitle" Value="{\WixUI_Font_Title}Antes de instalar GUARDIANA" />
   <String Id="WelcomeEulaDlgLicenseAcceptedCheckBox" Value="He leído qué hará la instalación y acepto los Términos de uso" />
-  <String Id="ExitDialogTitle" Value="{\WixUI_Font_Bigger}GUARDIANA está instalada" />
-  <String Id="ExitDialogDescription" Value="El servicio de GUARDIANA ya está en marcha. Pulsa «Finalizar» para cerrar." />
+  <!-- 3 nov 2026: la pantalla final ya no sale al instalar (GUARDIANA se abre sola y la ventana se cierra), así que
+       ExitDialogTitle y ExitDialogDescription, con su «Pulsa «Finalizar» para cerrar», ya no están: solo quedaría para
+       «msiexec /a», con los textos de WixUI. La página mientras se instala (InstalandoDlg) y lo que dice en cada paso: -->
+  <String Id="InstalandoTitulo" Value="Instalando GUARDIANA en tu PC" />
+  <String Id="InstalandoProteccion" Value="Poniendo en marcha la protección" />
+  <String Id="InstalandoZero" Value="Preparando el navegador GUARDIANA ZERO" />
+  <String Id="InstalandoDns" Value="Poniendo a GUARDIANA como DNS de este PC" />
+  <String Id="ProgresoAbrir" Value="Abriendo GUARDIANA…" />
+  <String Id="PasoPreparar" Value="Preparando los cambios…" />
+  <String Id="PasoWindows" Value="Anotando los cambios en Windows…" />
+  <String Id="PasoParaServicio" Value="Parando el servicio de GUARDIANA…" />
+  <String Id="PasoQuitaServicio" Value="Quitando el servicio de GUARDIANA…" />
+  <String Id="PasoRegistraServicio" Value="Registrando el servicio de GUARDIANA…" />
+  <String Id="PasoArrancaServicio" Value="Arrancando el servicio de GUARDIANA…" />
+  <String Id="PasoQuitaArchivos" Value="Quitando los archivos de GUARDIANA…" />
+  <String Id="PasoCopiaArchivos" Value="Copiando los archivos de GUARDIANA…" />
+  <String Id="PasoAccesos" Value="Creando los accesos de GUARDIANA…" />
+  <String Id="PasoTerminar" Value="Terminando…" />
+  <String Id="PasoDeshacer" Value="Deshaciendo los cambios…" />
 </WixLocalization>

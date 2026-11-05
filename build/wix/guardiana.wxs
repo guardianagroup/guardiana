@@ -60,10 +60,10 @@
     <Property Id="MSIFASTINSTALL" Value="1" />
 
     <!-- Two screens only: what the installer does and does not (build/wix/textos/bienvenida-XX.rtf)
-         with "Install", then "Finish" with "Open Guardiana" ticked, which opens the panel in the
-         browser as the user (not elevated). No folder choice, no options. Everything a person
-         reads comes from build/wix/loc-<culture>.wxl, so the same package builds in Spanish,
-         English and Portuguese: whoever downloads from the English page must not be handed a
+         with "Install", then GUARDIANA's own page while it installs (InstalandoDlg, further down). When it
+         ends, the window closes by itself and GUARDIANA opens (LaunchPanel). No folder choice, no options.
+         Everything a person reads comes from build/wix/loc-<culture>.wxl, so the same package builds in
+         Spanish, English and Portuguese: whoever downloads from the English page must not be handed a
          Spanish installer (22 Sep 2026). -->
     <ui:WixUI Id="WixUI_Minimal" />
     <WixVariable Id="WixUILicenseRtf" Value="$(var.Welcome)" />
@@ -75,12 +75,70 @@
          Windows shows it in every screen and in «Aplicaciones instaladas». -->
     <WixVariable Id="WixUIDialogBmp" Value="$(var.Dialogo)" />
     <WixVariable Id="WixUIBannerBmp" Value="$(sys.SOURCEFILEDIR)banner.bmp" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="!(loc.AbrirPanel)" />
-    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <!-- 3 nov 2026 (el dueño, 09:21: «hay que darle a la tecla finalizar, si no, no funciona. Eso quiero que lo quites para
+         que… se instale automáticamente todo»): hasta 1.0.56 el panel se abría solo al pulsar «Finalizar» en la última
+         pantalla, y quien la cerraba o no la veía se quedaba sin nada abierto. Ahora GUARDIANA se abre sola al terminar de
+         instalar y la ventana del instalador se cierra sola: ya no hay última pantalla.
+         LaunchPanel corre en la secuencia de la interfaz, justo después de ExecuteAction: en el proceso del instalador que
+         abrió la persona, con su usuario y sin elevar (el UAC eleva solo la parte que instala), y solo si la instalación salió
+         bien (si ExecuteAction falla o se cancela, la secuencia termina ahí, en FatalError o UserExit, como siempre).
+         «NOT Installed AND NOT REMOVE»: al instalar por primera vez y al actualizar (una versión nueva es otro producto, así que
+         Installed está vacío; WIX_UPGRADE_DETECTED tiene el producto anterior, y REMOVE=ALL es de la sesión que quita ese
+         anterior, no de esta), nunca al reparar ni al quitar (Installed). Con /qn, /qb o /passive Windows no corre la
+         secuencia de la interfaz: una instalación en silencio no abre nada. Return="ignore": si abrirlo fallara, la
+         instalación, que ya terminó bien, no se da por fallida. WixShellExecTarget se pone tras CostFinalize, mucho antes. -->
     <SetProperty Id="WixShellExecTarget" Value="[MenuDir]Guardiana.lnk" After="CostFinalize" Sequence="ui" />
-    <CustomAction Id="LaunchPanel" DllEntry="WixShellExec" Impersonate="yes" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
+    <CustomAction Id="LaunchPanel" DllEntry="WixShellExec" Impersonate="yes" Return="ignore" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
+    <!-- La pantalla final de WixUI (ExitDialog) ya no sale al terminar bien. Quitar su fila (Suppress) no vale: Windows
+         Installer exige un diálogo o una acción en el puesto -1 de InstallUISequence (ICE20) y la compilación fallaría; la
+         fila se queda con una condición que nunca se cumple. Las de error (FatalError, -3) y cancelar (UserExit, -2) siguen
+         como estaban. ProgressDlg, la ventana blanca de WixUI, sale solo al reparar o quitar (Installed); al instalar y al
+         actualizar sale la página de GUARDIANA, InstalandoDlg. -->
+    <InstallUISequence>
+      <Show Dialog="override ProgressDlg" Before="ExecuteAction" Condition="Installed" />
+      <Show Dialog="InstalandoDlg" After="ProgressDlg" Condition="NOT Installed" />
+      <Custom Action="LaunchPanel" After="ExecuteAction" Condition="NOT Installed AND NOT REMOVE" />
+      <Show Dialog="override ExitDialog" OnExit="success" Condition="0" />
+    </InstallUISequence>
+    <!-- 3 nov 2026 (el dueño, 09:23: «mientras se instala y tarda un poquito, que salga la pantalla de un instalador bien
+         bonita… o una página entera de Guardiana se está instalando en tu programa. Algo muy profesional»): la pantalla
+         mientras se instala es una página de GUARDIANA, del tamaño de las demás (370x270, la misma ventana que la de los
+         términos, que no cambia), hecha solo con lo que trae Windows Installer: el dibujo de fondo (instalando-<idioma>.bmp, de
+         build/wix/imagenes.py: fondo oscuro, el símbolo y el nombre, y una esfera tranquila con su red, como la portada del
+         programa), el título grande, debajo el paso de ahora (ActionText: los textos de ProgressText, en el idioma del
+         instalador), una barra fina de Windows y tres líneas de lo que está pasando, cada una solo cuando es verdad (ZERO, si
+         va en el paquete y no se quitó con ZERO=0; el DNS, solo la primera vez y con VIGILAR=1, las mismas condiciones que
+         ApplyDns). Letra Segoe UI en colores claros y texto transparente sobre el dibujo; Windows lo escala con el resto del
+         diálogo al 125 % o al 150 %. Debajo, la misma franja de botones que en las otras pantallas, solo con «Cancelar».
+         5 nov 2026: el título va dibujado en la imagen, en el idioma de cada instalador (instalando-es/en/pt.bmp, con
+         InstalandoTitulo de loc-*.wxl): como control de texto, Windows Installer lo pintaba en negro sobre el fondo oscuro, sin
+         leerse (fotos de instalador.yml, ejecución 42042498335), aunque las líneas pequeñas sí salían con su color. -->
+    <Binary Id="GuardianaInstalando" SourceFile="$(sys.SOURCEFILEDIR)instalando-$(var.Idioma).bmp" />
     <UI>
-      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchPanel" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+      <TextStyle Id="Guardiana_Paso" FaceName="Segoe UI" Size="9" Red="156" Green="195" Blue="228" />
+      <TextStyle Id="Guardiana_Linea" FaceName="Segoe UI" Size="9" Red="169" Green="179" Blue="190" />
+      <Dialog Id="InstalandoDlg" Width="370" Height="270" Title="!(loc.ProgressDlg_Title)" Modeless="yes">
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+        <Control Id="Fondo" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="GuardianaInstalando" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Paso" Type="Text" X="18" Y="141" Width="334" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Paso}!(loc.PasoPreparar)">
+          <Subscribe Event="ActionText" Attribute="Text" />
+        </Control>
+        <Control Id="Barra" Type="ProgressBar" X="18" Y="161" Width="334" Height="5" Text="!(loc.ProgressDlgProgressBar)">
+          <Subscribe Event="SetProgress" Attribute="Progress" />
+        </Control>
+        <!-- Cada línea con su punto (otro control, con la misma condición: una línea que no sale no deja su punto) -->
+        <Control Id="PuntoProteccion" Type="Text" X="18" Y="178" Width="8" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Paso}•" />
+        <Control Id="LineaProteccion" Type="Text" X="28" Y="178" Width="324" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Linea}!(loc.InstalandoProteccion)" />
+<?ifdef ZeroExe ?>
+        <Control Id="PuntoZero" Type="Text" X="18" Y="191" Width="8" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="ZERO &lt;&gt; &quot;0&quot;" Text="{\Guardiana_Paso}•" />
+        <Control Id="LineaZero" Type="Text" X="28" Y="191" Width="324" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="ZERO &lt;&gt; &quot;0&quot;" Text="{\Guardiana_Linea}!(loc.InstalandoZero)" />
+<?endif ?>
+        <Control Id="PuntoDns" Type="Text" X="18" Y="204" Width="8" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="VIGILAR = &quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" Text="{\Guardiana_Paso}•" />
+        <Control Id="LineaDns" Type="Text" X="28" Y="204" Width="324" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="VIGILAR = &quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" Text="{\Guardiana_Linea}!(loc.InstalandoDns)" />
+      </Dialog>
     </UI>
     <MajorUpgrade AllowSameVersionUpgrades="yes" IgnoreLanguage="yes" DowngradeErrorMessage="!(loc.VersionMasNueva)" />
     <MediaTemplate EmbedCab="yes" />
@@ -159,11 +217,11 @@
          limpia»): guardiana.exe is a console program, so a shortcut to it opened a black console
          window that stayed in front while the service came up (the panel waits for its key
          before it lets the console go). Show="minimized" starts that console on the taskbar
-         instead; the "Open Guardiana" box at the end of the install runs this same shortcut.
+         instead; the end of the install (LaunchPanel, since 3 Nov 2026 with no click) runs this same shortcut.
          18 Oct 2026 (the owner's video of 1.0.43: the console still showed): with GUARDIANA ZERO
          installed, the default, the shortcuts are ZERO's own further down (a window program,
          started with its panel argument: no console at all) and these two exist only with ZERO=0. Both sets are called
-         «Guardiana», so the finish box (WixShellExecTarget, [MenuDir]Guardiana.lnk) runs
+         «Guardiana», so the end of the install (WixShellExecTarget, [MenuDir]Guardiana.lnk) runs
          whichever is there. The «Guardiana (menú)» shortcut is gone: `guardiana menu` is the
          interactive test menu in a console (crates/cli/src/menu.rs), not something to open from
          the Start menu without a console. -->
@@ -270,7 +328,7 @@
          de la comprobación de Windows que saca esos avisos (InstallValidate), y los avisos de ZERO corren sin ventana a la que
          pedirle que se cierre. Ahora, al pulsar «Instalar» y antes de esa comprobación, se le pide a ZERO que se cierre como con su
          X (guarda lo suyo) y, a los 3 s, lo que quede se termina. Solo al actualizar, reparar o desinstalar; sin ventana de consola
-         (WixQuietExec, que en una acción inmediata lee la línea de WixQuietExecCmdLine). «Abrir GUARDIANA» lo vuelve a abrir. -->
+         (WixQuietExec, que en una acción inmediata lee la línea de WixQuietExecCmdLine). Al terminar, LaunchPanel lo vuelve a abrir. -->
     <!-- (segunda revisión, 2 Nov 2026) solo los ZERO de quien instala (/FI USERNAME: ni los de otras cuentas ni, con ZERO=0, uno
          instalado aparte), con las rutas enteras, y sin dar un error en el registro cuando ZERO no estaba abierto (exit /b 0). -->
     <SetProperty Id="WixQuietExecCmdLine" Value="&quot;[System64Folder]cmd.exe&quot; /d /c &quot;&quot;%SystemRoot%\System32\taskkill.exe&quot; /FI &quot;USERNAME eq %USERDOMAIN%\%USERNAME%&quot; /IM &quot;GUARDIANA ZERO.exe&quot; &amp; &quot;%SystemRoot%\System32\PING.EXE&quot; -n 4 127.0.0.1 &gt;nul &amp; &quot;%SystemRoot%\System32\taskkill.exe&quot; /F /FI &quot;USERNAME eq %USERDOMAIN%\%USERNAME%&quot; /IM &quot;GUARDIANA ZERO.exe&quot; &amp; exit /b 0&quot;" Before="CierraZeroAntes" Sequence="execute" Condition="(Installed OR WIX_UPGRADE_DETECTED) AND NOT (ZERO=&quot;0&quot;)" />
@@ -287,8 +345,8 @@
     <Component Id="ZeroExe" Directory="ZERODIR" Guid="5e0c7a31-8d24-4f6b-b9a2-3c1d7e8f4a95">
       <File Id="ZeroExeFile" Name="GUARDIANA ZERO.exe" Source="$(var.ZeroExe)" KeyPath="yes" />
     </Component>
-    <!-- 1.0.44, a clean start: «Guardiana» in the Start menu and on the desktop, and the finish
-         box, open GUARDIANA ZERO with its panel argument (see Arguments). ZERO is a window program, so no console shows;
+    <!-- 1.0.44, a clean start: «Guardiana» in the Start menu and on the desktop, and the end of
+         the install, open GUARDIANA ZERO with its panel argument (see Arguments). ZERO is a window program, so no console shows;
          its window opens at once on its own dark wait page and turns into the panel the moment
          the service answers (crates/zero/src/lanzador.rs). -->
     <Component Id="ZeroShortcut" Directory="MenuDir" Guid="bc24a3af-c4ba-4297-aa5e-2fac0894c940">
@@ -416,6 +474,11 @@
     <SetProperty Id="QuitarVigilanteAtras" Value="&quot;[System64Folder]schtasks.exe&quot; /Create /TN &quot;\GUARDIANA\Vigilante&quot; /XML &quot;[VIGILANTEDIR]vigilante.xml&quot; /F" Before="QuitarVigilanteAtras" Sequence="execute" />
     <CustomAction Id="QuitarVigilanteAtras" DllEntry="WixQuietExec" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" Execute="rollback" Impersonate="no" Return="ignore" />
     <!-- Lo que dice la barra de progreso mientras corren nuestras acciones (antes, la línea quedaba vacía) -->
+    <!-- 3 nov 2026: y mientras corren las de Windows, que salían en el idioma del sistema y no en el del instalador
+         («Updating component registration» en el instalador en español) y a veces con la plantilla sin rellenar («Copying
+         new files File: [1], Directory: [9], Size: [6]»). Cada texto dice lo que hace esa acción cuando tiene algo que hacer,
+         y vale igual al instalar, actualizar, reparar o quitar (la ventana de reparar y quitar enseña los mismos). Al
+         actualizar, mientras se quita la versión anterior, los textos son los de su propio instalador. -->
     <UI>
 <?ifdef ZeroExe ?>
       <ProgressText Action="CierraZeroAntes" Message="!(loc.ProgresoCerrarZero)" />
@@ -426,6 +489,40 @@
       <ProgressText Action="HomeOff" Message="!(loc.ProgresoHogar)" />
       <ProgressText Action="RestoreDns" Message="!(loc.ProgresoDevolverDns)" />
       <ProgressText Action="QuitarVigilante" Message="!(loc.ProgresoQuitarVigilante)" />
+      <ProgressText Action="LaunchPanel" Message="!(loc.ProgresoAbrir)" />
+      <ProgressText Action="FindRelatedProducts" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="AppSearch" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="LaunchConditions" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="CostInitialize" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="FileCost" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="CostFinalize" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="MigrateFeatureStates" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="InstallValidate" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="RemoveExistingProducts" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="GenerateScript" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="ProcessComponents" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="UnpublishFeatures" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="RemoveRegistryValues" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="RemoveEnvironmentStrings" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="WriteRegistryValues" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="WriteEnvironmentStrings" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="RegisterUser" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="RegisterProduct" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="PublishFeatures" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="PublishProduct" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="UnpublishProduct" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="StopServices" Message="!(loc.PasoParaServicio)" />
+      <ProgressText Action="DeleteServices" Message="!(loc.PasoQuitaServicio)" />
+      <ProgressText Action="InstallServices" Message="!(loc.PasoRegistraServicio)" />
+      <ProgressText Action="StartServices" Message="!(loc.PasoArrancaServicio)" />
+      <ProgressText Action="RemoveShortcuts" Message="!(loc.PasoQuitaArchivos)" />
+      <ProgressText Action="RemoveFiles" Message="!(loc.PasoQuitaArchivos)" />
+      <ProgressText Action="RemoveFolders" Message="!(loc.PasoQuitaArchivos)" />
+      <ProgressText Action="CreateFolders" Message="!(loc.PasoCopiaArchivos)" />
+      <ProgressText Action="InstallFiles" Message="!(loc.PasoCopiaArchivos)" />
+      <ProgressText Action="CreateShortcuts" Message="!(loc.PasoAccesos)" />
+      <ProgressText Action="RollbackCleanup" Message="!(loc.PasoTerminar)" />
+      <ProgressText Action="Rollback" Message="!(loc.PasoDeshacer)" />
     </UI>
     <InstallExecuteSequence>
 <?ifdef ZeroExe ?>

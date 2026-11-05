@@ -176,6 +176,12 @@ if ($null -ne $viejo) {
         Stop-Process -Id $viejo.Id -Force -ErrorAction SilentlyContinue
     }
 }
+# 3 Nov 2026: the installer opens ZERO when it ends only through its own screens (the interface sequence, which Windows
+# does not run with /qn, /qb or /passive); installed in silence, as here, nothing opens.
+Start-Sleep -Seconds 3
+$solos = @(Get-Process -Name 'GUARDIANA ZERO' -ErrorAction SilentlyContinue)
+Comprueba ($solos.Count -eq 0) "instalado en silencio, no se abre nada ($(Ventanas))"
+$solos | Stop-Process -Force -ErrorAction SilentlyContinue
 $productos = Productos
 Comprueba (($productos.Count -eq 1) -and ($productos[0] -eq $codigo)) "una sola GUARDIANA ZERO instalada, la nueva ($($productos -join ', '))"
 Comprueba ($codigoViejo -ne $codigo) "la vieja era otro producto de la misma familia ($codigoViejo)"

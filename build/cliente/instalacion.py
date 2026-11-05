@@ -402,6 +402,19 @@ def desinstalar(tipo, paquete, carpeta):
     return False, ""
 
 
+def nada_abierto(cuando):
+    """3 Nov 2026: GUARDIANA opens by itself when installing ends, but only through the installer's screens (its interface
+    sequence, which Windows does not run with /qn, /qb or /passive). Installed in silence, as here, nothing may open."""
+    if SISTEMA != "Windows":
+        return
+    time.sleep(5)
+    _, out = ps("Get-Process -Name 'GUARDIANA ZERO' -ErrorAction SilentlyContinue | "
+                "ForEach-Object { \"$($_.Id) «$($_.MainWindowTitle)»\" }")
+    abiertos = [l.strip() for l in out.splitlines() if l.strip()]
+    (ok if not abiertos else mal)(f"{cuando} en silencio no abre nada",
+                                  "ningún GUARDIANA ZERO en marcha" if not abiertos else " | ".join(abiertos))
+
+
 def paquete_de(tipo, carpeta):
     patron = {"msi": "guardiana-*-windows-x64.msi", "deb": "guardiana_*_amd64.deb",
               "tar": "guardiana-*-linux-x86_64.tar.gz", "app": "guardiana-*-macos.app.zip"}[tipo]
@@ -426,6 +439,8 @@ def tarde(tipo, paquete, version):
         mal("instalar", out[-1500:])
         return
     ok("instalar", os.path.basename(paquete))
+    if tipo == "msi":
+        nada_abierto("instalar")
 
     if esperar(lambda: servicio() == "running", 40):
         ok("servicio en marcha")
@@ -641,6 +656,8 @@ def tarde(tipo, paquete, version):
     if not bien:
         mal("reinstalar", out[-800:])
         return
+    if tipo == "msi":
+        nada_abierto("reinstalar")
     esperar(lambda: panel("/", con_llave=False)[0] == 200, 40)
     lic2, err = prueba_actual()
     termina2 = buscar(lic2, "termina") if lic2 else None
@@ -876,6 +893,7 @@ def actualizacion(anterior, nuevo, version):
     esperar(lambda: servicio() == "running", 40)
     bien, out = instalar("msi", nuevo, None)
     (ok if bien else mal)("actualizar · instalar encima la nueva", out[-600:])
+    nada_abierto("actualizar")
     code, out = ps("Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | "
                    "Where-Object { $_.DisplayName -like '*uardiana*' } | ForEach-Object { $_.DisplayName + ' ' + $_.DisplayVersion }")
     lineas = [l for l in out.splitlines() if l.strip()]
