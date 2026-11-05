@@ -2,13 +2,14 @@
 """The installer pictures (WiX, 1.0.18; new logo 17 Oct 2026), for GUARDIANA and for GUARDIANA ZERO: the side of the
 first and last screens (493x312, one per language: it carries the phrase of every social
 profile) and the band of the others (493x58). Near-black panel, the padlock-G symbol, the name
-centred under it. Since 3 Nov 2026 also the page shown while GUARDIANA installs (instalando.bmp, 493x312, the same for
-the three languages: its words are the dialog's own controls, see InstalandoDlg in guardiana.wxs). Rendered by Chromium
-with the panel's own fonts and saved as 24-bit BMP next to this file.
+centred under it. Since 3 Nov 2026 also the page shown while GUARDIANA installs (instalando-<es|en|pt>.bmp, 493x312: its
+title is drawn here, in the language of each installer, read from loc-*.wxl; the step, the bar and the lines are the dialog's
+own controls, see InstalandoDlg in guardiana.wxs). Rendered by Chromium with the panel's own fonts and saved as 24-bit BMP
+next to this file.
 Usage: python3 build/wix/imagenes.py <scratch dir for the html and png> [name ...]
-With names (banner, banner-zero, dialogo-es, ..., instalando) only those are drawn again: a newer Chromium draws the
+With names (banner, banner-zero, dialogo-es, ..., instalando-es) only those are drawn again: a newer Chromium draws the
 letters a hair differently, and pictures nobody changed should not change."""
-import glob, os, pathlib, sys
+import glob, os, pathlib, re, sys
 from playwright.sync_api import sync_playwright
 from PIL import Image
 D = pathlib.Path(__file__).resolve().parent
@@ -131,17 +132,31 @@ const t=.62*PI,ox=R*1.62*Math.cos(t),oy=R*.42*Math.sin(t),cr=Math.cos(-.30),sr=M
 x.save();x.shadowColor='rgba(156,195,228,.95)';x.shadowBlur=8;x.fillStyle='#E8ECF1';x.beginPath();
 x.arc(CX+ox*cr-oy*sr,CY+ox*sr+oy*cr,1.7,0,7);x.fill();x.restore();
 '''
-def instalando():
+# 5 Nov 2026: the title is drawn in the picture, in each installer's language. As a text control of the dialog (Segoe UI
+# Semibold 16, a light TextStyle) Windows Installer drew it in black on the dark picture, unreadable (photos of instalador.yml,
+# run 42042498335), while the smaller lines kept their colour. Its words stay in loc-*.wxl (InstalandoTitulo), read here.
+CULTURA = {'es': 'es-ES', 'en': 'en-US', 'pt': 'pt-BR'}
+def titulo(idioma):
+    t = (D / f'loc-{CULTURA[idioma]}.wxl').read_text(encoding='utf-8')
+    m = re.search(r'<String Id="InstalandoTitulo" Value="([^"]+)"', t)
+    if not m:
+        sys.exit(f'loc-{CULTURA[idioma]}.wxl: sin InstalandoTitulo')
+    return m.group(1)
+def instalando(idioma):
     return f'''<!doctype html><meta charset=utf-8><style>{BASE}
+@font-face{{font-family:'IBM Plex Sans';font-weight:600;src:url({FUENTES}/IBMPlexSans-600-latin.woff2)}}
 html,body{{width:493px;height:312px;background:#06080C}}
 canvas{{position:absolute;left:0;top:0;width:493px;height:312px}}
 .cab{{position:absolute;left:24px;top:20px;display:flex;align-items:center;gap:9px}}
 .cab .marca{{font-size:12.5px;letter-spacing:.24em;padding-left:0}}
+.titulo{{position:absolute;left:24px;top:153px;width:445px;margin:0;font:600 21px/1.2 'IBM Plex Sans';color:#E8ECF1;white-space:nowrap}}
 .pie{{position:absolute;right:24px;top:292px}}</style>
 <canvas id=c width=986 height=624></canvas>
 <div class=cab>{SYM(26)}<span class=marca>GUARDIANA</span></div>
+<p class=titulo>{titulo(idioma)}</p>
 <div class=pie><span class=web>guardianagroup.com</span></div>
-<script>{DIBUJO}</script>'''
+<script>{DIBUJO}
+document.fonts.ready.then(()=>{{const e=document.querySelector('.titulo');let t=21;while(e.scrollWidth>445&&t>15){{t-=.25;e.style.fontSize=t+'px'}}}});</script>'''
 def chromium():
     """Playwright's Chromium wherever this machine keeps it (chromium-1194 until Oct 2026, chromium-1243 after)."""
     if os.environ.get('CHROMIUM'):
@@ -156,7 +171,7 @@ with sync_playwright() as p:
     trabajos = [('banner', banner(False), 493, 58), ('banner-zero', banner(True), 493, 58)]
     for i in FRASE:
         trabajos += [(f'dialogo-{i}', dialogo(False, i), 493, 312), (f'dialogo-zero-{i}', dialogo(True, i), 493, 312)]
-    trabajos.append(('instalando', instalando(), 493, 312))
+    trabajos += [(f'instalando-{i}', instalando(i), 493, 312) for i in FRASE]
     for nombre, html, w, h in trabajos:
         if pedidos and nombre not in pedidos:
             continue

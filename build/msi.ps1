@@ -48,7 +48,9 @@ $welcome = Join-Path $here "wix\textos\bienvenida-$Idioma.rtf"
 $loc = Join-Path $here "wix\loc-$cultura.wxl"
 # The side picture carries the phrase of the profiles in the installer's language (1.0.18).
 $dialogo = Join-Path $here "wix\dialogo-$Idioma.bmp"
-foreach ($f in @($readme, $welcome, $loc, $dialogo)) { if (-not (Test-Path $f)) { throw "Falta $f" } }
+# The page while it installs, with its title drawn in the installer's language (5 Nov 2026; build/wix/imagenes.py).
+$instalando = Join-Path $here "wix\instalando-$Idioma.bmp"
+foreach ($f in @($readme, $welcome, $loc, $dialogo, $instalando)) { if (-not (Test-Path $f)) { throw "Falta $f" } }
 $icon = Join-Path $here "wix\guardiana.ico"
 # The exe must carry a version resource. Without one, Windows Installer compares timestamps
 # instead of versions and can silently keep the old binary on an upgrade (DECISIONES #93).

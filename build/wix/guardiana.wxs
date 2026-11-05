@@ -102,16 +102,18 @@
     <!-- 3 nov 2026 (el dueño, 09:23: «mientras se instala y tarda un poquito, que salga la pantalla de un instalador bien
          bonita… o una página entera de Guardiana se está instalando en tu programa. Algo muy profesional»): la pantalla
          mientras se instala es una página de GUARDIANA, del tamaño de las demás (370x270, la misma ventana que la de los
-         términos, que no cambia), hecha solo con lo que trae Windows Installer: el dibujo de fondo (instalando.bmp, de
+         términos, que no cambia), hecha solo con lo que trae Windows Installer: el dibujo de fondo (instalando-<idioma>.bmp, de
          build/wix/imagenes.py: fondo oscuro, el símbolo y el nombre, y una esfera tranquila con su red, como la portada del
          programa), el título grande, debajo el paso de ahora (ActionText: los textos de ProgressText, en el idioma del
          instalador), una barra fina de Windows y tres líneas de lo que está pasando, cada una solo cuando es verdad (ZERO, si
          va en el paquete y no se quitó con ZERO=0; el DNS, solo la primera vez y con VIGILAR=1, las mismas condiciones que
          ApplyDns). Letra Segoe UI en colores claros y texto transparente sobre el dibujo; Windows lo escala con el resto del
-         diálogo al 125 % o al 150 %. Debajo, la misma franja de botones que en las otras pantallas, solo con «Cancelar». -->
-    <Binary Id="GuardianaInstalando" SourceFile="$(sys.SOURCEFILEDIR)instalando.bmp" />
+         diálogo al 125 % o al 150 %. Debajo, la misma franja de botones que en las otras pantallas, solo con «Cancelar».
+         5 nov 2026: el título va dibujado en la imagen, en el idioma de cada instalador (instalando-es/en/pt.bmp, con
+         InstalandoTitulo de loc-*.wxl): como control de texto, Windows Installer lo pintaba en negro sobre el fondo oscuro, sin
+         leerse (fotos de instalador.yml, ejecución 42042498335), aunque las líneas pequeñas sí salían con su color. -->
+    <Binary Id="GuardianaInstalando" SourceFile="$(sys.SOURCEFILEDIR)instalando-$(var.Idioma).bmp" />
     <UI>
-      <TextStyle Id="Guardiana_Titulo" FaceName="Segoe UI Semibold" Size="16" Red="232" Green="236" Blue="241" />
       <TextStyle Id="Guardiana_Paso" FaceName="Segoe UI" Size="9" Red="156" Green="195" Blue="228" />
       <TextStyle Id="Guardiana_Linea" FaceName="Segoe UI" Size="9" Red="169" Green="179" Blue="190" />
       <Dialog Id="InstalandoDlg" Width="370" Height="270" Title="!(loc.ProgressDlg_Title)" Modeless="yes">
@@ -120,7 +122,6 @@
         </Control>
         <Control Id="Fondo" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="GuardianaInstalando" />
         <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
-        <Control Id="Titulo" Type="Text" X="18" Y="116" Width="334" Height="24" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Titulo}!(loc.InstalandoTitulo)" />
         <Control Id="Paso" Type="Text" X="18" Y="141" Width="334" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Paso}!(loc.PasoPreparar)">
           <Subscribe Event="ActionText" Attribute="Text" />
         </Control>
