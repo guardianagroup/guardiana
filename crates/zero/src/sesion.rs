@@ -843,8 +843,9 @@ const PANEL_LECTURAS: &[(&str, &str)] = &[
     ("GET", "/api/ruta"),
     ("POST", "/api/ruta/ahora"),
     // 1.0.52, the VPN (the owner, 1 Nov 2026: «VPN como sección propia»): its state, and the two orders, which the
-    // panel takes only right after a real click (see the gesture rule above). No server is named from the web: the
-    // panel connects to GUARDIANA's default one.
+    // panel takes only right after a real click (see the gesture rule above). Since 5 Nov 2026 the web may name one of
+    // GUARDIANA's exits by its id, never a server's name or address: [`cuerpo_para_el_panel`] checks the body and
+    // writes it again, and the panel checks the id is one of its exits.
     ("GET", "/api/vpn"),
     ("POST", "/api/vpn/conecta"),
     ("POST", "/api/vpn/desconecta"),
@@ -865,7 +866,8 @@ const PANEL_LECTURAS: &[(&str, &str)] = &[
 /// 5 Nov 2026: the body GUARDIANA's web may send with a VPN order, passed to the panel rewritten from what it means:
 /// `{"salida": "<id>"}` for «conectar» (an exit's id, or `rapida`; the panel checks it is one of GUARDIANA's) and
 /// `{"activo": true|false}` for strict mode's switch (the web says it as `"estricto"`). No body, an empty one or `{}`:
-/// none, and the panel does what it always did. Anything else is refused (`Err`), and no other order carries a body.
+/// none, and the panel does what it always did; for «desconectar» too (review of the 1.0.56 VPN: its `{}` was refused).
+/// Anything else is refused (`Err`), and no other order carries a body.
 fn cuerpo_para_el_panel(
     metodo: &str,
     ruta: &str,
@@ -882,7 +884,12 @@ fn cuerpo_para_el_panel(
     }
     let v: Value = serde_json::from_str(texto).map_err(|_| ())?;
     let o = v.as_object().ok_or(())?;
-    if o.is_empty() && (ruta == "/api/vpn/conecta" || ruta == "/api/vpn/estricto") {
+    if o.is_empty()
+        && matches!(
+            ruta,
+            "/api/vpn/conecta" | "/api/vpn/desconecta" | "/api/vpn/estricto"
+        )
+    {
         return Ok(None);
     }
     if o.len() != 1 {
