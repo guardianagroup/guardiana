@@ -863,7 +863,7 @@ impl Vpn {
         let d = self.deseo();
         for (id, medida) in &mut m.de {
             if medida.ip.is_none() {
-                medida.ip = salidas::por_id(*id)
+                medida.ip = salidas::por_id(id)
                     .and_then(|s| d.sin_resolver(s.nombre, 443))
                     .map(|a| a.ip());
             }
