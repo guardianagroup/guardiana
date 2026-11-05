@@ -117,6 +117,10 @@ body:has(main.lente) > footer { max-width: calc(var(--s-pagina) + 2 * var(--s-ma
 .lente-tarjeta > .lente-tb > :last-child { margin-bottom: 0; }
 .lente-tarjeta > .lente-tb + .lente-tb { border-top: 1px solid var(--line); }
 .lente-tarjeta .lente-tabla { overflow-x: auto; }
+/* Las etiquetas de una celda («Asistente Ejemplo IA», «asistente-ejemplo.exe ×540») pueden ir en dos líneas: sin
+   partirse se quedaban con el ancho y la última columna («última actividad») salía cortada a 1366 px, con
+   desplazamiento lateral (apiñamientos, 5 nov 2026). */
+.lente-tabla td .tag { white-space: normal; line-height: 1.3; }
 .lente-tarjeta > .lente-tb.sin-margen { padding: 0; }
 /* Older cards inside the pattern take the same paper and the same spacing. */
 .lente .card, .lente .tarjeta { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-tarjeta); padding: var(--e5); margin: 0; box-shadow: none; }
