@@ -8,6 +8,7 @@
 
 pub mod acceso;
 pub mod avisos;
+pub mod bandeja;
 pub mod campos;
 pub mod cartas;
 pub mod chivatos;
