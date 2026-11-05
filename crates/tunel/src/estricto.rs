@@ -6,14 +6,17 @@
 //!
 //! - [`Deseo`]: strict mode (on unless the person turns it off), whether the VPN is meant to be on, its server, and the
 //!   server's addresses: with the block on no name resolves outside the tunnel, so a new sign-up goes to the address
-//!   known. Kept in [`ARCHIVO`], under the data folder's `sistema`, which only the system and the administrators can
-//!   write (`guardiana_core::paths::harden_data_dir`).
+//!   known. While the VPN is on, the last address known of each of GUARDIANA's servers too (review of the 1.0.56 VPN):
+//!   changing exit with the tunnel down, or going back to the one of before, needs one. Kept in [`ARCHIVO`], under the
+//!   data folder's `sistema`, which only the system and the administrators can write
+//!   (`guardiana_core::paths::harden_data_dir`).
 //! - [`al_arrancar`]: at the service's start, a block nobody wants any more is removed; a VPN meant to be on in strict
 //!   mode is brought back, with the block held meanwhile.
 //! - [`claves`]: the provider, the sublayer and the filters strict mode adds to Windows, by fixed keys, so the service,
 //!   `guardiana vpn apaga` and the uninstaller always find and remove them, whichever version put them there.
 
-use std::net::SocketAddr;
+use std::collections::BTreeMap;
+use std::net::{IpAddr, SocketAddr};
 use std::path::Path;
 use std::time::Duration;
 
@@ -70,7 +73,17 @@ pub struct Deseo {
     /// ...and its address, where the encrypted packets go.
     #[serde(default)]
     pub extremo: Option<SocketAddr>,
+    /// The last address known of each of GUARDIANA's servers while the VPN is on, by name (review of the 1.0.56 VPN):
+    /// the servers it went to, and what was measured of the exits with the VPN off. With the block on no name resolves
+    /// outside the tunnel, so changing exit, or going back to the one of before, goes to the address known here. Only
+    /// names of guardianagroup.com, at most [`CONOCIDAS_MAXIMO`], and forgotten with the rest when the VPN is turned
+    /// off.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub conocidas: BTreeMap<String, IpAddr>,
 }
+
+/// How many servers' addresses [`Deseo::conocidas`] keeps.
+pub const CONOCIDAS_MAXIMO: usize = 16;
 
 fn si() -> bool {
     true
@@ -86,21 +99,53 @@ impl Default for Deseo {
             alta: None,
             punto: String::new(),
             extremo: None,
+            conocidas: BTreeMap::new(),
         }
     }
 }
 
 impl Deseo {
     /// The wish in the file's text. What cannot be read is the VPN off (strict mode on); so is a VPN «on» with no server
-    /// of GUARDIANA's or no address to reach it, which would be a block with no way back to the server.
+    /// of GUARDIANA's or no address to reach it, which would be a block with no way back to the server. Of the addresses
+    /// known, only those of GUARDIANA's servers.
     #[must_use]
     pub fn de_texto(texto: &str) -> Self {
-        let d: Self = serde_json::from_str(texto).unwrap_or_default();
+        let mut d: Self = serde_json::from_str(texto).unwrap_or_default();
+        d.conocidas
+            .retain(|nombre, _| crate::alta::es_servidor(nombre));
+        while d.conocidas.len() > CONOCIDAS_MAXIMO {
+            d.conocidas.pop_last();
+        }
         if d.encendida && (!crate::alta::es_servidor(&d.servidor) || d.alta.is_none()) {
             d.apagada()
         } else {
             d
         }
+    }
+
+    /// `nombre` is at `ip`, kept among the addresses known when it is one of GUARDIANA's servers and there is room (the
+    /// newest address of a name known wins).
+    fn conoce(&mut self, nombre: &str, ip: IpAddr) {
+        let nombre = nombre.to_ascii_lowercase();
+        if !crate::alta::es_servidor(&nombre)
+            || (self.conocidas.len() >= CONOCIDAS_MAXIMO && !self.conocidas.contains_key(&nombre))
+        {
+            return;
+        }
+        self.conocidas.insert(nombre, ip);
+    }
+
+    /// With `direcciones` among the addresses known: each a server's name and its address (what was measured of the
+    /// exits with the VPN off). Names not of GUARDIANA's are left out.
+    #[must_use]
+    pub fn con_conocidas<'a>(
+        mut self,
+        direcciones: impl IntoIterator<Item = (&'a str, IpAddr)>,
+    ) -> Self {
+        for (nombre, ip) in direcciones {
+            self.conoce(nombre, ip);
+        }
+        self
     }
 
     /// The text kept in the file.
@@ -124,23 +169,44 @@ impl Deseo {
         }
     }
 
-    /// The VPN on with `servidor`, its HTTPS at `alta`. What was known of its endpoint stays when it is the same server.
+    /// The VPN on with `servidor`, its HTTPS at `alta`. What was known of its endpoint stays when it is the same server;
+    /// with another, the addresses of the one of before stay among the addresses known (until the 1.0.56 review they
+    /// were forgotten, and going back to it with the block on and the tunnel down had no address to go to).
     #[must_use]
     pub fn encendida_con(self, servidor: &str, alta: SocketAddr) -> Self {
-        let mismo = self.servidor == servidor;
-        Self {
-            estricto: self.estricto,
+        let Self {
+            estricto,
+            servidor: antes,
+            alta: alta_antes,
+            punto,
+            extremo,
+            conocidas,
+            ..
+        } = self;
+        let mismo = antes == servidor;
+        let mut d = Self {
+            estricto,
             encendida: true,
             servidor: servidor.to_owned(),
             alta: Some(alta),
-            punto: if mismo { self.punto } else { String::new() },
-            extremo: if mismo { self.extremo } else { None },
+            punto: if mismo { punto.clone() } else { String::new() },
+            extremo: if mismo { extremo } else { None },
+            conocidas,
+        };
+        if let Some(a) = alta_antes {
+            d.conoce(&antes, a.ip());
         }
+        if let Some(e) = extremo {
+            d.conoce(&punto, e.ip());
+        }
+        d.conoce(servidor, alta.ip());
+        d
     }
 
-    /// The endpoint a sign-up gave: its name and its address.
+    /// The endpoint a sign-up gave: its name and its address (known from now on too).
     #[must_use]
-    pub fn con_extremo(self, punto: &str, extremo: SocketAddr) -> Self {
+    pub fn con_extremo(mut self, punto: &str, extremo: SocketAddr) -> Self {
+        self.conoce(punto, extremo.ip());
         Self {
             punto: punto.to_owned(),
             extremo: Some(extremo),
@@ -158,17 +224,20 @@ impl Deseo {
     }
 
     /// The address of `nombre` at `puerto` without asking any resolver: the HTTPS address's, when it is the server
-    /// asked for (GUARDIANA's servers answer the sign-up and the tunnel on one address), or the endpoint's the last
-    /// sign-up gave. `None` when neither is known.
+    /// asked for (GUARDIANA's servers answer the sign-up and the tunnel on one address), the endpoint's the last
+    /// sign-up gave, or the last one known of that name. `None` when none is known.
     #[must_use]
     pub fn sin_resolver(&self, nombre: &str, puerto: u16) -> Option<SocketAddr> {
-        if !nombre.is_empty() && nombre == self.servidor {
-            return self.alta.map(|a| SocketAddr::new(a.ip(), puerto));
+        if nombre.is_empty() {
+            return None;
         }
-        if !nombre.is_empty() && nombre == self.punto {
-            return self.extremo.map(|e| SocketAddr::new(e.ip(), puerto));
-        }
-        None
+        let del_servidor = (nombre == self.servidor).then_some(self.alta).flatten();
+        let del_punto = (nombre == self.punto).then_some(self.extremo).flatten();
+        del_servidor
+            .or(del_punto)
+            .map(|a| a.ip())
+            .or_else(|| self.conocidas.get(&nombre.to_ascii_lowercase()).copied())
+            .map(|ip| SocketAddr::new(ip, puerto))
     }
 }
 
@@ -177,6 +246,20 @@ impl Deseo {
 pub fn lee_de(datos: &Path) -> Deseo {
     std::fs::read_to_string(datos.join(ARCHIVO))
         .map_or_else(|_| Deseo::default(), |t| Deseo::de_texto(&t))
+}
+
+/// The wish kept in the data folder `datos`, telling a file that cannot be read right now apart: no file is the VPN off
+/// (strict mode on), as for [`lee_de`]; a file there that cannot be read is an error, so that a passing failure (another
+/// program holding it a moment) is not taken for the VPN turned off from outside the service.
+///
+/// # Errors
+/// What the file system said, other than the file not being there.
+pub fn lee_si_se_puede(datos: &Path) -> std::io::Result<Deseo> {
+    match std::fs::read_to_string(datos.join(ARCHIVO)) {
+        Ok(t) => Ok(Deseo::de_texto(&t)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Deseo::default()),
+        Err(e) => Err(e),
+    }
 }
 
 /// Keeps `deseo` in the data folder `datos`, whole or not at all: written aside, then put in its place.
@@ -336,6 +419,80 @@ mod tests {
         assert!(otro.estricto && otro.encendida);
     }
 
+    /// Review of the 1.0.56 VPN: changing exit no longer forgets where the one of before is. With the block on and the
+    /// tunnel down no name resolves, and going back to it needs its address.
+    #[test]
+    fn otro_servidor_no_olvida_la_direccion_del_anterior() {
+        let otro = encendida().encendida_con(
+            "vpn-mia.guardianagroup.com",
+            "192.0.2.9:443".parse().unwrap(),
+        );
+        assert_eq!(
+            otro.sin_resolver("vpn.guardianagroup.com", 443),
+            Some("62.238.17.121:443".parse().unwrap())
+        );
+        assert_eq!(
+            otro.sin_resolver("VPN-MIA.guardianagroup.com", 51820),
+            Some("192.0.2.9:51820".parse().unwrap())
+        );
+        // and back to Helsinki: its address is known, and Miami's stays
+        let vuelta = otro.encendida_con(
+            "vpn.guardianagroup.com",
+            "62.238.17.121:443".parse().unwrap(),
+        );
+        assert_eq!(
+            vuelta.sin_resolver("vpn-mia.guardianagroup.com", 443),
+            Some("192.0.2.9:443".parse().unwrap())
+        );
+        // the endpoint a sign-up gave is known too
+        let con = vuelta.con_extremo(
+            "motor-hel.guardianagroup.com",
+            "192.0.2.7:51820".parse().unwrap(),
+        );
+        assert_eq!(
+            con.conocidas.get("motor-hel.guardianagroup.com"),
+            Some(&"192.0.2.7".parse().unwrap())
+        );
+        // saved and read alike; turned off, nothing of it stays
+        assert_eq!(Deseo::de_texto(&con.texto()), con);
+        assert!(con.apagada().conocidas.is_empty());
+    }
+
+    /// What was measured of the exits joins the addresses known, only for names of GUARDIANA's, and never more than the
+    /// maximum, also when the file says otherwise.
+    #[test]
+    fn las_direcciones_conocidas_solo_de_guardiana_y_con_tope() {
+        let ip: IpAddr = "192.0.2.10".parse().unwrap();
+        let d = encendida().con_conocidas([
+            ("vpn-nbg.guardianagroup.com", ip),
+            ("vpn.example.com", ip),
+            ("", ip),
+        ]);
+        assert_eq!(
+            d.sin_resolver("vpn-nbg.guardianagroup.com", 443),
+            Some(SocketAddr::new(ip, 443))
+        );
+        assert_eq!(d.sin_resolver("vpn.example.com", 443), None);
+        let muchos: Vec<String> = (0..40)
+            .map(|i| format!("vpn-{i}.guardianagroup.com"))
+            .collect();
+        let lleno = Deseo::default().con_conocidas(muchos.iter().map(|n| (n.as_str(), ip)));
+        assert_eq!(lleno.conocidas.len(), CONOCIDAS_MAXIMO);
+        // a file with others' names, or too many, is read with GUARDIANA's alone and the maximum
+        let mut texto: serde_json::Value = serde_json::from_str(&encendida().texto()).unwrap();
+        let mut todas = serde_json::Map::new();
+        for n in &muchos {
+            todas.insert(n.clone(), serde_json::json!("192.0.2.10"));
+        }
+        todas.insert("evil.example.com".into(), serde_json::json!("192.0.2.66"));
+        texto["conocidas"] = serde_json::Value::Object(todas);
+        let leido = Deseo::de_texto(&texto.to_string());
+        assert_eq!(leido.conocidas.len(), CONOCIDAS_MAXIMO);
+        assert!(!leido.conocidas.contains_key("evil.example.com"));
+        // a file of before, with no addresses known: read as it was
+        assert!(Deseo::de_texto("{\"estricto\": true}").conocidas.is_empty());
+    }
+
     /// With the block on no name resolves outside the tunnel: the server's addresses come from what is known.
     #[test]
     fn las_direcciones_sin_resolver() {
@@ -391,9 +548,16 @@ mod tests {
         assert!(!dir.join("sistema/vpn.json.tmp").exists());
         guarda_en(&dir, &encendida().apagada()).unwrap();
         assert!(!lee_de(&dir).encendida);
+        assert!(!lee_si_se_puede(&dir).unwrap().encendida);
         olvida_en(&dir).unwrap();
         olvida_en(&dir).unwrap();
         assert!(!dir.join(ARCHIVO).exists());
+        // no file is the VPN off, also for the reading that tells a file it cannot read apart
+        assert_eq!(lee_si_se_puede(&dir).unwrap(), Deseo::default());
+        // a file there that cannot be read (here, a folder in its place) is not taken for the VPN off
+        std::fs::create_dir_all(dir.join(ARCHIVO)).unwrap();
+        assert!(lee_si_se_puede(&dir).is_err());
+        assert_eq!(lee_de(&dir), Deseo::default());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -435,6 +599,10 @@ mod tests {
         assert_eq!(espera_tras(3), Duration::from_secs(15));
         assert_eq!(espera_tras(9), crate::conexion::REINTENTO);
         assert!(espera_tras(0) <= espera_tras(2) && espera_tras(2) <= espera_tras(4));
+        // what the panel's loop waits after each failed attempt in a row (it counts the failure first, so the first
+        // wait is `espera_tras(1)`): 5 s, 15 s, 15 s, and then every 30 s. docs/VPN.md says the same.
+        let esperas: Vec<u64> = (1..=6).map(|f| espera_tras(f).as_secs()).collect();
+        assert_eq!(esperas, [5, 15, 15, 30, 30, 30]);
     }
 
     /// After a sleep, the clock jumped: the server gets its margin again from the wake-up.
