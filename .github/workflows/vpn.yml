@@ -119,7 +119,7 @@ jobs:
   # the service killed, and then stopped as an update stops it: the block stays (persistent filters, outliving the
   # process); «Desconectar» (POST /api/vpn/desconecta) takes it all away and the network is back; a block left with
   # strict mode off in what is kept is removed by the service's start; and `guardiana vpn apaga`, with the service
-  # stopped, removes it too. The block on what Windows forwards (WSL2, Hyper-V, Docker, ICS; 1.0.56) is read in
+  # stopped, removes it too. The block on what Windows forwards (ICS, the mobile hotspot, WinNAT; 1.0.56) is read in
   # Windows' own list (netsh wfp show state), in both forwarding layers, and counted filter by filter by `guardiana vpn
   # estado` (2 persistent and 2 boot-time), through the service's death and stop, and gone with each way out. Review of
   # the 1.0.56 VPN: the service starts after Windows' filtering service (BFE), also one registered before without it; the

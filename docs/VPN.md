@@ -108,11 +108,10 @@ Lo que cambió en la 1.0.55 (tercera revisión, 2 nov 2026), y por qué:
   DHCPv6 entre direcciones del enlace y el descubrimiento de vecinos (ICMPv6 133 a 137), y nada del servicio salvo que el
   servidor sea de IPv6 (y entonces solo el UDP a él). Todo lo demás de IPv6 cae en «todo lo demás».
 
-**Lo que Windows reenvía** (1.0.56, revisión del 5 nov 2026). Lo que Windows pasa de una de sus interfaces a otra —WSL2,
-el «Default Switch» de Hyper-V, Windows Sandbox, Docker, la conexión compartida (ICS) y la zona con cobertura móvil, con
-el NAT del propio Windows— no pasa por las capas de autorización de conexiones, donde estaba todo el plan, sino por las de
-reenvío (`FWPM_LAYER_IPFORWARD_V4` y `_V6`; Microsoft, «WFP layer requirements and restrictions»). Hasta la 1.0.56 lo de
-esas máquinas salía por la tarjeta con la dirección real siempre que una ruta lo mandara allí: con el túnel caído (el
+**Lo que Windows reenvía** (1.0.56, revisión del 5 nov 2026). Lo que la pila IP de Windows pasa de una de sus interfaces
+a otra —la conexión compartida (ICS), la zona con cobertura móvil y el NAT del propio Windows (WinNAT)— no pasa por las
+capas de autorización de conexiones, donde estaba todo el plan, sino por las de reenvío (`FWPM_LAYER_IPFORWARD_V4` y
+`_V6`; Microsoft, «WFP layer requirements and restrictions»). Hasta la 1.0.56 lo reenviado salía por la tarjeta con la dirección real siempre que una ruta lo mandara allí: con el túnel caído (el
 modo estricto reconectando, el equipo arrancando, el servicio muerto o parado) y, con él arriba, hacia la red de casa,
 por una ruta de un DHCP ajeno (TunnelVision) o en IPv6. Ahora el plan bloquea todo lo reenviado con el peso más bajo
 («lo reenviado fuera del túnel»), en el corte de siempre y en el modo estricto, persistente y de arranque, con las mismas
@@ -125,10 +124,13 @@ las demás capas y lo que da el adaptador, sin nada que traducir. `FWPM_CONDITIO
 túnel en las capas de conexiones, en las de reenvío es la interfaz por la que llegó el paquete: se usa ahí para las
 respuestas que salen del túnel. Lo mismo hace el interruptor de corte de VpnHood para Windows; las reglas de WireGuard
 no filtran el reenvío; y a los usuarios de simplewall un bloqueo ahí les cortaba la zona con cobertura, ICS y los
-conmutadores virtuales con NAT, así que ese tráfico pasa por ahí. Lo que no alcanza: lo que traduce el propio
+conmutadores virtuales con NAT, así que ese tráfico pasa por ahí. **Lo que no cubre, y no se ha probado en un equipo
+real:** WSL2 (con NAT o en modo «mirrored»), ni Hyper-V, Windows Sandbox o Docker Desktop cuando el NAT lo hace el propio
 conmutador virtual de Hyper-V sin que la pila IP de Windows lo reenvíe (Mullvad vio así el tráfico de WSL, solo como
-tramas Ethernet, y lo corta con el cortafuegos de Hyper-V, de Windows 11 22H2 en adelante), y las máquinas en un
-conmutador externo, que son de la red y no de este equipo.
+tramas Ethernet); ni las máquinas en un conmutador externo, que son de la red y no de este equipo. Su tráfico puede salir
+fuera del túnel, también con el modo estricto, y la pantalla de la VPN lo dice. Siguiente paso: el cortafuegos de Hyper-V
+(Windows 11 22H2 y posteriores), como hace Mullvad. Lo que la integración continua comprueba es que Windows acepta estos
+filtros y los quita; no tiene WSL, ni Hyper-V, ni ICS para probar tráfico reenviado de verdad.
 
 Las pruebas del plan, en todos los sistemas, le preguntan qué decide para cada conexión como lo decide Windows dentro de
 una subcapa (el peso más alto entre los filtros que casan; dos condiciones del mismo campo valen cualquiera de las dos):

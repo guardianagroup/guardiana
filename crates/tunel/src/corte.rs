@@ -22,9 +22,10 @@
 //! - block everything Windows forwards, at the lowest weight, but what goes into the tunnel's interface or comes out of
 //!   it (1.0.56, below).
 //!
-//! Forwarding (1.0.56, review of 5 Nov 2026): what Windows forwards from one of its interfaces to another (WSL2,
-//! Hyper-V's Default Switch, Windows Sandbox, Docker, the shared connection or the mobile hotspot, through Windows' own
-//! NAT) never meets the connection-authorisation layers: it is classified in the forwarding layers,
+//! Forwarding (1.0.56, review of 5 Nov 2026): what Windows' IP stack forwards from one of its interfaces to another (the
+//! shared connection, the mobile hotspot and Windows' own NAT, WinNAT; not WSL2, nor Hyper-V, Windows Sandbox or Docker
+//! Desktop when Hyper-V's virtual switch does the NAT itself, docs/VPN.md) never meets the connection-authorisation
+//! layers: it is classified in the forwarding layers,
 //! `FWPM_LAYER_IPFORWARD_V4` and `_V6`, once forwarding is on for the interfaces, as Hyper-V's network service and ICS
 //! turn it on for theirs (Microsoft, «WFP layer requirements and restrictions», «Forwarding layer»; WinNAT itself
 //! translates there). Until 1.0.56 nothing of the plan was there, so a virtual machine's packets went out by the network
