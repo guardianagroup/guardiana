@@ -381,6 +381,29 @@ function Wfp([string]$cuando, [switch]$Detalle) {
             $r.VerboseP = Sitios $tv $PERSISTENTES
             $r.VerboseA = Sitios $tv $ARRANQUE
         }
+        # Para entender lo que netsh enseña y lo que no: unos filtros, tal como salen en cada volcado
+        try {
+            $tf = [System.IO.File]::ReadAllText($f)
+            Linea ('     tamaños: show filters {0:N0} bytes, show state {1:N0} bytes' -f $tf.Length, $(if ($texto) { $texto.Length } else { 0 }))
+            foreach ($caso in @(
+                    @{ Que = 'show state, el persistente del sitio 32 (todo lo demás)'; Texto = $texto; Busca = "$($PERSISTENTES)0020" }
+                    @{ Que = 'show state, el persistente del sitio 24 (DNS fuera del túnel)'; Texto = $texto; Busca = "$($PERSISTENTES)0018" }
+                    @{ Que = 'show filters, uno de «todo lo demás»'; Texto = $tf; Busca = 'GUARDIANA VPN: todo lo demás' }
+                    @{ Que = 'show filters, el persistente del sitio 24 (DNS fuera del túnel)'; Texto = $tf; Busca = "$($PERSISTENTES)0018" })) {
+                $t = [string]$caso.Texto
+                $en = $t.IndexOf($caso.Busca, [System.StringComparison]::OrdinalIgnoreCase)
+                if ($en -lt 0) {
+                    Linea "     XML, $($caso.Que): no está"
+                    continue
+                }
+                $desde = $t.LastIndexOf('<item>', $en)
+                if ($desde -lt 0) { $desde = [math]::Max(0, $en - 400) }
+                $trozo = $t.Substring($desde, [math]::Min(2600, $t.Length - $desde))
+                Linea "     XML, $($caso.Que): $((($trozo -replace '\s+', ' ') -replace '> <', '><'))"
+            }
+        } catch {
+            Linea "     XML: $($_.Exception.Message)"
+        }
     }
     $segundos = ((Get-Date) - $t0).TotalSeconds
     $prov = if ($r.Proveedor) { 'sí' } else { 'no' }
@@ -579,12 +602,11 @@ function ElBloqueoPorFuera($e) {
     $w = Wfp 'con el bloqueo puesto' -Detalle
     $np = [int]$e.persistentes
     $na = [int]$e.arranque
+    # los de arranque salen en netsh con otra clave que la que les puso el programa: se cuentan por sus banderas
     $faltanP = Faltan $w.SitiosP $np
-    $faltanA = Faltan $w.SitiosA $na
-    Bien ($w.Leido -and ($np -gt 0) -and -not $faltanP -and -not $faltanA -and $w.Proveedor -and $w.Subcapa) ('netsh wfp show filters ve el bloqueo entero que dice el programa ({0} persistentes y {1} de arranque), con su proveedor y su subcapa' -f $np, $na) $(if ($faltanP -or $faltanA) { "no salen en show filters los sitios persistentes [$faltanP] ni los de arranque [$faltanA] (el sitio es el orden en cada conjunto de crates/tunel/src/corte.rs, función estricto)" } else { '' })
+    Bien ($w.Leido -and ($np -gt 0) -and -not $faltanP -and ($w.Arranque -eq $na)) ('netsh wfp show filters ve el bloqueo entero que dice el programa: {0} de {1} persistentes (por su clave) y {2} de {3} de arranque (por sus banderas)' -f @($w.SitiosP).Count, $np, $w.Arranque, $na) $(if ($faltanP) { "no salen en show filters los persistentes de los sitios [$faltanP] (el sitio es su orden en el conjunto persistente de crates/tunel/src/corte.rs, función estricto)" } else { '' })
     $faltanEP = Faltan $w.EstadoP $np
-    $faltanEA = Faltan $w.EstadoA $na
-    Bien ($w.EstadoLeido -and -not $faltanEP -and -not $faltanEA) 'netsh wfp show state ve las mismas claves' $(if ($faltanEP -or $faltanEA) { "no salen en show state los sitios persistentes [$faltanEP] ni los de arranque [$faltanEA]" } else { '' })
+    Bien ($w.EstadoLeido -and -not $faltanEP -and $w.Proveedor -and $w.Subcapa) ('netsh wfp show state ve los {0} persistentes por su clave, el proveedor y la subcapa del modo estricto' -f $np) $(if ($faltanEP) { "no salen en show state los persistentes de los sitios [$faltanEP]" } else { '' })
     if ($null -ne $w.VerboseP) {
         Linea ('     show filters verbose=on: faltan los sitios persistentes [{0}] y los de arranque [{1}]' -f (Faltan $w.VerboseP $np), (Faltan $w.VerboseA $na))
     }
