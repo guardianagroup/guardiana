@@ -316,6 +316,13 @@ body:has(main.lente) > footer { max-width: calc(var(--s-pagina) + 2 * var(--s-ma
 .lente-tarjeta.lente-sec .card { border: 1px solid var(--line); background: var(--campo); }
 /* Lines the program adds at the top of a page (plan, trial, case files): above the breadcrumb. */
 .lente > .tarjeta, .lente > .card:not(.hidden) { margin-top: var(--e5); }
+/* Las franjas de la prueba, de la licencia caducada y de los expedientes, en una sola línea cada una y con menos
+   relleno: a 1366×720 las dos juntas ocupaban 210 px y el título y las cuatro cifras de la página quedaban por debajo
+   del borde (apiñamientos, 5 nov 2026). Una franja tras otra, con el aire de una fila. */
+.lente > .card.prueba, .lente > .card.caducado, .lente > .card.franja-exp { padding: var(--e3) var(--e5); }
+.lente > .card.prueba strong, .lente > .card.caducado strong { display: inline; margin: 0 var(--e2) 0 0; }
+.lente > .card.caducado p { margin: var(--e2) 0 0; }
+.lente > .card + .card:not(.hidden) { margin-top: var(--e3); }
 .lente > #no-session:not(.hidden) { margin-top: var(--e5); }
 .lente .vigilante.lente-ajuste { margin: var(--e4) 0; }
 .lente .vigilante.lente-ajuste > b { font: var(--t-15); font-weight: 600; }

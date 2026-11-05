@@ -801,6 +801,9 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 .rv-botones{display:flex;flex-wrap:wrap;gap:8px}
 .rv-grupo h2{font-family:var(--display);font-size:17px;margin:26px 0 6px}
 .rv-check{border-inline-start:4px solid var(--line)}
+/* Dentro del patrón Lente las tarjetas pierden su margen y las comprobaciones de un grupo salían tocándose; una
+   fila de aire entre una y otra (apiñamientos, 5 nov 2026). */
+.lente .rv-grupo .rv-check+.rv-check{margin-top:10px}
 .rv-check.ok{border-inline-start-color:var(--nivel-verde)}
 .rv-check.aviso{border-inline-start-color:var(--nivel-naranja)}
 .rv-check.alerta{border-inline-start-color:var(--nivel-rojo)}
@@ -809,7 +812,9 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 .rv-punto{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none;background:var(--desconocido)}
 .rv-punto.ok{background:var(--nivel-verde)}.rv-punto.aviso{background:var(--nivel-naranja)}.rv-punto.alerta{background:var(--nivel-rojo)}.rv-punto.info{background:var(--accent)}
 .rv-check details{margin-top:8px}
-.rv-check ul{margin:6px 0 0;padding-inline-start:18px;max-height:340px;overflow:auto}
+/* La lista crece hasta 70 % de la ventana antes de desplazarse por dentro: con 340 px, nueve programas de arranque
+   dejaban el último a medias bajo el borde (apiñamientos, 5 nov 2026). */
+.rv-check ul{margin:6px 0 0;padding-inline-start:18px;max-height:min(560px,70vh);overflow:auto}
 .rv-check li{margin:3px 0;overflow-wrap:anywhere}
 .rv-check li .muted{font-size:12px}
 .rv-marca{display:inline-block;font-size:11px;padding:1px 6px;border-radius:8px;border:1px solid var(--line);margin-inline-start:6px;color:var(--muted)}
@@ -826,7 +831,9 @@ body.universo { margin: 0; background: #06080C; color: #E8ECF1; overflow: hidden
 .rv-pasos{position:relative;z-index:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .rv-paso{display:flex;align-items:center;gap:10px;min-width:0;padding:10px 12px;border:1px solid #2a3653;border-radius:10px;background:rgba(20,26,46,.82);box-shadow:inset 0 1px rgba(255,255,255,.025)}
 .rv-paso>i{width:9px;height:9px;flex:none;border-radius:50%;background:var(--desconocido);box-shadow:0 0 0 4px color-mix(in srgb,var(--desconocido) 12%,transparent)}
-.rv-paso span{display:grid;min-width:0;line-height:1.25}.rv-paso b{color:#edf2ff;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rv-paso small{margin-top:3px;color:#9ca8c4;font:600 11px/1.3 var(--texto);text-transform:uppercase;letter-spacing:.05em}
+/* El nombre de cada paso cabe en dos líneas: en una sola, «Lo que anotó tu antivirus (7 días)» salía cortado con «…»
+   a 1366 px, y en inglés, alemán o francés casi siempre (apiñamientos, 5 nov 2026). */
+.rv-paso span{display:grid;min-width:0;line-height:1.25}.rv-paso b{color:#edf2ff;font-size:13px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere}.rv-paso small{margin-top:3px;color:#9ca8c4;font:600 11px/1.3 var(--texto);text-transform:uppercase;letter-spacing:.05em}
 .rv-paso.ok>i{background:var(--nivel-verde)}.rv-paso.aviso>i{background:var(--nivel-naranja)}.rv-paso.alerta>i{background:var(--nivel-rojo)}.rv-paso.info>i{background:var(--accent)}
 .rv-progreso{display:grid;gap:7px;font:12px var(--texto);letter-spacing:.03em}.rv-progreso[hidden]{display:none}
 .rv-progreso-barra{height:5px;overflow:hidden;border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,var(--line))}.rv-progreso-barra i{display:block;width:36%;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent),#3fc7a0,var(--accent));animation:rv-progreso 1.7s ease-in-out infinite}
