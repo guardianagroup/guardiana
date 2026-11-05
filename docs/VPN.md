@@ -219,7 +219,9 @@ VPN debe estar encendida, nada sale del equipo fuera del túnel, también cuando
   conocida de cada servidor de GUARDIANA (`conocidas`, como mucho 16, solo nombres de guardianagroup.com): los servidores
   a los que fue y lo medido de las salidas con la VPN apagada, para poder cambiar de salida, o volver a la de antes, con
   el túnel caído (revisión de la 1.0.56). Ni llaves ni a dónde se va; al apagar la VPN, nada de esto se queda. Sin el
-  modo estricto no se guarda la VPN encendida: acaba con el servicio, como siempre.
+  modo estricto no se guarda la VPN encendida: acaba con el servicio, como siempre. Si al conectar en el modo estricto no
+  se puede guardar, la VPN no cambia y el estado lo dice (sin quedar guardado el modo estricto no se sostiene; hasta la
+  revisión de la 1.0.56 se apagaba sin decir nada).
 - **Al arrancar, el servicio reconcilia** (`estricto::al_arrancar`, lo primero de `engine::run`, y solo en el servicio:
   `guardiana observe` no toca la VPN de nadie): si la VPN debe seguir encendida en el modo estricto, el bloqueo vuelve a
   ponerse en el acto (con el archivo del programa como esté, también tras una actualización) y el túnel se levanta otra
@@ -309,8 +311,8 @@ el servicio de filtrado de Windows fallara); de esta, lo pendiente y su generaci
 La API (para la web): `GET /api/vpn` añade `"estricto"` (bool, el interruptor), `"bloqueado"` (bool, el bloqueo está en
 Windows), `"aviso"` (el aviso en el idioma de la persona, o vacío), `"estricto_titulo"` y `"estricto_linea"` (el nombre
 del interruptor y su línea, en su idioma), y la fase `"reconectando"`. Desde la revisión de la 1.0.56, también
-`"desconectar"` (bool: hace falta «Desconectar», porque la VPN está encendida o el bloqueo sigue en Windows, también en
-`"error"`; la página enseña el botón con él) y `"aviso_arranque"` (en su idioma, o vacío: Windows no aceptó los filtros
+`"desconectar"` (bool: hace falta «Desconectar», porque la VPN está encendida, el bloqueo sigue en Windows, también en
+`"error"`, o la VPN sigue encendida en lo guardado; la página enseña el botón con él) y `"aviso_arranque"` (en su idioma, o vacío: Windows no aceptó los filtros
 de arranque del bloqueo, y tras un reinicio el bloqueo vale desde que arranca su servicio de filtrado). `POST /api/vpn/estricto` con
 `{"activo": true|false}` (o sin cuerpo: lo contrario de lo que está) contesta `{"ok": true, "estricto": bool}` o
 `{"ok": false, "motivo": "…"}`; no es de Plus, y por ZERO solo tras un clic de verdad, como `conecta`.

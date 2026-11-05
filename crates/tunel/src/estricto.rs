@@ -111,11 +111,11 @@ impl Deseo {
     #[must_use]
     pub fn de_texto(texto: &str) -> Self {
         let mut d: Self = serde_json::from_str(texto).unwrap_or_default();
-        d.conocidas
-            .retain(|nombre, _| crate::alta::es_servidor(nombre));
-        while d.conocidas.len() > CONOCIDAS_MAXIMO {
-            d.conocidas.pop_last();
-        }
+        d.conocidas = std::mem::take(&mut d.conocidas)
+            .into_iter()
+            .filter(|(nombre, _)| crate::alta::es_servidor(nombre))
+            .take(CONOCIDAS_MAXIMO)
+            .collect();
         if d.encendida && (!crate::alta::es_servidor(&d.servidor) || d.alta.is_none()) {
             d.apagada()
         } else {
