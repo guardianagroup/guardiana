@@ -272,7 +272,9 @@ Las salidas, siempre (tan importantes como el bloqueo):
    Windows o de un cierre a mitad de la primera conexión, y en esos casos dejarla apagada sería que los programas
    salieran fuera del túnel sin que la persona lo pidiera; así que la vuelve a levantar con su bloqueo, y es al apagar
    donde se hace todo para que quede escrito. Solo si ni se escribe ni se quita el archivo y el servicio se reinicia antes
-   de conseguirlo, la VPN vuelve con su bloqueo, y «Desconectar» ya lo había dicho. Lo mismo al apagar el modo estricto.
+   de conseguirlo, la VPN vuelve con su bloqueo, y «Desconectar» ya lo había dicho. El archivo solo se quita cuando sin él
+   queda justo lo que se quería guardar (sin archivo, la VPN está apagada y el modo estricto encendido; segunda revisión,
+   «N3»).
 2. **`guardiana vpn apaga`**, también con el servicio parado: le pide al servicio que desconecte (con la llave del panel) y,
    siempre, lo quita directamente por sus claves fijas y deja la VPN apagada en lo guardado. La llave solo va al servicio
    de GUARDIANA: antes de mandarla se pregunta al gestor de servicios de Windows si el servicio «guardiana» está en marcha,
@@ -285,7 +287,11 @@ Las salidas, siempre (tan importantes como el bloqueo):
 4. **El interruptor**: apagar el modo estricto con el servidor sin contestar es volver a la conexión normal, como haría la
    VPN sin él; con el túnel abierto, el cambio no deja ni un momento sin corte (primero el corte nuevo, luego se va el
    viejo). Si en ese momento Windows no deja quitar el bloqueo, el estado lo dice (sin decir que la conexión del equipo
-   sigue como estaba) y `"desconectar": true` deja a la página enseñar «Desconectar», que lo vuelve a intentar.
+   sigue como estaba) y `"desconectar": true` deja a la página enseñar «Desconectar», que lo vuelve a intentar. Al
+   apagarlo, lo guardado va primero: si no se puede escribir, nada cambia (ni el túnel ni el bloqueo) y la respuesta lo
+   dice (segunda revisión, «N3»: hasta entonces se cambiaba y luego, sin poder escribir, se quitaba el archivo, que deja
+   el modo estricto encendido en lo guardado; con el túnel ya en el modo normal, `GET /api/vpn` decía `"estricto": true`
+   sin serlo).
 5. **La desinstalación**: el instalador ejecuta `guardiana vpn apaga --desinstalando` después de parar el servicio (no al
    actualizar ni al reparar), y `guardiana service uninstall` lo hace también. Si algo fallara, el proveedor nombra el
    servicio: sin él, Windows no carga los filtros persistentes en el siguiente arranque.
