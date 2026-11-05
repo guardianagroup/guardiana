@@ -13,6 +13,13 @@ pub const DISPLAY_NAME: &str = "Guardiana";
 pub const DESCRIPTION: &str =
     "Guardiana: guardián DNS de la casa. Todo ocurre en este equipo; sin cuenta ni servidor.";
 
+/// The Windows services GUARDIANA's service starts after (review of the 1.0.56 VPN): the Base Filtering Engine (`BFE`),
+/// where the antivirus cuts and the VPN's strict mode live. Without it the service could start first, and its start-up
+/// reconciliation of strict mode find Windows' filter engine not there yet. The installer registers the service with
+/// it (build/wix/guardiana.wxs), `service install` too, and the service sets it again at each start
+/// (`sc.exe config guardiana depend= BFE`), for a service registered before.
+pub const DEPENDENCIAS: &[&str] = &["BFE"];
+
 /// Errors of service management.
 #[derive(Debug)]
 pub enum Error {
@@ -58,13 +65,13 @@ mod imp {
     use std::time::Duration;
 
     use windows_service::service::{
-        ServiceAccess, ServiceAction, ServiceActionType, ServiceErrorControl,
+        ServiceAccess, ServiceAction, ServiceActionType, ServiceDependency, ServiceErrorControl,
         ServiceFailureActions, ServiceFailureResetPeriod, ServiceInfo, ServiceStartType,
         ServiceState, ServiceType,
     };
     use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
-    use super::{Error, State, DESCRIPTION, DISPLAY_NAME, SERVICE_NAME};
+    use super::{Error, State, DEPENDENCIAS, DESCRIPTION, DISPLAY_NAME, SERVICE_NAME};
 
     fn map(e: windows_service::Error) -> Error {
         let text = e.to_string();
@@ -90,7 +97,11 @@ mod imp {
             error_control: ServiceErrorControl::Normal,
             executable_path: exe.to_path_buf(),
             launch_arguments: vec![OsString::from("service"), OsString::from("run")],
-            dependencies: vec![],
+            // after Windows' filtering service (review of the 1.0.56 VPN)
+            dependencies: DEPENDENCIAS
+                .iter()
+                .map(|d| ServiceDependency::Service(OsString::from(*d)))
+                .collect(),
             account_name: None, // LocalSystem
             account_password: None,
         };
@@ -459,7 +470,19 @@ pub fn state() -> Result<State, Error> {
 mod tests {
     use std::path::Path;
 
-    use super::{launchd_plist, systemd_unit, DEB_UNIT, DESCRIPTION};
+    use super::{launchd_plist, systemd_unit, DEB_UNIT, DEPENDENCIAS, DESCRIPTION};
+
+    /// Review of the 1.0.56 VPN: GUARDIANA's Windows service starts after Windows' filtering service (BFE), and the
+    /// installer says the same.
+    #[test]
+    fn the_windows_service_starts_after_the_filtering_service() {
+        assert_eq!(DEPENDENCIAS, ["BFE"]);
+        let wxs = include_str!("../../../build/wix/guardiana.wxs");
+        assert!(
+            wxs.contains("<ServiceDependency Id=\"BFE\" />"),
+            "build/wix/guardiana.wxs registers the service without BFE"
+        );
+    }
 
     /// The lines systemd reads: no comments, no blanks.
     fn directives(unit: &str) -> Vec<&str> {

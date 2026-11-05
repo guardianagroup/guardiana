@@ -190,7 +190,14 @@
                       ErrorControl="normal"
                       Arguments="service run"
                       Account="LocalSystem"
-                      Vital="yes" />
+                      Vital="yes">
+        <!-- 5 Nov 2026 (revisión de la VPN de la 1.0.56): el servicio arranca después del servicio de filtrado de Windows
+             (BFE), donde viven los cortes del antivirus y el bloqueo del modo estricto de la VPN, que el servicio reconcilia
+             al arrancar. Es la columna Dependencies de la tabla ServiceInstall, no las tablas ServiceConfig que rompían la
+             reparación (28 Sep 2026, más abajo). Un servicio registrado antes sin ella la recibe del propio servicio al
+             arrancar (service_cmd.rs, sc.exe config ... depend= BFE). -->
+        <ServiceDependency Id="BFE" />
+      </ServiceInstall>
       <ServiceControl Id="SvcCtl" Name="guardiana" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
       <!-- What Windows does when the service dies is set by the service itself, with sc.exe, each
            time it starts (service_cmd.rs). The MSI tables for it (ServiceConfig and

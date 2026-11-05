@@ -157,6 +157,9 @@ mod windows {
         // every minute). While it is down the machine has its old DNS back
         // (engine::give_dns_back_while_stopped); restarting is what gets the watching back. Set
         // here and not in the MSI: the MSI tables for it broke the repair (28 Sep 2026).
+        // And, since the review of the 1.0.56 VPN, that it starts after Windows' filtering service (BFE), where the
+        // VPN's strict mode and the antivirus cuts live: a service registered before (by an older installer or `service
+        // install`) gets it here, at its first start with this version. The same list as the installer's.
         std::thread::spawn(|| {
             let _ = std::process::Command::new("sc.exe")
                 .args([
@@ -170,6 +173,10 @@ mod windows {
                 .output();
             let _ = std::process::Command::new("sc.exe")
                 .args(["failureflag", super::SERVICE, "1"])
+                .output();
+            let depende = guardiana_service::daemon::DEPENDENCIAS.join("/");
+            let _ = std::process::Command::new("sc.exe")
+                .args(["config", super::SERVICE, "depend=", depende.as_str()])
                 .output();
         });
         let cfg = EngineConfig::default_service();
