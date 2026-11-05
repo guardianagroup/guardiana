@@ -1184,6 +1184,10 @@
       if (!html) return;
       const m = document.querySelector('main');
       if (!m) return;
+      // Las páginas «Lente» (1.0.46) traen sus propias migas (`.lente-miga`, justo sobre el título): hasta 1.0.56 se
+      // añadía además esta otra fila al principio de <main>, y la página decía «Diagnóstico › Revisión del equipo» dos
+      // veces, la primera pegada a la franja de la prueba (apiñamientos, 5 nov 2026).
+      if (m.querySelector('.lente-miga')) return;
       sitio = m.querySelector(':scope > .g-migas-sitio');
       if (!sitio) { sitio = document.createElement('div'); sitio.className = 'g-migas-sitio'; m.insertBefore(sitio, m.firstChild); }
     }
