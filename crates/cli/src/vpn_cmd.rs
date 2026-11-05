@@ -288,9 +288,14 @@ mod tests {
     fn el_estado_se_lee_sin_windows() {
         let e = guardiana_panel::estado_del_modo_estricto();
         #[cfg(not(windows))]
-        assert_eq!((e.persistentes, e.arranque, e.objetos), (0, 0, false));
+        assert_eq!(
+            (e.persistentes, e.arranque, e.reenvio, e.objetos),
+            (0, 0, 0, false)
+        );
         let texto = serde_json::to_string(&e).unwrap_or_default();
         assert!(texto.contains("\"estricto\":"));
         assert!(texto.contains("\"persistentes\":"));
+        // 1.0.56: cuántos están en las capas de reenvío (lo mira el trabajo «estricto» de vpn.yml)
+        assert!(texto.contains("\"reenvio\":"));
     }
 }

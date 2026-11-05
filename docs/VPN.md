@@ -108,10 +108,36 @@ Lo que cambió en la 1.0.55 (tercera revisión, 2 nov 2026), y por qué:
   DHCPv6 entre direcciones del enlace y el descubrimiento de vecinos (ICMPv6 133 a 137), y nada del servicio salvo que el
   servidor sea de IPv6 (y entonces solo el UDP a él). Todo lo demás de IPv6 cae en «todo lo demás».
 
+**Lo que Windows reenvía** (1.0.56, revisión del 5 nov 2026). Lo que la pila IP de Windows pasa de una de sus interfaces
+a otra —la conexión compartida (ICS), la zona con cobertura móvil y el NAT del propio Windows (WinNAT)— no pasa por las
+capas de autorización de conexiones, donde estaba todo el plan, sino por las de reenvío (`FWPM_LAYER_IPFORWARD_V4` y
+`_V6`; Microsoft, «WFP layer requirements and restrictions»). Hasta la 1.0.56 lo reenviado salía por la tarjeta con la dirección real siempre que una ruta lo mandara allí: con el túnel caído (el
+modo estricto reconectando, el equipo arrancando, el servicio muerto o parado) y, con él arriba, hacia la red de casa,
+por una ruta de un DHCP ajeno (TunnelVision) o en IPv6. Ahora el plan bloquea todo lo reenviado con el peso más bajo
+(«lo reenviado fuera del túnel»), en el corte de siempre y en el modo estricto, persistente y de arranque, con las mismas
+claves que lo demás (así que se quita igual, lo pusiera la versión que lo pusiera); y el permiso del túnel deja pasar lo
+que se reenvía hacia la interfaz del túnel y lo que sale de ella hacia las máquinas, así que con el túnel arriba siguen
+saliendo por él. La condición de la interfaz de salida es `FWPM_CONDITION_IP_FORWARD_INTERFACE`, el LUID de «la interfaz
+por la que se va a enviar el paquete reenviado» (Microsoft, «Filtering conditions available at each filtering layer»),
+y no `FWPM_CONDITION_DESTINATION_INTERFACE_INDEX`, la misma interfaz por su índice: el LUID es lo que nombra el túnel en
+las demás capas y lo que da el adaptador, sin nada que traducir. `FWPM_CONDITION_IP_LOCAL_INTERFACE`, la condición del
+túnel en las capas de conexiones, en las de reenvío es la interfaz por la que llegó el paquete: se usa ahí para las
+respuestas que salen del túnel. Lo mismo hace el interruptor de corte de VpnHood para Windows; las reglas de WireGuard
+no filtran el reenvío; y a los usuarios de simplewall un bloqueo ahí les cortaba la zona con cobertura, ICS y los
+conmutadores virtuales con NAT, así que ese tráfico pasa por ahí. **Lo que no cubre, y no se ha probado en un equipo
+real:** WSL2 (con NAT o en modo «mirrored»), ni Hyper-V, Windows Sandbox o Docker Desktop cuando el NAT lo hace el propio
+conmutador virtual de Hyper-V sin que la pila IP de Windows lo reenvíe (Mullvad vio así el tráfico de WSL, solo como
+tramas Ethernet); ni las máquinas en un conmutador externo, que son de la red y no de este equipo. Su tráfico puede salir
+fuera del túnel, también con el modo estricto, y la pantalla de la VPN lo dice. Siguiente paso: el cortafuegos de Hyper-V
+(Windows 11 22H2 y posteriores), como hace Mullvad. Lo que la integración continua comprueba es que Windows acepta estos
+filtros y los quita; no tiene WSL, ni Hyper-V, ni ICS para probar tráfico reenviado de verdad.
+
 Las pruebas del plan, en todos los sistemas, le preguntan qué decide para cada conexión como lo decide Windows dentro de
 una subcapa (el peso más alto entre los filtros que casan; dos condiciones del mismo campo valen cualquiera de las dos):
 los paquetes al servidor pasan, de ida y de vuelta; nada más del servicio fuera del túnel, ni hacia la red de casa ni el
-DNS por una ruta ajena; la casa llega a lo del Modo Hogar y a nada más; nada de IPv6 fuera del túnel salvo lo del enlace.
+DNS por una ruta ajena; la casa llega a lo del Modo Hogar y a nada más; nada de IPv6 fuera del túnel salvo lo del enlace;
+de lo reenviado, solo lo que va hacia el túnel o sale de él, y sin túnel nada; y cada condición está en una capa que la
+tiene, según la tabla de Microsoft.
 
 Hecho y probado en un Windows real (la integración continua de GitHub, como administrador; `.github/workflows/vpn.yml`):
 
@@ -196,11 +222,12 @@ VPN debe estar encendida, nada sale del equipo fuera del túnel, también cuando
   persistentes; y los bloqueos, con lo que mantiene viva la red de debajo, otra vez como **filtros de arranque**
   (`FWPM_FILTER_FLAG_BOOTTIME`: desde que arranca el equipo hasta que el servicio de filtrado carga los persistentes;
   Microsoft no deja que un filtro sea las dos cosas). Windows los acepta en la subcapa propia (prueba real en `vpn.yml`,
-  3 nov 2026: 24 persistentes y 15 de arranque con solo los permisos; 36 y 27 con el bloqueo entero); si no los aceptara
-  allí, irían a su subcapa universal. Cada conjunto se cambia en una transacción, que quita el de antes y pone el nuevo:
-  nunca hay un momento sin bloqueo.
-- **Lo que dura lo que el túnel**: el permiso de la interfaz del túnel va a la misma subcapa desde una sesión dinámica del
-  servicio (`PermisoTunel`), así que se va con el adaptador, que se va con el proceso. Con el túnel abierto, el modo
+  5 nov 2026: 26 persistentes y 17 de arranque con los permisos y el bloqueo de lo reenviado; 38 y 29 con el bloqueo
+  entero, dos de cada conjunto en las capas de reenvío); si no los aceptara allí, irían a su subcapa universal. Cada
+  conjunto se cambia en una transacción, que quita el de antes y pone el nuevo: nunca hay un momento sin bloqueo.
+- **Lo que dura lo que el túnel**: el permiso de la interfaz del túnel (con lo que se reenvía hacia el túnel y desde él)
+  va a la misma subcapa desde una sesión dinámica del servicio (`PermisoTunel`), así que se va con el adaptador, que se
+  va con el proceso: sin túnel, nada reenviado sale. Con el túnel abierto, el modo
   estricto decide lo mismo que el corte de siempre, más un permiso: el alta nueva del servicio con su servidor (TCP a su
   HTTPS, solo de salida, no firme), porque con el túnel caído no hay otro camino hasta él (la prueba
   `el_modo_estricto_conectado_decide_como_el_corte_de_siempre`).
@@ -321,17 +348,20 @@ VPN está puesta, sin ganar nada contra una fuga.
 
 Pruebas: las del plan y de lo guardado, en los tres sistemas (`corte.rs`, `estricto.rs`); las reales en Windows, como
 administrador (`.github/workflows/vpn.yml`): que Windows acepta cada filtro persistente y de arranque con sus claves, que
-volver a ponerlos no los duplica, que el permiso del túnel va en la misma subcapa y que quitar lo quita todo
+volver a ponerlos no los duplica, que el permiso del túnel va en la misma subcapa, que el bloqueo de lo reenviado está en
+las dos capas de reenvío (Windows lo dice al preguntarle la capa de cada filtro) y que quitar lo quita todo
 (`corte_vpn`); con un servidor que no contesta (192.0.2.1, una dirección de documentación), que nada sale ni con el túnel
 puesto ni al cerrarse, y que al quitar el bloqueo la red vuelve (`tunel_win`); y el trabajo «estricto», con el servicio de
 verdad: el bloqueo al arrancar, nada por la tarjeta (WSAEACCES), «reconectando» con el aviso en `GET /api/vpn`, el bloqueo
 que sigue con el servicio muerto y con el servicio parado, «Desconectar» que lo quita todo y devuelve la red, el arranque
-que quita lo que quedó con el modo estricto apagado, y `guardiana vpn apaga` con el servicio parado; y, desde la revisión
-de la 1.0.56, que el servicio depende de BFE (también uno registrado antes sin ello, que lo recibe al arrancar),
+que quita lo que quedó con el modo estricto apagado, y `guardiana vpn apaga` con el servicio parado; en cada paso, el
+bloqueo de lo reenviado en la propia lista de filtros de Windows (`netsh wfp show state`); y, desde la revisión de la
+1.0.56, que el servicio depende de BFE (también uno registrado antes sin ello, que lo recibe al arrancar),
 `"desconectar"` y `"comprobado"` en la API, y sin `wireguard.dll` el arranque que no vuelve a poner el bloqueo, lo dice y
 deja que «Desconectar» quite el que quedó. Lo que la integración continua no puede probar: el efecto de los filtros de
-arranque en un reinicio de verdad, el instalador entero, ni la reconciliación que se repite cada minuto (haría falta que
-el servicio de filtrado de Windows fallara); de esta, lo pendiente y su generación se prueban en `crates/panel/src/vpn.rs`.
+arranque en un reinicio de verdad, el instalador entero, tráfico reenviado de verdad (sus máquinas no tienen WSL ni
+Hyper-V), ni la reconciliación que se repite cada minuto (haría falta que el servicio de filtrado de Windows fallara); de
+esta, lo pendiente y su generación se prueban en `crates/panel/src/vpn.rs`.
 
 La API (para la web): `GET /api/vpn` añade `"estricto"` (bool, el interruptor), `"bloqueado"` (bool, el bloqueo está en
 Windows), `"aviso"` (el aviso en el idioma de la persona, o vacío), `"estricto_titulo"` y `"estricto_linea"` (el nombre

@@ -402,6 +402,9 @@ pub struct EstadoEstricto {
     pub persistentes: usize,
     /// Sus filtros de arranque.
     pub arranque: usize,
+    /// De esos, persistentes y de arranque, los que están en las capas de reenvío de Windows (1.0.56: el bloqueo de lo
+    /// que Windows reenvía para sus máquinas virtuales o una conexión compartida), según Windows, filtro a filtro.
+    pub reenvio: usize,
     /// Si Windows tiene su proveedor o su subcapa.
     pub objetos: bool,
     /// Por qué no se pudo preguntar a Windows, si no se pudo.
@@ -413,23 +416,26 @@ pub struct EstadoEstricto {
 pub fn estado_del_modo_estricto() -> EstadoEstricto {
     let d = estricto::lee_de(&datos());
     #[cfg(windows)]
-    let (persistentes, arranque, objetos, error) = match guardiana_apps::corte_vpn::en_windows() {
-        Ok(en) => (
-            en.persistentes,
-            en.arranque,
-            en.proveedor || en.subcapa,
-            None,
-        ),
-        Err(no) => (0, 0, false, Some(no.to_string())),
-    };
+    let (persistentes, arranque, reenvio, objetos, error) =
+        match guardiana_apps::corte_vpn::en_windows() {
+            Ok(en) => (
+                en.persistentes,
+                en.arranque,
+                en.reenvio,
+                en.proveedor || en.subcapa,
+                None,
+            ),
+            Err(no) => (0, 0, 0, false, Some(no.to_string())),
+        };
     #[cfg(not(windows))]
-    let (persistentes, arranque, objetos, error) = (0, 0, false, None);
+    let (persistentes, arranque, reenvio, objetos, error) = (0, 0, 0, false, None);
     EstadoEstricto {
         estricto: d.estricto,
         encendida: d.encendida,
         servidor: d.servidor,
         persistentes,
         arranque,
+        reenvio,
         objetos,
         error,
     }

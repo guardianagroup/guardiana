@@ -16,6 +16,13 @@
 //! both connection-authorisation layers, outgoing and accepted incoming. Only the plan's firm permit, the encrypted
 //! packets to the server, gets `FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT`.
 //!
+//! What Windows forwards (1.0.56; `guardiana_tunel::corte`, «Forwarding»): the plan's forwarding layers are
+//! `FWPM_LAYER_IPFORWARD_V4` and `_V6`, and the tunnel is named there by its LUID too, as the interface a forwarded
+//! packet leaves by (`FWPM_CONDITION_IP_FORWARD_INTERFACE`) or the one it arrived on (`FWPM_CONDITION_IP_LOCAL_INTERFACE`,
+//! which means that in those layers). Strict mode's sets carry the block on everything forwarded, persistent and
+//! boot-time, under the same keys as the rest, so removing them takes it too, whichever version put it; the tunnel's
+//! dynamic permit carries the two ways through the tunnel.
+//!
 //! Strict mode (ronda 91; docs/VPN.md, «Modo estricto»): the block must hold when GUARDIANA does not, so it is **not**
 //! in a dynamic session. [`pon_estricto`] adds `guardiana_tunel::corte::estricto`'s plan from a session that is not
 //! dynamic, under a persistent provider and a persistent sublayer with fixed keys (`guardiana_tunel::estricto::claves`),
@@ -96,6 +103,21 @@ fn clave_de(base: u128, i: usize) -> GUID {
     guid(base + i as u128)
 }
 
+/// A key as the number it was made from (the inverse of `GUID::from_u128`): windows-sys's `GUID` has no `==`.
+fn numero(g: &GUID) -> u128 {
+    (u128::from(g.data1) << 96)
+        | (u128::from(g.data2) << 80)
+        | (u128::from(g.data3) << 64)
+        | u128::from(u64::from_be_bytes(g.data4))
+}
+
+/// Whether `capa` is one of WFP's forwarding layers.
+fn de_reenvio(capa: &GUID) -> bool {
+    [FWPM_LAYER_IPFORWARD_V4, FWPM_LAYER_IPFORWARD_V6]
+        .iter()
+        .any(|c| numero(c) == numero(capa))
+}
+
 fn ancho(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
@@ -106,6 +128,8 @@ fn capa_wfp(c: Capa) -> GUID {
         Capa::AceptaV4 => FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V4,
         Capa::ConectaV6 => FWPM_LAYER_ALE_AUTH_CONNECT_V6,
         Capa::AceptaV6 => FWPM_LAYER_ALE_AUTH_RECV_ACCEPT_V6,
+        Capa::ReenviaV4 => FWPM_LAYER_IPFORWARD_V4,
+        Capa::ReenviaV6 => FWPM_LAYER_IPFORWARD_V6,
         Capa::SaleMac => FWPM_LAYER_OUTBOUND_MAC_FRAME_NATIVE,
         Capa::EntraMac => FWPM_LAYER_INBOUND_MAC_FRAME_NATIVE,
     }
@@ -183,8 +207,9 @@ impl Motor {
         }
     }
 
-    /// The keys of the strict set starting at `base` that Windows has now.
-    fn existentes(&self, base: u128) -> Result<Vec<GUID>, ErrorCorte> {
+    /// The keys of the strict set starting at `base` that Windows has now, each with whether its filter is in one of
+    /// the forwarding layers.
+    fn existentes(&self, base: u128) -> Result<Vec<(GUID, bool)>, ErrorCorte> {
         let mut hay = Vec::new();
         for i in 0..usize::from(claves::MAXIMO) {
             let clave = clave_de(base, i);
@@ -193,12 +218,14 @@ impl Motor {
             // once, right after.
             let r = unsafe { FwpmFilterGetByKey0(self.0, &clave, &mut f) };
             if r == 0 && !f.is_null() {
+                // SAFETY: the filter Windows just gave, read (its layer's key, copied) before it is freed below.
+                let capa = unsafe { (*f).layerKey };
                 // SAFETY: given by FwpmFilterGetByKey0 and not used after this.
                 unsafe {
                     let mut p = f.cast::<core::ffi::c_void>();
                     FwpmFreeMemory0(&mut p);
                 }
-                hay.push(clave);
+                hay.push((clave, de_reenvio(&capa)));
             } else if r != 0 && r != FILTRO_NO_ESTA {
                 return Err(err("FwpmFilterGetByKey0", r));
             }
@@ -317,10 +344,17 @@ fn condiciones(
     let nueva = || -> FWPM_FILTER_CONDITION0 { unsafe { std::mem::zeroed() } };
     let mut out = Vec::new();
     match *c {
-        Condicion::Interfaz(luid) => {
+        Condicion::Interfaz(luid) | Condicion::Llegada(luid) | Condicion::Salida(luid) => {
             let mut x = nueva();
             v.u64s.push(Box::new(luid));
-            x.fieldKey = FWPM_CONDITION_IP_LOCAL_INTERFACE;
+            // by its LUID: in the connection-authorisation layers the interface of this computer's address; in the
+            // forwarding layers the same field is the one a packet arrived on, and the forward interface the one it
+            // leaves by
+            x.fieldKey = if matches!(c, Condicion::Salida(_)) {
+                FWPM_CONDITION_IP_FORWARD_INTERFACE
+            } else {
+                FWPM_CONDITION_IP_LOCAL_INTERFACE
+            };
             x.matchType = FWP_MATCH_EQUAL;
             x.conditionValue.r#type = FWP_UINT64;
             if let Some(caja) = v.u64s.last_mut() {
@@ -601,7 +635,7 @@ pub fn pon_estricto(plan: &Estricto, servicio: &Path) -> Result<Puesto, ErrorCor
         if !hay_subcapa {
             pon_subcapa(&motor)?;
         }
-        for clave in &viejos {
+        for (clave, _) in &viejos {
             motor.borra_filtro(clave)?;
         }
         for (i, f) in plan.persistentes.iter().enumerate() {
@@ -679,7 +713,7 @@ fn pon_arranque(
         ("subcapa universal", guid(SUBCAPA_UNIVERSAL), None),
     ] {
         let r = motor.en_transaccion(|| {
-            for clave in &viejos {
+            for (clave, _) in &viejos {
                 motor.borra_filtro(clave)?;
             }
             for (i, f) in filtros.iter().enumerate() {
@@ -711,8 +745,8 @@ pub struct Quitado {
     pub en_uso: bool,
 }
 
-/// Removes everything of strict mode from Windows: its filters (every key it may have used, persistent and boot-time),
-/// its sublayer and its provider. Nothing there is no error.
+/// Removes everything of strict mode from Windows: its filters (every key it may have used, persistent and boot-time,
+/// whatever its layer: the forwarding ones of 1.0.56 too), its sublayer and its provider. Nothing there is no error.
 ///
 /// # Errors
 /// [`ErrorCorte::Sistema`] with the call Windows refused ([`sin_permiso`] says when it is for want of an
@@ -723,7 +757,7 @@ pub fn quita_estricto() -> Result<Quitado, ErrorCorte> {
     viejos.extend(motor.existentes(claves::ARRANQUE)?);
     if !viejos.is_empty() {
         motor.en_transaccion(|| {
-            for clave in &viejos {
+            for (clave, _) in &viejos {
                 motor.borra_filtro(clave)?;
             }
             Ok(())
@@ -761,6 +795,8 @@ pub struct EnWindows {
     pub persistentes: usize,
     /// Its boot-time filters.
     pub arranque: usize,
+    /// Of those, persistent and boot-time, the ones in the forwarding layers (the block on what Windows forwards).
+    pub reenvio: usize,
 }
 
 impl EnWindows {
@@ -777,11 +813,19 @@ impl EnWindows {
 /// [`ErrorCorte::Sistema`] with the call Windows refused.
 pub fn en_windows() -> Result<EnWindows, ErrorCorte> {
     let motor = Motor::abre(false)?;
+    let persistentes = motor.existentes(claves::PERSISTENTES)?;
+    let arranque = motor.existentes(claves::ARRANQUE)?;
+    let reenvio = persistentes
+        .iter()
+        .chain(&arranque)
+        .filter(|(_, en_reenvio)| *en_reenvio)
+        .count();
     Ok(EnWindows {
         proveedor: motor.hay_proveedor()?,
         subcapa: motor.hay_subcapa()?,
-        persistentes: motor.existentes(claves::PERSISTENTES)?.len(),
-        arranque: motor.existentes(claves::ARRANQUE)?.len(),
+        persistentes: persistentes.len(),
+        arranque: arranque.len(),
+        reenvio,
     })
 }
 
@@ -822,12 +866,18 @@ mod tests {
     /// A server reached over IPv4 and one over IPv6 (documentation addresses: nothing is sent to them).
     const EXTREMOS: [&str; 2] = ["192.0.2.1:51820", "[2001:db8::1]:51820"];
 
-    /// The plan for a server at `extremo` without the filters that would block the test machine's own network
-    /// (everything else, and DNS outside the tunnel).
-    fn permisos(extremo: &str) -> Vec<Filtro> {
+    /// Whether `f` may go into Windows here without cutting the test machine's own network: every permit, and the block
+    /// on what Windows forwards (the test machine forwards nothing of its own: its programs leave by the interface of
+    /// their own address). Not «todo lo demás» nor DNS outside the tunnel.
+    fn no_corta_la_red(f: &Filtro) -> bool {
+        f.permite || f.capa.es_reenvio()
+    }
+
+    /// The plan for a server at `extremo` without the filters that would block the test machine's own network.
+    fn sin_cortar_la_red(extremo: &str) -> Vec<Filtro> {
         guardiana_tunel::corte::plan(0x0123_4567_89ab_cdef, extremo.parse().unwrap())
             .into_iter()
-            .filter(|f| f.permite)
+            .filter(no_corta_la_red)
             .collect()
     }
 
@@ -867,16 +917,18 @@ mod tests {
     }
 
     /// On a real Windows, as an administrator: every filter of the plan is accepted by Windows (each condition is
-    /// of a type its field takes), except the ones that would block the test machine's own network, and the session
-    /// closes cleanly. For a server of each family (1.0.55: the service's permit goes in its family's layers, with
-    /// the server's address, port and protocol), and with Home Mode's permits (the service's program file, a protocol
-    /// and a local port, in the accepted incoming layer).
+    /// of a type its field takes, in a layer that has that field), except the ones that would block the test machine's
+    /// own network, and the session closes cleanly. For a server of each family (1.0.55: the service's permit goes in
+    /// its family's layers, with the server's address, port and protocol), with Home Mode's permits (the service's
+    /// program file, a protocol and a local port, in the accepted incoming layer), and with what Windows forwards
+    /// (1.0.56): the tunnel's LUID as the interface a forwarded packet leaves by and as the one it arrived on, and the
+    /// block on the rest, in both forwarding layers.
     #[test]
     #[ignore = "necesita Windows como administrador"]
     fn windows_acepta_cada_filtro_del_plan() {
         let yo = std::env::current_exe().unwrap();
         for extremo in EXTREMOS {
-            let plan = permisos(extremo);
+            let plan = sin_cortar_la_red(extremo);
             assert!(plan.len() > 20);
             // the firm permit is the one to the server, in its two layers; Home Mode's are not firm
             assert_eq!(plan.iter().filter(|f| f.firme).count(), 2, "{extremo}");
@@ -885,6 +937,12 @@ mod tests {
                     .filter(|f| f.nombre == "GUARDIANA VPN: Modo Hogar" && !f.firme)
                     .count(),
                 4
+            );
+            // lo reenviado: hacia el túnel y desde él, y el bloqueo de lo demás, en las dos capas del reenvío
+            assert_eq!(
+                plan.iter().filter(|f| f.capa.es_reenvio()).count(),
+                6,
+                "{extremo}"
             );
             let corte = CorteVpn::activa(&plan, &yo).unwrap();
             drop(corte);
@@ -907,7 +965,7 @@ mod tests {
             "otra sesión con el proveedor de los cortes del antivirus: 0x{r:08x}"
         );
         let yo = std::env::current_exe().unwrap();
-        let corte = CorteVpn::activa(&permisos(EXTREMOS[0]), &yo).unwrap();
+        let corte = CorteVpn::activa(&sin_cortar_la_red(EXTREMOS[0]), &yo).unwrap();
         drop(corte);
         drop(cortes);
     }
@@ -918,30 +976,33 @@ mod tests {
     #[ignore = "necesita Windows como administrador"]
     fn dos_a_la_vez() {
         let yo = std::env::current_exe().unwrap();
-        let a = CorteVpn::activa(&permisos(EXTREMOS[0]), &yo).unwrap();
-        let b = CorteVpn::activa(&permisos(EXTREMOS[0]), &yo).unwrap();
+        let a = CorteVpn::activa(&sin_cortar_la_red(EXTREMOS[0]), &yo).unwrap();
+        let b = CorteVpn::activa(&sin_cortar_la_red(EXTREMOS[0]), &yo).unwrap();
         drop(a);
         drop(b);
     }
 
-    /// Strict mode's block without its blocks (they would cut the test machine's network): only its permits.
-    fn estricto_sin_bloqueos(extremo: &str) -> Estricto {
+    /// Strict mode's block without the blocks that would cut the test machine's network: its permits, and its block on
+    /// what Windows forwards.
+    fn estricto_sin_cortar_la_red(extremo: &str) -> Estricto {
         let extremo: std::net::SocketAddr = extremo.parse().unwrap();
         let e = guardiana_tunel::corte::estricto(Servidor {
             extremo: Some(extremo),
             alta: Some(std::net::SocketAddr::new(extremo.ip(), 443)),
         });
         Estricto {
-            persistentes: e.persistentes.into_iter().filter(|f| f.permite).collect(),
-            arranque: e.arranque.into_iter().filter(|f| f.permite).collect(),
+            persistentes: e.persistentes.into_iter().filter(no_corta_la_red).collect(),
+            arranque: e.arranque.into_iter().filter(no_corta_la_red).collect(),
         }
     }
 
     /// On a real Windows, as an administrator (strict mode, ronda 91): Windows takes every persistent filter and the
     /// boot-time ones under strict mode's fixed keys, and says so when asked; putting the set again replaces it and
     /// never doubles it; the tunnel's own permit goes into the same sublayer from a dynamic session; removing takes
-    /// every filter at once, and the sublayer and the provider once the tunnel's permit is gone. Only permits: the
-    /// test machine's network is never cut.
+    /// every filter at once, and the sublayer and the provider once the tunnel's permit is gone. The block on what
+    /// Windows forwards (1.0.56) goes in both forwarding layers, persistent and boot-time, as Windows itself says when
+    /// asked for each filter's layer, and goes with the rest; the tunnel's permit carries what is forwarded through
+    /// it. Only permits and that block: the test machine's network is never cut.
     #[test]
     #[ignore = "necesita Windows como administrador"]
     fn el_modo_estricto_en_windows() {
@@ -949,11 +1010,17 @@ mod tests {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let yo = std::env::current_exe().unwrap();
+        let reenvio = |p: &[Filtro]| p.iter().filter(|f| f.capa.es_reenvio()).count();
         // a clean start: what a test of before may have left
         let _ = quita_estricto().unwrap();
         assert!(!en_windows().unwrap().alguno());
         for extremo in EXTREMOS {
-            let plan = estricto_sin_bloqueos(extremo);
+            let plan = estricto_sin_cortar_la_red(extremo);
+            // el bloqueo de lo reenviado, uno en cada capa del reenvío, en los dos conjuntos
+            assert_eq!(
+                (reenvio(&plan.persistentes), reenvio(&plan.arranque)),
+                (2, 2)
+            );
             let puesto = pon_estricto(&plan, &yo).unwrap();
             eprintln!("modo estricto puesto ({extremo}): {puesto:?}");
             assert_eq!(puesto.persistentes, plan.persistentes.len());
@@ -964,21 +1031,31 @@ mod tests {
                 Ok((n, donde)) => {
                     eprintln!("filtros de arranque: {n}, en la {donde}");
                     assert_eq!(en.arranque, *n);
+                    assert_eq!(en.reenvio, 4, "{en:?}");
                 }
-                Err(e) => eprintln!("Windows no tomó los filtros de arranque: {e}"),
+                Err(e) => {
+                    eprintln!("Windows no tomó los filtros de arranque: {e}");
+                    assert_eq!(en.reenvio, 2, "{en:?}");
+                }
             }
             // otra vez (el servicio que vuelve a arrancar, una actualización): se cambian, nunca se duplican
             let otra = pon_estricto(&plan, &yo).unwrap();
             assert_eq!(otra.persistentes, plan.persistentes.len());
             assert_eq!(en_windows().unwrap(), en);
         }
-        // el permiso del túnel, en la misma subcapa, desde una sesión dinámica
-        let permiso =
-            PermisoTunel::pon(&guardiana_tunel::corte::del_tunel(0x0123_4567_89ab_cdef)).unwrap();
+        // el permiso del túnel, en la misma subcapa, desde una sesión dinámica: también lo reenviado hacia el túnel y
+        // desde él
+        let del_tunel = guardiana_tunel::corte::del_tunel(0x0123_4567_89ab_cdef);
+        assert_eq!(reenvio(&del_tunel), 4);
+        let permiso = PermisoTunel::pon(&del_tunel).unwrap();
         let q = quita_estricto().unwrap();
         assert!(q.filtros > 0 && q.en_uso, "{q:?}");
         let en = en_windows().unwrap();
-        assert_eq!((en.persistentes, en.arranque), (0, 0), "{en:?}");
+        assert_eq!(
+            (en.persistentes, en.arranque, en.reenvio),
+            (0, 0, 0),
+            "{en:?}"
+        );
         drop(permiso);
         let q = quita_estricto().unwrap();
         assert_eq!(q, Quitado::default());
