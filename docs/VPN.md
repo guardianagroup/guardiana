@@ -255,6 +255,13 @@ VPN debe estar encendida, nada sale del equipo fuera del túnel, también cuando
   de antes, la que dice lo guardado, con el bloqueo puesto como estaba; si en ese momento lo guardado no se puede leer,
   el bloqueo sigue y lo hace la mirada de cada minuto, en cuanto se pueda leer (segunda revisión, «N2»: hasta entonces el
   bloqueo se quedaba sin nadie que reconectara).
+- **Cambiar de salida sin el modo estricto** (segunda revisión de la 1.0.56): la conexión de antes se cierra, y su corte
+  con ella, y después se hace la nueva entera: el nombre de la salida resuelto, el alta por HTTPS, el túnel nuevo con su
+  corte y la espera del primer saludo (hasta 8 s). Durante esos segundos no hay túnel ni corte: lo que sale de los
+  programas sale por la conexión normal, y la página dice «Conectando». No hay un arreglo sencillo y seguro: abrir el
+  túnel nuevo antes de cerrar el viejo no sirve, porque el corte del viejo no deja salir los paquetes encriptados hacia
+  el servidor nuevo, y sostener un bloqueo durante el cambio es justo lo que hace el modo estricto (encendido salvo que
+  la persona lo apague), con el que no sale nada de los programas fuera del túnel mientras cambia de salida.
 - **El DNS y el IPv6**, como siempre: cada salida con su resolutor (Unbound en `10.66.0.1`, por el túnel), ningún DNS
   fuera del túnel, nada de IPv6 fuera de él salvo lo del enlace.
 - **La licencia**: conectar sigue siendo de Plus; la VPN que el servicio levanta al arrancar es la que la persona ya tenía
