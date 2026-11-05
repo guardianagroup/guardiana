@@ -417,6 +417,17 @@ a.enlace-empresa:hover { color: var(--accent); text-decoration-color: currentCol
 .av-latido{display:inline-block;width:10px;height:10px;border-radius:50%;background:#d33;box-shadow:0 0 0 0 rgba(221,51,51,.6);animation:av-latir 1.6s infinite}
 @keyframes av-latir{0%{box-shadow:0 0 0 0 rgba(221,51,51,.6)}70%{box-shadow:0 0 0 8px rgba(221,51,51,0)}100%{box-shadow:0 0 0 0 rgba(221,51,51,0)}}
 #av-vivo tr{animation:av-entra .5s ease}
+/* Las tablas del antivirus a 1366 px (apiñamientos, 5 nov 2026): en «En directo», la etiqueta del producto en
+   mayúsculas («ANTIVIRUS EJEMPLO TOTAL SECURITY») se quedaba con el ancho y la dirección salía partida a mitad
+   («wdcp.microsoft.co / m»); en la tabla de cada antivirus, la dirección sin partir y «Ver documentación del fabricante»
+   empujaban «De madrugada» y «Última actividad» fuera de la tarjeta, con desplazamiento lateral. La etiqueta del
+   producto puede ocupar dos líneas, la dirección se parte solo si no cabe de otro modo y las cabeceras pueden ir en
+   dos líneas. */
+#av-vivo td .tag.ia{white-space:normal;line-height:1.3}
+#av-vivo td.mono,#av-vistos td:first-child.mono{white-space:normal;word-break:normal;overflow-wrap:anywhere}
+#av-vistos .wrap td:first-child.mono{width:32%;min-width:12em}
+#av-vivo-card .wrap th,#av-vistos .wrap th{white-space:normal}
+#av-vistos .wrap td .tag{white-space:normal;line-height:1.3}
 @keyframes av-entra{from{background:rgba(31,95,174,.12)}to{background:transparent}}
 @media (prefers-reduced-motion: reduce){.av-latido{animation:none}#av-vivo tr{animation:none}}
 
