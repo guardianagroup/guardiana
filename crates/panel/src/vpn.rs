@@ -34,6 +34,15 @@
 //! de ZERO, `POST /api/vpn/desconecta`, en cualquier fase), `guardiana vpn apaga` con el servicio parado
 //! ([`quita_el_bloqueo`]), el arranque del servicio cuando ya no se quiere y la desinstalación.
 //!
+//! Las salidas (5 nov 2026; el dueño, 3 nov, 09:25: «me ha conectado, pero no sé a dónde… Todas las VPN te dicen a
+//! dónde… Haz una VPN de verdad y de calidad»; docs/VPN.md, «La API»): cada servidor de GUARDIANA es una salida real en
+//! su país (`guardiana_tunel::salidas::SALIDAS`). `GET /api/vpn/salidas` las da con lo medido desde este equipo (si
+//! están, a cuánto, y su dirección) y la más rápida; se miden solo con la VPN apagada y sin el bloqueo (puesta, la medida
+//! iría por el túnel), y lo medido vale un minuto. `POST /api/vpn/conecta` `{"salida": "<id>" | "rapida"}` conecta a
+//! una. `GET /api/vpn/comprueba` dice lo que una web verá: la dirección (la que el eco de otro servidor de GUARDIANA ve
+//! llegar, nunca un tercero), el DNS, el IPv6, la hora del equipo frente a la de la salida y el permiso de ubicación de
+//! Windows.
+//!
 //! De la conexión no se guarda nada más que eso: ni llaves ni a dónde se va; el estado vive en la memoria del servicio.
 // Handlers answer axum's own `Response` on error, as every module of the panel does (see `api.rs`).
 #![allow(clippy::result_large_err)]
@@ -46,11 +55,12 @@ use std::time::Duration;
 use axum::extract::State;
 use axum::Json;
 use guardiana_tunel::estricto::{self, Deseo};
+use guardiana_tunel::salidas::{self, Medida, Salida, SALIDAS};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::api::ApiResult;
-use crate::auth::{Lang, Session};
+use crate::auth::{Lang, Session, Zona};
 use crate::AppState;
 
 /// En qué está la VPN. Fuera de Windows nunca llega a conectada ni a error: no se conecta.
@@ -103,6 +113,43 @@ struct Estado {
 #[cfg(windows)]
 const VISTAZO: Duration = Duration::from_secs(10);
 
+/// Cuánto vale lo medido de las salidas antes de medirlas otra vez (con la VPN apagada).
+const MEDIDAS_VALEN_MS: u64 = 60_000;
+
+/// Lo que se midió de las salidas desde este equipo, con la VPN apagada.
+#[derive(Debug, Clone, Default)]
+struct Medidas {
+    /// Cuándo, en milisegundos desde 1970.
+    cuando_ms: u64,
+    /// La medida de cada salida, por su id, en el orden de la tabla.
+    de: Vec<(&'static str, Medida)>,
+}
+
+impl Medidas {
+    fn de(&self, id: &str) -> Option<&Medida> {
+        self.de.iter().find(|(i, _)| *i == id).map(|(_, m)| m)
+    }
+
+    /// La salida disponible más rápida, por su nombre.
+    fn mas_rapida(&self) -> Option<&'static Salida> {
+        salidas::mas_rapida(&self.de).and_then(salidas::por_id)
+    }
+}
+
+/// Lo que se lee de la conexión abierta para la página, sin esperar por ella.
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(not(windows), allow(dead_code))]
+struct Abierta {
+    /// Lo que el controlador dice del servidor.
+    par: Option<guardiana_tunel::nt::EstadoPar>,
+    /// La dirección del servidor: la que las webs ven mientras es la salida.
+    extremo: std::net::IpAddr,
+    /// El resolutor de GUARDIANA manda solo al del túnel.
+    dns_tunel: bool,
+    /// El corte (o el bloqueo del modo estricto) está puesto.
+    corte: bool,
+}
+
 /// La VPN del servicio: su estado y, en Windows, la conexión abierta.
 #[derive(Default)]
 pub(crate) struct Vpn {
@@ -116,6 +163,10 @@ pub(crate) struct Vpn {
     /// sube la generación con este candado puesto, así que una conexión a medias nunca vuelve a poner el bloqueo después
     /// de que la persona apagara la VPN.
     cambio: Mutex<()>,
+    /// Lo último que se midió de las salidas (con la VPN apagada).
+    medidas: Mutex<Option<Medidas>>,
+    /// Una medida de las salidas a la vez.
+    midiendo: Mutex<()>,
     #[cfg(windows)]
     conexion: Mutex<Option<guardiana_apps::tunel_win::Conexion>>,
 }
@@ -386,26 +437,48 @@ impl Vpn {
         let d = self.deseo();
         let bloqueado = self.bloqueado.load(Ordering::SeqCst);
         // sin esperar: si la conexión está ocupada en ese momento, el estado sale sin bytes
-        #[cfg(windows)]
-        let par = self
-            .conexion
-            .try_lock()
-            .ok()
-            .and_then(|c| c.as_ref().and_then(|c| c.tunel.estado()));
-        #[cfg(not(windows))]
-        let par: Option<guardiana_tunel::nt::EstadoPar> = None;
+        let con_tunel = matches!(e.fase, Fase::Conectada | Fase::SinRespuesta);
+        let abierta = self.abierta().filter(|_| con_tunel);
+        let par = abierta.and_then(|a| a.par);
         let motivo = no_disponible();
         let no_conecta = bloqueado && matches!(e.fase, Fase::Reconectando | Fase::SinRespuesta);
+        // 5 nov 2026: la salida en la que está, o a la que iba: su país, su ciudad y su dirección (la del túnel abierto,
+        // o la medida)
+        let salida = (e.fase.encendida() || e.fase == Fase::Error)
+            .then(|| salidas::por_nombre(&e.servidor))
+            .flatten()
+            .map(|s| {
+                let m = self
+                    .medidas_guardadas()
+                    .and_then(|m| m.de(s.id).copied())
+                    .unwrap_or_default();
+                salida_json(
+                    s,
+                    Some(Medida {
+                        disponible: true,
+                        ip: abierta.map(|a| a.extremo).or(m.ip),
+                        ..m
+                    }),
+                )
+            });
         json!({
             "disponible": motivo.is_none(),
             "motivo": motivo,
             "fase": e.fase.como_texto(),
             "servidor": e.servidor,
+            "salida": salida,
+            "desde": (e.desde_ms > 0).then_some(e.desde_ms),
+            "saludo": par.and_then(|p| p.ultimo_saludo_ms),
+            "subidos": par.map(|p| p.enviados),
+            "bajados": par.map(|p| p.recibidos),
+            // el alta de GUARDIANA siempre lleva su mitad de ML-KEM (`guardiana_tunel::alta`): sin ella no hay túnel
+            "postcuantica": con_tunel,
+            "dns_tunel": abierta.is_some_and(|a| a.dns_tunel),
             "desde_ms": e.desde_ms,
             "direccion": e.direccion,
             "error": e.error,
-            "enviados": par.as_ref().map(|p| p.enviados),
-            "recibidos": par.as_ref().map(|p| p.recibidos),
+            "enviados": par.map(|p| p.enviados),
+            "recibidos": par.map(|p| p.recibidos),
             "ultimo_saludo_ms": par.and_then(|p| p.ultimo_saludo_ms),
             "estricto": d.estricto,
             "bloqueado": bloqueado,
@@ -445,6 +518,304 @@ impl Vpn {
         }
         self.pon(Estado::default());
         quitado.and(guardado)
+    }
+
+    /// La conexión abierta, sin esperar por ella: si en ese momento está ocupada, nada.
+    fn abierta(&self) -> Option<Abierta> {
+        #[cfg(windows)]
+        {
+            self.conexion.try_lock().ok().and_then(|g| {
+                g.as_ref().map(|c| Abierta {
+                    par: c.tunel.estado(),
+                    extremo: c.extremo.ip(),
+                    dns_tunel: c.tunel.con_dns_del_tunel(),
+                    corte: c.tunel.con_corte(),
+                })
+            })
+        }
+        #[cfg(not(windows))]
+        {
+            None
+        }
+    }
+
+    /// Lo último que se midió de las salidas, como está.
+    fn medidas_guardadas(&self) -> Option<Medidas> {
+        self.medidas.lock().ok().and_then(|m| m.clone())
+    }
+
+    /// Si ahora se pueden medir las salidas: con la VPN apagada y sin el bloqueo del modo estricto (encendida, la medida
+    /// iría por el túnel; con el bloqueo, no saldría).
+    fn se_puede_medir(&self) -> bool {
+        !self.estado().fase.encendida() && !self.bloqueado.load(Ordering::SeqCst)
+    }
+
+    /// Lo medido de las salidas, al día: lo guardado si vale todavía; si no, se miden todas ahora, a la vez. Cuando no se
+    /// puede medir, lo guardado; y si no hay nada guardado, solo si su nombre resuelve (por el túnel, si está puesto).
+    fn medidas_al_dia(&self) -> Option<Medidas> {
+        if no_disponible().is_some() {
+            return None;
+        }
+        if !self.se_puede_medir() {
+            return self
+                .medidas_guardadas()
+                .or_else(|| Some(solo_nombres(ahora_ms())));
+        }
+        let _una = self.midiendo.lock().unwrap_or_else(PoisonError::into_inner);
+        let ahora = ahora_ms();
+        if let Some(m) = self
+            .medidas_guardadas()
+            .filter(|m| ahora.saturating_sub(m.cuando_ms) < MEDIDAS_VALEN_MS)
+        {
+            return Some(m);
+        }
+        let m = mide_todas(ahora);
+        // si mientras se medía se encendió la VPN, lo medido pudo ir por el túnel: no se guarda
+        if !self.se_puede_medir() {
+            return self.medidas_guardadas().or(Some(m));
+        }
+        if let Ok(mut g) = self.medidas.lock() {
+            *g = Some(m.clone());
+        }
+        Some(m)
+    }
+
+    /// `GET /api/vpn/salidas`: la tabla de salidas, con lo medido y la más rápida; la salida en la que está la VPN,
+    /// disponible siempre y con la dirección del túnel abierto.
+    fn lista(&self) -> Value {
+        let medidas = self.medidas_al_dia();
+        let e = self.estado();
+        let con_tunel = matches!(e.fase, Fase::Conectada | Fase::SinRespuesta);
+        let en = e
+            .fase
+            .encendida()
+            .then(|| salidas::por_nombre(&e.servidor))
+            .flatten();
+        let ip = self.abierta().filter(|_| con_tunel).map(|a| a.extremo);
+        lista_json(medidas.as_ref(), en.map(|s| (s.id, ip)))
+    }
+
+    /// `GET /api/vpn/comprueba`: lo que una web verá desde este equipo ahora, con `desfase_equipo` (los minutos al este de
+    /// UTC del navegador que pregunta: la hora de este equipo).
+    ///
+    /// - La dirección, la que ve llegar el eco de un servidor de GUARDIANA (`guardiana_tunel::salidas::ip_vista`), nunca
+    ///   un tercero: con el túnel abierto, el de otra salida (la propia no contesta a lo que llega por su túnel), así que
+    ///   es la dirección con la que sale el tráfico del túnel; sin VPN, el de cualquiera, y es la de este equipo. En
+    ///   medio (conectando, sin respuesta, con el bloqueo puesto) no se pregunta. Sin eco, sin dirección: la página no la
+    ///   da por comprobada.
+    /// - Su país, según la base de direcciones del programa (`guardiana_lists::ubicacion`).
+    /// - El DNS y el IPv6, de lo que el túnel tiene puesto: el resolutor de GUARDIANA solo hacia el del túnel y el corte
+    ///   (que no deja salir DNS ni IPv6 fuera del túnel; docs/VPN.md, «Reglas»).
+    /// - La hora: el desfase de este equipo y el de la salida ahora, con su horario de verano.
+    /// - El permiso de ubicación de Windows para el equipo.
+    fn comprueba(&self, desfase_equipo: i64) -> Value {
+        let e = self.estado();
+        let con_tunel = e.fase == Fase::Conectada;
+        let fuera = self.se_puede_medir();
+        let abierta = self.abierta().filter(|_| con_tunel);
+        let en = if con_tunel {
+            salidas::por_nombre(&e.servidor)
+        } else {
+            None
+        };
+        let medidas = self.medidas_guardadas();
+        let ip_vista = if no_disponible().is_none() && (con_tunel || fuera) {
+            a_quien_preguntar(en, medidas.as_ref())
+                .into_iter()
+                .find_map(|s| salidas::ip_vista(s.nombre))
+        } else {
+            None
+        };
+        let pais_ip = ip_vista.and_then(|ip| guardiana_lists::ubicacion::ubicacion_de_ip(ip).pais);
+        let ahora = i64::try_from(ahora_ms()).unwrap_or(0);
+        let desfase_salida = en.and_then(|s| salidas::desfase_min(s.zona, ahora));
+        let dns = match (con_tunel, abierta) {
+            (true, Some(a)) if a.dns_tunel && a.corte => "tunel",
+            (true, Some(_)) => "fuera",
+            (false, _) if fuera => "fuera",
+            _ => "desconocido",
+        };
+        // con el corte puesto no sale nada por IPv6 fuera del túnel, la red lo tenga o no
+        let ipv6 = match (con_tunel, abierta) {
+            (true, Some(a)) if a.corte => Some("bloqueado"),
+            (true, Some(_)) => Some(if salidas::tiene_ipv6() {
+                "fuga"
+            } else {
+                "sin_ipv6"
+            }),
+            (false, _) if fuera && !salidas::tiene_ipv6() => Some("sin_ipv6"),
+            _ => None,
+        };
+        json!({
+            "ip_vista": ip_vista.map(|ip| ip.to_string()),
+            "pais_ip": pais_ip,
+            "dns": dns,
+            "ipv6": ipv6,
+            "zona": {
+                "equipo": Value::Null,
+                "desfase_equipo": desfase_equipo,
+                "salida": en.map(|s| s.zona),
+                "desfase_salida": desfase_salida,
+                "coincide": desfase_salida.map(|d| i64::from(d) == desfase_equipo),
+            },
+            "idioma": Value::Null,
+            "ubicacion_windows": ubicacion_windows(),
+        })
+    }
+}
+
+/// Las salidas a cuyo eco se pregunta qué dirección ve, en el orden de la tabla: todas menos `en` (la salida del túnel
+/// abierto) y menos las que la última medida vio no disponibles.
+fn a_quien_preguntar(
+    en: Option<&'static Salida>,
+    medidas: Option<&Medidas>,
+) -> Vec<&'static Salida> {
+    SALIDAS
+        .iter()
+        .filter(|s| en.is_none_or(|x| x.id != s.id))
+        .filter(|s| {
+            medidas
+                .and_then(|m| m.de(s.id))
+                .is_none_or(|m| m.disponible)
+        })
+        .collect()
+}
+
+/// Una salida para la página, con lo medido de ella (`m`): sin medida, ni disponible ni retraso ni dirección (no se
+/// sabe).
+fn salida_json(s: &Salida, m: Option<Medida>) -> Value {
+    json!({
+        "id": s.id,
+        "pais": s.pais,
+        "ciudad": s.ciudad,
+        "continente": s.continente,
+        "proveedor": s.proveedor,
+        "nombre": s.nombre,
+        "zona": s.zona,
+        "ip": m.and_then(|m| m.ip).map(|ip| ip.to_string()),
+        "disponible": m.map(|m| m.disponible),
+        "ms": m.and_then(|m| m.ms),
+    })
+}
+
+/// La tabla de salidas para la página, con `medidas`; `en`, la salida en la que está la VPN (su id, y la dirección del
+/// túnel abierto), disponible siempre.
+fn lista_json(medidas: Option<&Medidas>, en: Option<(&str, Option<std::net::IpAddr>)>) -> Value {
+    let lista: Vec<Value> = SALIDAS
+        .iter()
+        .map(|s| {
+            let mut m = medidas.and_then(|m| m.de(s.id)).copied();
+            if let Some((id, ip)) = en {
+                if id == s.id {
+                    let base = m.unwrap_or_default();
+                    m = Some(Medida {
+                        disponible: true,
+                        ip: ip.or(base.ip),
+                        ..base
+                    });
+                }
+            }
+            salida_json(s, m)
+        })
+        .collect();
+    json!({
+        "salidas": lista,
+        "mas_rapida": medidas.and_then(Medidas::mas_rapida).map(|s| s.id),
+        "medido": medidas.map(|m| m.cuando_ms),
+    })
+}
+
+/// Mide todas las salidas desde aquí, a la vez (cada una en su hilo): si están, a cuánto y su dirección.
+fn mide_todas(cuando_ms: u64) -> Medidas {
+    let hilos: Vec<_> = SALIDAS
+        .iter()
+        .map(|s| {
+            let s = *s;
+            (s.id, std::thread::spawn(move || salidas::mide(&s)))
+        })
+        .collect();
+    Medidas {
+        cuando_ms,
+        de: hilos
+            .into_iter()
+            .map(|(id, h)| (id, h.join().unwrap_or_default()))
+            .collect(),
+    }
+}
+
+/// Lo único que se puede saber de las salidas con la VPN encendida y nada medido: si su nombre resuelve (por el túnel,
+/// si está puesto). Sin retraso, que iría por el túnel; ni se guarda.
+fn solo_nombres(cuando_ms: u64) -> Medidas {
+    let hilos: Vec<_> = SALIDAS
+        .iter()
+        .map(|s| {
+            let nombre = s.nombre;
+            (
+                s.id,
+                std::thread::spawn(move || {
+                    use std::net::ToSocketAddrs;
+                    let ip = (nombre, 443)
+                        .to_socket_addrs()
+                        .ok()
+                        .and_then(|mut v| v.find(std::net::SocketAddr::is_ipv4))
+                        .map(|a| a.ip());
+                    Medida {
+                        disponible: ip.is_some(),
+                        ms: None,
+                        ip,
+                    }
+                }),
+            )
+        })
+        .collect();
+    Medidas {
+        cuando_ms,
+        de: hilos
+            .into_iter()
+            .map(|(id, h)| (id, h.join().unwrap_or_default()))
+            .collect(),
+    }
+}
+
+/// El permiso de ubicación de Windows para todo el equipo (`HKLM\…\ConsentStore\location`, `Value`), leído con el
+/// `reg.exe` del propio Windows: «permitida», «denegada» o «desconocida».
+fn ubicacion_windows() -> &'static str {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // el reg.exe de Windows, por su ruta entera; CREATE_NO_WINDOW: sin consola desde el servicio
+        let raiz = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".to_owned());
+        std::process::Command::new(format!(r"{raiz}\System32\reg.exe"))
+            .args([
+                "query",
+                r"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location",
+                "/v",
+                "Value",
+            ])
+            .creation_flags(0x0800_0000)
+            .output()
+            .map_or("desconocida", |o| permiso_de_reg(&String::from_utf8_lossy(&o.stdout)))
+    }
+    #[cfg(not(windows))]
+    {
+        "desconocida"
+    }
+}
+
+/// `Value` en la salida de `reg query` (`    Value    REG_SZ    Allow`): «permitida», «denegada» o «desconocida».
+#[cfg_attr(not(windows), allow(dead_code))]
+fn permiso_de_reg(salida: &str) -> &'static str {
+    let valor = salida.lines().find_map(|l| {
+        let mut p = l.split_whitespace();
+        if p.next()? != "Value" {
+            return None;
+        }
+        p.nth(1)
+    });
+    match valor {
+        Some(v) if v.eq_ignore_ascii_case("Allow") => "permitida",
+        Some(v) if v.eq_ignore_ascii_case("Deny") => "denegada",
+        _ => "desconocida",
     }
 }
 
@@ -863,7 +1234,6 @@ impl Vpn {
 }
 
 /// La hora, en milisegundos desde 1970.
-#[cfg(windows)]
 fn ahora_ms() -> u64 {
     u64::try_from(guardiana_core::time::now_ms()).unwrap_or(0)
 }
@@ -892,10 +1262,29 @@ pub(crate) async fn ver(
 /// Lo que pide «conectar».
 #[derive(Debug, Default, Deserialize)]
 pub(crate) struct Pedido {
-    /// El servidor: un nombre de guardianagroup.com. Vacío (o sin cuerpo, como pide la web de GUARDIANA a través de
-    /// ZERO): el de [`SERVIDOR`].
+    /// El servidor: un nombre de guardianagroup.com. Vacío (o sin cuerpo): el de [`SERVIDOR`].
     #[serde(default)]
     servidor: String,
+    /// La salida, por su id (`hel`), o `rapida`: la más rápida de lo medido (5 nov 2026; la web de GUARDIANA lo pide así
+    /// a través de ZERO). Si está, manda sobre `servidor`.
+    #[serde(default)]
+    salida: String,
+}
+
+/// El servidor de un pedido: la salida por su id; la más rápida de `medidas` (`rapida`; sin medidas, [`SERVIDOR`]); o el
+/// nombre dicho; sin nada, [`SERVIDOR`].
+fn servidor_del_pedido(p: &Pedido, medidas: Option<&Medidas>) -> Result<String, &'static str> {
+    match (p.salida.trim(), p.servidor.trim()) {
+        ("", "") => Ok(SERVIDOR.to_owned()),
+        ("", s) => Ok(s.to_ascii_lowercase()),
+        (salidas::RAPIDA, _) => Ok(medidas
+            .and_then(Medidas::mas_rapida)
+            .map_or(SERVIDOR, |s| s.nombre)
+            .to_owned()),
+        (id, _) => salidas::por_id(id)
+            .map(|s| s.nombre.to_owned())
+            .ok_or("esa salida no es de GUARDIANA"),
+    }
 }
 
 /// El servidor al que se conecta quien no elige uno: el nombre que tendrá el primer extremo (Helsinki) cuando esté
@@ -926,9 +1315,9 @@ pub(crate) async fn conecta(
             }
         }
     };
-    let host = match pedido.servidor.trim() {
-        "" => SERVIDOR.to_owned(),
-        s => s.to_ascii_lowercase(),
+    let host = match servidor_del_pedido(&pedido, state.vpn.medidas_guardadas().as_ref()) {
+        Ok(h) => h,
+        Err(motivo) => return Ok(Json(json!({ "ok": false, "motivo": motivo }))),
     };
     if !guardiana_tunel::alta::es_servidor(&host) {
         return Ok(Json(
@@ -980,13 +1369,36 @@ pub(crate) async fn desconecta(
     }))
 }
 
+/// `GET /api/vpn/salidas`: las salidas de GUARDIANA, con lo medido desde este equipo (si están, a cuánto y su
+/// dirección) y la más rápida. Medir tarda unos segundos: fuera de los hilos de la página.
+pub(crate) async fn ver_salidas(
+    State(state): State<Arc<AppState>>,
+    _s: Session,
+) -> ApiResult<Value> {
+    let vpn = state.vpn;
+    let r = tokio::task::spawn_blocking(move || vpn.lista()).await;
+    Ok(Json(r.unwrap_or_else(|_| lista_json(None, None))))
+}
+
+/// `GET /api/vpn/comprueba`: lo que una web verá desde este equipo ahora (la dirección, el DNS, el IPv6, la hora y el
+/// permiso de ubicación de Windows). Pregunta a los servidores de GUARDIANA: fuera de los hilos de la página.
+pub(crate) async fn comprueba(
+    State(state): State<Arc<AppState>>,
+    Zona(desfase): Zona,
+    _s: Session,
+) -> ApiResult<Value> {
+    let vpn = state.vpn;
+    let r = tokio::task::spawn_blocking(move || vpn.comprueba(desfase)).await;
+    Ok(Json(r.unwrap_or_else(|_| json!({}))))
+}
+
 /// Lo que pide el interruptor del modo estricto.
 #[derive(Debug, Default, Deserialize)]
 #[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) struct PideEstricto {
-    /// Encendido o apagado. Sin él (o sin cuerpo, como pide la web de GUARDIANA a través de ZERO), lo contrario de lo que
-    /// está: el interruptor.
-    #[serde(default)]
+    /// Encendido o apagado (también como `estricto`, como lo pide la web de GUARDIANA). Sin él (o sin cuerpo), lo
+    /// contrario de lo que está: el interruptor.
+    #[serde(default, alias = "estricto")]
     activo: Option<bool>,
 }
 
@@ -1112,6 +1524,12 @@ mod tests {
         let f = v.foto(es);
         assert_eq!(f["fase"], "apagada");
         assert_eq!(f["enviados"], Value::Null);
+        // 5 nov 2026: sin VPN, ni salida ni cifras; los campos están (así la web sabe que el programa tiene salidas)
+        assert!(f.get("salida").is_some_and(Value::is_null));
+        assert_eq!(f["desde"], Value::Null);
+        assert_eq!(f["subidos"], Value::Null);
+        assert_eq!(f["postcuantica"], false);
+        assert_eq!(f["dns_tunel"], false);
         // el modo estricto: su interruptor, con su línea, y sin aviso mientras no hay bloqueo
         assert!(f["estricto"].is_boolean());
         assert_eq!(f["bloqueado"], false);
@@ -1134,6 +1552,8 @@ mod tests {
         let f = v.foto(es);
         assert_eq!(f["fase"], "error");
         assert_eq!(f["error"], "el servidor no contesta");
+        // un servidor que no es una salida de la tabla: sin salida
+        assert_eq!(f["salida"], Value::Null);
         // el servidor dejó de contestar con el túnel puesto (desde la 1.0.53)
         v.pon(Estado {
             fase: Fase::SinRespuesta,
@@ -1146,6 +1566,13 @@ mod tests {
         assert_eq!(f["fase"], "sin_respuesta");
         assert_eq!(f["direccion"], "10.66.0.7");
         assert_eq!(f["aviso"], "");
+        // la salida: Helsinki, con su país y su ciudad; sin túnel abierto en esta prueba, sin dirección
+        assert_eq!(f["salida"]["id"], "hel");
+        assert_eq!(f["salida"]["pais"], "FI");
+        assert_eq!(f["salida"]["ciudad"], "Helsinki");
+        assert_eq!(f["salida"]["disponible"], true);
+        assert_eq!(f["salida"]["ip"], Value::Null);
+        assert_eq!(f["postcuantica"], true);
         // el modo estricto con el servidor callado: el bloqueo sigue, y la página lo dice con el aviso
         v.bloqueado.store(true, Ordering::SeqCst);
         v.pon(Estado {
@@ -1165,6 +1592,125 @@ mod tests {
         assert!(f["aviso"]
             .as_str()
             .is_some_and(|a| a.starts_with("The VPN")));
+    }
+
+    /// 5 Nov 2026: what «conectar» connects to: an exit by its id, the fastest measured one, a name, or Helsinki.
+    #[test]
+    fn el_servidor_de_cada_pedido() {
+        let pide = |c: &str| serde_json::from_str::<Pedido>(c).unwrap();
+        let m = |disponible, ms| Medida {
+            disponible,
+            ms,
+            ip: None,
+        };
+        let medidas = Medidas {
+            cuando_ms: 1,
+            de: vec![
+                ("hel", m(true, Some(48))),
+                ("nbg", m(true, Some(31))),
+                ("mia", m(false, Some(5))),
+            ],
+        };
+        let servidor = |c: &str, med: Option<&Medidas>| servidor_del_pedido(&pide(c), med);
+        assert_eq!(servidor("{}", None).unwrap(), SERVIDOR);
+        assert_eq!(
+            servidor(r#"{"salida":"nbg"}"#, None).unwrap(),
+            "vpn-nbg.guardianagroup.com"
+        );
+        assert_eq!(
+            servidor(
+                r#"{"salida":"mia","servidor":"vpn.guardianagroup.com"}"#,
+                None
+            )
+            .unwrap(),
+            "vpn-mia.guardianagroup.com"
+        );
+        // la más rápida de las disponibles (Miami no lo está); sin medidas, la de siempre
+        assert_eq!(
+            servidor(r#"{"salida":"rapida"}"#, Some(&medidas)).unwrap(),
+            "vpn-nbg.guardianagroup.com"
+        );
+        assert_eq!(servidor(r#"{"salida":"rapida"}"#, None).unwrap(), SERVIDOR);
+        assert_eq!(
+            servidor(r#"{"servidor":"VPN.guardianagroup.com"}"#, None).unwrap(),
+            "vpn.guardianagroup.com"
+        );
+        assert!(servidor(r#"{"salida":"xyz"}"#, None).is_err());
+        assert!(servidor(r#"{"salida":"../hel"}"#, None).is_err());
+        // el interruptor del modo estricto, también como lo pide la web
+        let e = |c: &str| serde_json::from_str::<PideEstricto>(c).unwrap().activo;
+        assert_eq!(e(r#"{"activo":true}"#), Some(true));
+        assert_eq!(e(r#"{"estricto":false}"#), Some(false));
+        assert_eq!(e("{}"), None);
+    }
+
+    /// 5 Nov 2026: the exits for the page, with what was measured, the fastest, and the one the VPN is in.
+    #[test]
+    fn la_tabla_de_salidas_para_la_pagina() {
+        // nada medido: cada salida sin disponible ni retraso (no se sabe), y ninguna más rápida
+        let v = lista_json(None, None);
+        let l = v["salidas"].as_array().unwrap();
+        assert_eq!(l.len(), SALIDAS.len());
+        assert_eq!(l[0]["id"], "hel");
+        assert_eq!(l[0]["zona"], "Europe/Helsinki");
+        assert_eq!(l[0]["disponible"], Value::Null);
+        assert_eq!(v["mas_rapida"], Value::Null);
+        assert_eq!(v["medido"], Value::Null);
+        let ip: std::net::IpAddr = "62.238.17.121".parse().unwrap();
+        let medidas = Medidas {
+            cuando_ms: 7,
+            de: vec![
+                (
+                    "hel",
+                    Medida {
+                        disponible: true,
+                        ms: Some(176),
+                        ip: Some(ip),
+                    },
+                ),
+                ("nbg", Medida::default()),
+                ("mia", Medida::default()),
+            ],
+        };
+        let v = lista_json(Some(&medidas), None);
+        assert_eq!(v["salidas"][0]["ms"], 176);
+        assert_eq!(v["salidas"][0]["ip"], "62.238.17.121");
+        assert_eq!(v["salidas"][1]["disponible"], false);
+        assert_eq!(v["mas_rapida"], "hel");
+        assert_eq!(v["medido"], 7);
+        // la salida en la que está la VPN, siempre disponible, con la dirección del túnel abierto
+        let otra: std::net::IpAddr = "168.119.225.147".parse().unwrap();
+        let v = lista_json(Some(&medidas), Some(("nbg", Some(otra))));
+        assert_eq!(v["salidas"][1]["disponible"], true);
+        assert_eq!(v["salidas"][1]["ip"], "168.119.225.147");
+        assert_eq!(v["salidas"][1]["ms"], Value::Null);
+        // a quién se pregunta qué dirección ve: con el túnel en Helsinki, a las otras disponibles; sin VPN, a todas las
+        // que no se vieron caídas
+        let hel = salidas::por_id("hel");
+        let nombres = |v: Vec<&Salida>| v.into_iter().map(|s| s.id).collect::<Vec<_>>().join(",");
+        assert_eq!(nombres(a_quien_preguntar(hel, None)), "nbg,mia");
+        assert_eq!(nombres(a_quien_preguntar(None, Some(&medidas))), "hel");
+        assert_eq!(nombres(a_quien_preguntar(hel, Some(&medidas))), "");
+    }
+
+    /// The Windows location permission, as `reg query` writes it.
+    #[test]
+    fn el_permiso_de_ubicacion_de_windows() {
+        let reg = |v: &str| {
+            format!(
+                "\r\nHKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\location\r\n    Value    REG_SZ    {v}\r\n\r\n"
+            )
+        };
+        assert_eq!(permiso_de_reg(&reg("Allow")), "permitida");
+        assert_eq!(permiso_de_reg(&reg("Deny")), "denegada");
+        assert_eq!(permiso_de_reg(&reg("Prompt")), "desconocida");
+        assert_eq!(
+            permiso_de_reg(
+                "ERROR: The system was unable to find the specified registry key or value."
+            ),
+            "desconocida"
+        );
+        assert_eq!(permiso_de_reg(""), "desconocida");
     }
 
     /// The VPN is on in every phase where «Desconectar» shows, «reconectando» among them (strict mode).

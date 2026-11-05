@@ -89,6 +89,9 @@ pub struct Medida {
     pub disponible: bool,
     /// The median of three TCP connections to its HTTPS, in milliseconds; `None` when none connected.
     pub ms: Option<u32>,
+    /// Its address, as its name resolved here (IPv4): the one websites see while it is the exit. `None` when the name
+    /// did not resolve.
+    pub ip: Option<IpAddr>,
 }
 
 /// The median of `ms` (the lower middle one of an even count); `None` when empty.
@@ -179,7 +182,33 @@ pub fn mide(s: &Salida) -> Medida {
     Medida {
         disponible,
         ms: mediana(&tiempos),
+        ip: Some(direccion.ip()),
     }
+}
+
+/// Whether this computer has a way out by IPv6 to the internet: a route to a global address, and a global address of
+/// its own to send from (5 Nov 2026, «lo que una web verá»). Nothing is sent: a UDP socket only asks the system which
+/// route and which address it would use, towards an address of the documentation range (2001:db8::/32), which the
+/// system routes like any other global one.
+#[must_use]
+pub fn tiene_ipv6() -> bool {
+    let Ok(s) = std::net::UdpSocket::bind("[::]:0") else {
+        return false;
+    };
+    if s.connect("[2001:db8::1]:9").is_err() {
+        return false;
+    }
+    s.local_addr().is_ok_and(|a| match a.ip() {
+        IpAddr::V6(v6) => es_global(v6),
+        IpAddr::V4(_) => false,
+    })
+}
+
+/// A global unicast IPv6 address (2000::/3), the kind that reaches the internet: not the link's, not a unique local
+/// one, not the loopback.
+#[must_use]
+pub fn es_global(a: std::net::Ipv6Addr) -> bool {
+    (a.segments()[0] & 0xe000) == 0x2000
 }
 
 /// The address a website sees from this computer, asked of GUARDIANA's own server called `nombre` (its echo, `GET
@@ -301,7 +330,11 @@ mod tests {
 
     #[test]
     fn la_mas_rapida_de_las_disponibles() {
-        let m = |disponible, ms| Medida { disponible, ms };
+        let m = |disponible, ms| Medida {
+            disponible,
+            ms,
+            ip: None,
+        };
         assert_eq!(
             mas_rapida(&[
                 ("hel", m(true, Some(48))),
@@ -341,6 +374,21 @@ mod tests {
         );
         assert_eq!(ip_del_eco("{\"v\":1,\"ip\":null}"), None);
         assert_eq!(ip_del_eco("Method Not Allowed"), None);
+    }
+
+    #[test]
+    fn que_es_una_ipv6_de_internet() {
+        let g = |s: &str| es_global(s.parse().unwrap());
+        assert!(g("2001:db8::1"));
+        assert!(g("2800:e2:7a80::5"));
+        assert!(g("3fff::1"));
+        assert!(!g("fe80::1"));
+        assert!(!g("fd12:3456::1"));
+        assert!(!g("::1"));
+        assert!(!g("::"));
+        assert!(!g("ff02::1"));
+        // it can be asked anywhere, with or without IPv6, and nothing is sent
+        let _ = tiene_ipv6();
     }
 
     /// The exits' offsets now, with their summer times, against dates whose offset is known.

@@ -1143,6 +1143,9 @@ pub async fn start(config: Config) -> Result<Running, Error> {
         .route("/api/vpn/desconecta", post(vpn::desconecta))
         // Strict mode (ronda 91): its switch; its state is in `GET /api/vpn`.
         .route("/api/vpn/estricto", post(vpn::modo_estricto))
+        // 5 Nov 2026, the exits: GUARDIANA's servers, measured from here, and what a website will see.
+        .route("/api/vpn/salidas", get(vpn::ver_salidas))
+        .route("/api/vpn/comprueba", get(vpn::comprueba))
         .route("/api/revision/ahora", post(revision::ahora))
         // 1.0.51: the route of the data, hop by hop (src/ruta.rs).
         .route("/api/ruta", get(ruta::ver))

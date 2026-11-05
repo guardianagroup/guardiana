@@ -3480,6 +3480,104 @@ fn a_notice_of_the_shield_opens_orbita_on_the_scanner() {
     assert_eq!(s.producto(), "orbita");
 }
 
+/// 5 Nov 2026: «conectar» names its exit and strict mode's switch its side, in a body the program checks and passes
+/// rewritten; any other body is refused (400) and the panel is not asked.
+#[test]
+fn the_vpn_orders_carry_only_their_own_body() {
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "9".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    let panel = s
+        .pestanas
+        .iter()
+        .find(|p| p.url == url)
+        .map(|p| p.id)
+        .unwrap_or_default();
+    let pide = |ruta: &str, cuerpo: Value| {
+        json!({ "tipo": "zg_panel_pide", "n": 9, "metodo": "POST", "ruta": ruta, "cuerpo": cuerpo })
+            .to_string()
+    };
+    // what reaches the panel's tab, as it parsed it
+    let al_panel = |o: &[Orden]| -> Option<Value> {
+        o.iter().find_map(|x| match x {
+            Orden::EnviaAPagina { id, json, .. } if *id == panel => serde_json::from_str(json).ok(),
+            _ => None,
+        })
+    };
+    for (ruta, cuerpo, pasa) in [
+        (
+            "/api/vpn/conecta",
+            json!("{\"salida\":\"nbg\"}"),
+            Some("{\"salida\":\"nbg\"}"),
+        ),
+        (
+            "/api/vpn/conecta",
+            json!("{\"salida\":\"rapida\"}"),
+            Some("{\"salida\":\"rapida\"}"),
+        ),
+        (
+            "/api/vpn/estricto",
+            json!("{\"estricto\":false}"),
+            Some("{\"activo\":false}"),
+        ),
+        (
+            "/api/vpn/estricto",
+            json!("{\"activo\":true}"),
+            Some("{\"activo\":true}"),
+        ),
+        // none, empty or {}: no body, and the panel does what it always did
+        ("/api/vpn/conecta", json!("{}"), None),
+        ("/api/vpn/conecta", json!(""), None),
+        ("/api/vpn/estricto", Value::Null, None),
+        ("/api/vpn/desconecta", Value::Null, None),
+    ] {
+        let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, cuerpo.clone()));
+        let v = al_panel(&o).unwrap_or_default();
+        assert_eq!(v["ruta"], ruta, "{ruta} {cuerpo}");
+        assert_eq!(v["cuerpo"].as_str(), pasa, "{ruta} {cuerpo}");
+    }
+    for (ruta, cuerpo) in [
+        // not an exit's id, another key, more than one, not JSON, too long, not a string
+        ("/api/vpn/conecta", json!("{\"salida\":\"../hel\"}")),
+        ("/api/vpn/conecta", json!("{\"salida\":\"NBG\"}")),
+        (
+            "/api/vpn/conecta",
+            json!("{\"servidor\":\"evil.example.com\"}"),
+        ),
+        ("/api/vpn/conecta", json!("{\"salida\":\"nbg\",\"x\":1}")),
+        ("/api/vpn/conecta", json!("[\"nbg\"]")),
+        ("/api/vpn/conecta", json!("salida=nbg")),
+        (
+            "/api/vpn/conecta",
+            json!(format!("{{\"salida\":\"{}\"}}", "a".repeat(300))),
+        ),
+        ("/api/vpn/conecta", json!({ "salida": "nbg" })),
+        ("/api/vpn/estricto", json!("{\"estricto\":\"si\"}")),
+        // no other order carries a body
+        ("/api/vpn/desconecta", json!("{\"salida\":\"nbg\"}")),
+        ("/api/revision/ahora", json!("{\"x\":1}")),
+    ] {
+        let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, cuerpo.clone()));
+        assert!(al_panel(&o).is_none(), "{ruta} {cuerpo}");
+        assert!(
+            o.iter().any(|x| matches!(
+                x,
+                Orden::EnviaAPagina { id, json, .. } if *id == orbita && json.contains("\"estado\":400")
+            )),
+            "{ruta} {cuerpo}"
+        );
+    }
+    // a reading never carries one
+    let o = s.mensaje(
+        Origen::Pestana(orbita),
+        ORBITA,
+        &json!({ "tipo": "zg_panel_pide", "n": 9, "metodo": "GET", "ruta": "/api/vpn/salidas", "cuerpo": "{\"a\":1}" })
+            .to_string(),
+    );
+    assert!(al_panel(&o).is_none());
+}
+
 #[test]
 fn the_web_asks_the_panel_only_for_its_readings() {
     // 1.0.50 (the owner, 30 Oct 2026, 23:32: «el Vigía… analizar todo lo que sea medible en
@@ -3515,6 +3613,9 @@ fn the_web_asks_the_panel_only_for_its_readings() {
         "/api/vpn",
         // 3 Nov 2026: the level in force, for Ultra.
         "/api/plan",
+        // 5 Nov 2026: the VPN's exits, and what a website will see.
+        "/api/vpn/salidas",
+        "/api/vpn/comprueba",
     ] {
         let o = s.mensaje(Origen::Pestana(orbita), ORBITA, &pide(ruta, "GET"));
         assert!(

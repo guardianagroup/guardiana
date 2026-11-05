@@ -851,11 +851,67 @@ const PANEL_LECTURAS: &[(&str, &str)] = &[
     // 3 Nov 2026, strict mode (ronda 91): its switch, a POST like the two above, so the panel's tab takes it only right
     // after a real click; its state comes in `GET /api/vpn`.
     ("POST", "/api/vpn/estricto"),
+    // 5 Nov 2026, the exits (the owner, 3 Nov, 09:25: «Todas las VPN te dicen a dónde»): GUARDIANA's servers measured
+    // from this computer, and what a website will see. Both only read; «conectar» names its exit in its body
+    // ([`cuerpo_para_el_panel`]).
+    ("GET", "/api/vpn/salidas"),
+    ("GET", "/api/vpn/comprueba"),
     // 3 Nov 2026, Ultra (the owner, 00:20: «empezar ya la versión ultra»): the level in force (`plus` or
     // `gratis`), so Comunicaciones in the program knows whether an Ultra invitation can be created here.
     // Read only; the key never leaves the panel.
     ("GET", "/api/plan"),
 ];
+
+/// 5 Nov 2026: the body GUARDIANA's web may send with a VPN order, passed to the panel rewritten from what it means:
+/// `{"salida": "<id>"}` for «conectar» (an exit's id, or `rapida`; the panel checks it is one of GUARDIANA's) and
+/// `{"activo": true|false}` for strict mode's switch (the web says it as `"estricto"`). No body, an empty one or `{}`:
+/// none, and the panel does what it always did. Anything else is refused (`Err`), and no other order carries a body.
+fn cuerpo_para_el_panel(
+    metodo: &str,
+    ruta: &str,
+    cuerpo: Option<&Value>,
+) -> Result<Option<String>, ()> {
+    let texto = match cuerpo {
+        None | Some(Value::Null) => return Ok(None),
+        Some(Value::String(t)) if t.trim().is_empty() => return Ok(None),
+        Some(Value::String(t)) if t.len() <= 256 => t,
+        Some(_) => return Err(()),
+    };
+    if metodo != "POST" {
+        return Err(());
+    }
+    let v: Value = serde_json::from_str(texto).map_err(|_| ())?;
+    let o = v.as_object().ok_or(())?;
+    if o.is_empty() && (ruta == "/api/vpn/conecta" || ruta == "/api/vpn/estricto") {
+        return Ok(None);
+    }
+    if o.len() != 1 {
+        return Err(());
+    }
+    match ruta {
+        "/api/vpn/conecta" => {
+            let id = o.get("salida").and_then(Value::as_str).ok_or(())?;
+            if id.is_empty()
+                || id.len() > 24
+                || !id
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
+            {
+                return Err(());
+            }
+            Ok(Some(json!({ "salida": id }).to_string()))
+        }
+        "/api/vpn/estricto" => {
+            let activo = o
+                .get("activo")
+                .or_else(|| o.get("estricto"))
+                .and_then(Value::as_bool)
+                .ok_or(())?;
+            Ok(Some(json!({ "activo": activo }).to_string()))
+        }
+        _ => Err(()),
+    }
+}
 
 /// 1.0.52: `POST /api/escudo/cuarentena/<id>`, the id being a warning's (`<línea>-<cuando_ms>`, digits only), the
 /// one address outside [`PANEL_LECTURAS`] GUARDIANA's web may ask the panel for.
@@ -2117,7 +2173,8 @@ impl Sesion {
     }
 
     /// An answer for Órbita's tab that its reading cannot be given (`estado`: 403 not on the list,
-    /// 503 the panel is not open, 413 too large), so the page does not wait for nothing.
+    /// 400 a body that is not one of the VPN's, 503 the panel is not open, 413 too large), so the page does not wait
+    /// for nothing.
     fn sin_lectura(&self, para: u32, n: u64, estado: u64) -> Vec<Orden> {
         if !self
             .pestana(para)
@@ -2190,6 +2247,10 @@ impl Sesion {
         {
             return self.sin_lectura(id, n, 403);
         }
+        // 5 Nov 2026: the exit «conectar» goes to, and the side of strict mode's switch
+        let Ok(cuerpo) = cuerpo_para_el_panel(metodo, ruta, m.get("cuerpo")) else {
+            return self.sin_lectura(id, n, 400);
+        };
         let Some(panel) = self.panel_fijo() else {
             return self.sin_lectura(id, n, 503);
         };
@@ -2199,12 +2260,16 @@ impl Sesion {
             self.vpn.proxima = self.vpn.proxima.min(pronto);
             self.vpn.fallos = 0;
         }
+        let mut pedido =
+            json!({ "tipo": "zg_panel_pide", "para": id, "n": n, "metodo": metodo, "ruta": ruta });
+        if let Some(c) = cuerpo {
+            pedido["cuerpo"] = Value::String(c);
+        }
         vec![Orden::EnviaAPagina {
             id: panel,
             prefijo: PANEL_LOCAL,
             excepto: None,
-            json: json!({ "tipo": "zg_panel_pide", "para": id, "n": n, "metodo": metodo, "ruta": ruta })
-                .to_string(),
+            json: pedido.to_string(),
         }]
     }
 

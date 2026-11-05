@@ -281,6 +281,32 @@ del interruptor y su línea, en su idioma), y la fase `"reconectando"`. `POST /a
 `{"activo": true|false}` (o sin cuerpo: lo contrario de lo que está) contesta `{"ok": true, "estricto": bool}` o
 `{"ok": false, "motivo": "…"}`; no es de Plus, y por ZERO solo tras un clic de verdad, como `conecta`.
 
+Las salidas, en la API (5 nov 2026; el dueño, 3 nov, 09:25: «Todas las VPN te dicen a dónde»):
+
+- `GET /api/vpn` añade `"salida"` (la salida en la que está o a la que iba: `id`, `pais`, `ciudad`, `continente`,
+  `proveedor`, `nombre`, `zona`, `ip` —la del túnel abierto, o la medida—, `disponible` y `ms`; `null` sin VPN),
+  `"desde"`, `"saludo"`, `"subidos"`, `"bajados"` (siguen también `desde_ms`, `ultimo_saludo_ms`, `enviados` y
+  `recibidos`), `"postcuantica"` (con el túnel: el alta siempre lleva su mitad de ML-KEM) y `"dns_tunel"`.
+- `GET /api/vpn/salidas`: `{"salidas": [cada salida, como arriba], "mas_rapida": id | null, "medido": ms | null}`. Se
+  miden (el nombre, tres conexiones TCP a su HTTPS y su alta, todas a la vez) solo con la VPN apagada y sin el bloqueo
+  —encendida, la medida iría por el túnel—, y lo medido vale un minuto. Con la VPN encendida y nada medido, solo si su
+  nombre resuelve. La salida en la que está, siempre disponible.
+- `POST /api/vpn/conecta` acepta `{"salida": "<id>" | "rapida"}` (la más rápida de lo medido; sin medida, Helsinki);
+  `POST /api/vpn/estricto`, también `{"estricto": bool}`.
+- `GET /api/vpn/comprueba`: `{"ip_vista", "pais_ip", "dns": "tunel" | "fuera" | "desconocido", "ipv6": "bloqueado" |
+  "sin_ipv6" | "fuga" | null, "zona": {"equipo": null, "desfase_equipo", "salida", "desfase_salida", "coincide"},
+  "idioma": null, "ubicacion_windows": "permitida" | "denegada" | "desconocida"}`. La dirección es la que ve llegar el
+  eco (`GET /vpn/alta`) de un servidor de GUARDIANA, nunca un tercero: con el túnel abierto, el de otra salida (la propia
+  no contesta a lo que llega por su túnel: sus reglas solo dejan el resolutor), así que es la dirección con la que sale el
+  tráfico del túnel; sin VPN, la de este equipo. Sin otro servidor que conteste, no hay dirección y la página no la da
+  por comprobada. El país, de la base de direcciones del programa. El DNS y el IPv6, de lo que el túnel tiene puesto
+  (el resolutor solo hacia el del túnel; el corte). La hora del equipo llega del navegador (`X-Guardiana-Tz`); su zona y
+  su idioma los pone la página, que los lee ella misma.
+- Por ZERO (`crates/zero/src/sesion.rs`, `PANEL_LECTURAS`) pasan las tres lecturas, y el cuerpo de `conecta` y de
+  `estricto` comprobado y reescrito (`cuerpo_para_el_panel`: un id de salida, o el lado del interruptor; cualquier otro
+  cuerpo, 400). El guion del programa (`paginas.rs`) deja pasar, campo a campo, la dirección de la salida y la que ve una
+  web (el servidor de la web ya ve esta al cargar la página), y nunca la del túnel.
+
 Pendiente, en este orden:
 
 1. La pantalla de la VPN en la web del programa (Órbita), con la lista de servidores cuando existan.

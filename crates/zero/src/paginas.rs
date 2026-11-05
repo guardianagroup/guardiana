@@ -322,6 +322,32 @@ const GUION: &str = r#"(() => {
       },
     };
     LIMPIA['/api/vigilancia/resumen'] = LIMPIA['/api/vigilancia'];
+    // 5 Nov 2026, the VPN's screen: field by field what it shows, and nothing else. The exit's address and the one a
+    // website sees are the point of these readings (the web's own server already sees the latter when the page loads),
+    // so they pass whole; the tunnel's inner address does not.
+    const ipVpn = (x) => (typeof x === 'string' && (/^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$/.test(x) || /^[0-9a-f:]{2,39}$/i.test(x)) ? x : null);
+    const tx = (x, k) => (typeof x === 'string' ? x.slice(0, k) : null);
+    const nu = (x) => (typeof x === 'number' && isFinite(x) ? x : null);
+    const si = (x) => (typeof x === 'boolean' ? x : null);
+    const salidaVpn = (x) => (x && typeof x === 'object' ? { id: tx(x.id, 24), pais: tx(x.pais, 2), ciudad: tx(x.ciudad, 60), continente: tx(x.continente, 30), proveedor: tx(x.proveedor, 40), nombre: tx(x.nombre, 80), zona: tx(x.zona, 40), ip: ipVpn(x.ip), disponible: si(x.disponible), ms: nu(x.ms) } : null);
+    const VPN = {
+      '/api/vpn': (j) => ({
+        disponible: si(j.disponible), motivo: tx(j.motivo, 200), fase: tx(j.fase, 30), servidor: tx(j.servidor, 80), salida: salidaVpn(j.salida),
+        desde: nu(j.desde), saludo: nu(j.saludo), subidos: nu(j.subidos), bajados: nu(j.bajados), postcuantica: si(j.postcuantica), dns_tunel: si(j.dns_tunel),
+        desde_ms: nu(j.desde_ms), enviados: nu(j.enviados), recibidos: nu(j.recibidos), ultimo_saludo_ms: nu(j.ultimo_saludo_ms),
+        error: typeof j.error === 'string' ? limpiaTexto(j.error) : '', estricto: si(j.estricto), bloqueado: si(j.bloqueado),
+        aviso: tx(j.aviso, 300), estricto_titulo: tx(j.estricto_titulo, 80), estricto_linea: tx(j.estricto_linea, 400),
+      }),
+      '/api/vpn/salidas': (j) => ({ salidas: Array.isArray(j.salidas) ? j.salidas.slice(0, 60).map(salidaVpn) : [], mas_rapida: tx(j.mas_rapida, 24), medido: nu(j.medido) }),
+      '/api/vpn/comprueba': (j) => {
+        const z = j.zona && typeof j.zona === 'object' ? j.zona : {};
+        return {
+          ip_vista: ipVpn(j.ip_vista), pais_ip: tx(j.pais_ip, 2), dns: tx(j.dns, 20), ipv6: tx(j.ipv6, 20),
+          zona: { equipo: tx(z.equipo, 60), salida: tx(z.salida, 40), desfase_equipo: nu(z.desfase_equipo), desfase_salida: nu(z.desfase_salida), coincide: si(z.coincide) },
+          idioma: tx(j.idioma, 40), ubicacion_windows: tx(j.ubicacion_windows, 20),
+        };
+      },
+    };
     LIMPIA['/vigia'] = (j) => {
       const quita = (x) => (typeof x === 'string' ? x.replace(/ \((?:cuenta|account|conta) [^)]*\)/g, '').replace(/, (?:desde el equipo|from the computer|a partir do computador) [^.]*/g, '') : x);
       for (const c of ['alertas', 'avisos']) if (Array.isArray(j[c])) j[c] = j[c].map((x) => Object.assign({}, x, { texto: quita(x && x.texto) }));
@@ -332,6 +358,7 @@ const GUION: &str = r#"(() => {
       try { j = JSON.parse(texto); } catch (_) { return ''; }
       if (!j || typeof j !== 'object') return '';
       if (ruta === '/api/textos') return texto;
+      if (VPN[ruta]) { try { return JSON.stringify(VPN[ruta](j)); } catch (_) { return ''; } }
       const f = LIMPIA[ruta];
       try { if (f) j = f(j) || j; } catch (_) { return ''; }
       return JSON.stringify(limpiaTodo(j, ''));
@@ -341,7 +368,7 @@ const GUION: &str = r#"(() => {
     // minute, a new slow look of the watch every 30 s, and the list of antivirus (a PowerShell each time) kept 30 s.
     const RUTA_OK = /^\/(?:api\/[a-z0-9\-\/]+|vigia)$/;
     const ESPERA = { 'POST /api/revision/ahora': 60000, 'POST /api/vigilancia/ahora': 30000, 'POST /api/ruta/ahora': 60000 };
-    const GUARDA = { 'GET /api/antivirus/detectar': 30000 };
+    const GUARDA = { 'GET /api/antivirus/detectar': 30000, 'GET /api/vpn/salidas': 15000, 'GET /api/vpn/comprueba': 3000 };
     const ultimo = new Map(), guardado = new Map();
     let enVuelo = 0;
     escucha('message', (e) => {
@@ -362,7 +389,9 @@ const GUION: &str = r#"(() => {
       const h = cabeceras(tk);
       if (post) h['Content-Type'] = 'application/json';
       enVuelo++;
-      fetch(m.ruta, { method: post ? 'POST' : 'GET', headers: h, body: post ? '{}' : undefined, cache: 'no-store' })
+      // 5 Nov 2026: a VPN order's body, as the program checked and rewrote it (the exit, the switch's side)
+      const cuerpo = post && typeof m.cuerpo === 'string' && m.cuerpo.length <= 256 ? m.cuerpo : '{}';
+      fetch(m.ruta, { method: post ? 'POST' : 'GET', headers: h, body: post ? cuerpo : undefined, cache: 'no-store' })
         .then((r) => r.text().then((t) => {
           const datos = r.ok || r.status === 402 ? paraLaWeb(m.ruta, t) : '';
           if (GUARDA[k] && r.ok) guardado.set(k, { t: Date.now(), estado: r.status, datos });
@@ -437,7 +466,10 @@ const GUION: &str = r#"(() => {
         setTimeout(() => document.dispatchEvent(new CustomEvent('guardiana-panel', { detail: JSON.stringify({ n, estado: 428, datos: '' }) })), 0);
         return;
       }
-      manda({ tipo: 'zg_panel_pide', n, metodo: post ? 'POST' : 'GET', ruta: q.ruta.slice(0, 80) });
+      // 5 Nov 2026: «conectar» names its exit and strict mode's switch its side; the program checks the body
+      const pedido = { tipo: 'zg_panel_pide', n, metodo: post ? 'POST' : 'GET', ruta: q.ruta.slice(0, 80) };
+      if (post && typeof q.cuerpo === 'string' && q.cuerpo.length <= 256) pedido.cuerpo = q.cuerpo;
+      manda(pedido);
     });
     escucha('message', (e) => {
       const m = e && e.data;
