@@ -192,8 +192,8 @@ input.trabajando { opacity: .55; }
   --s-pagina: 1200px;       /* ancho máximo de toda página interior (Lente) */
   --s-inspector: 400px;     /* panel derecho: lugar, empresa, programa, escudo de llamada */
   --s-lista: 264px;         /* columna izquierda de salas (Comunicaciones) y de categorías (tabla en vivo) */
-  --s-cristal: 56px;        /* franja de ZERO plegada; desplegada = 360px */
-  --s-cristal-abierto: 360px;
+  --s-cristal: 152px;       /* escudo de ZERO plegado en su carril (5 nov 2026; antes, una franja de 56) */
+  --s-cristal-abierto: 384px; /* escudo de ZERO abierto, como viene por defecto junto a una web */
   /* Rejilla de página: 12 columnas, separación 24; contenido 8 + lateral 4 */
   --s-col-gap: 24px;
   /* Espaciado: solo múltiplos de 4 → usar --e1..--e6 (4 8 12 16 24 32) y 40/48 */
@@ -219,6 +219,7 @@ input.trabajando { opacity: .55; }
    - Cifras: font-variant-numeric: tabular-nums; separador de miles del idioma.
    - Iconos: trazo 1.6, 20 px (16 px en filas), color var(--muted).
    - Interruptor: el estándar `interruptor` (44×24), nunca otro control para on/off.
-   - Paneles que se abren (inspector, tabla en vivo, escudo de ZERO): se cierran con ✕, Esc o clic fuera; animación --m-normal --m-curva.
+   - Paneles que se abren (inspector, tabla en vivo): se cierran con ✕, Esc o clic fuera; animación --m-normal --m-curva. El escudo de
+     ZERO viene abierto y se queda abierto: solo lo pliegan su botón o Esc (5 nov 2026, el dueño).
 */
 /* === FIN SISTEMA 1.0.46 === */

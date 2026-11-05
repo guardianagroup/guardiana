@@ -4,7 +4,7 @@
 (() => {
   const { manda, en, t, tn, esc, $, n } = Z;
   let vista = null;
-  let ultimoEscudo = null; // 1.0.46: the last shield message, to redraw the dots at their size
+  let ultimoEscudo = null; // the last shield message, to redraw the figure when the view shows
   let pais = (c) => c || '';
   const fecha = (ms) => new Date(ms).toLocaleDateString(document.documentElement.lang, { day: 'numeric', month: 'long', year: 'numeric' });
   const hora = (ms) => new Date(ms).toLocaleTimeString(document.documentElement.lang, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -106,8 +106,14 @@
     if (parcial) li.classList.add('parcial');
     else if (corta) li.classList.add('cortado');
     else if (sigue) li.classList.add('sigue');
-    li.querySelector('.quien').innerHTML = `<button class="enlace-empresa" data-empresa="${esc(x.quien)}" title="${esc(t('ficha_ver'))}">${esc(x.quien)}</button>${x.pais ? `<small>${esc(pais(x.pais))}</small>` : ''}<span class="cat">${esc(mayuscula(t('cat_' + x.categoria)))}</span>`;
+    // 5 Nov 2026 (the redesign): what was cut of it goes on the same second line, red (amber when only part).
+    const cuentaFila = x.cortadas > 0
+      ? `<span class="cuenta-fila ${parcial ? 'ambar' : 'rojo'}">${esc(t('escudo_cortadas_de', { c: n(x.cortadas), n: n(x.vistas) }))}</span>`
+      : `<span class="cuenta-fila">${esc(tn('escudo_peticiones', x.vistas, { n: n(x.vistas) }))}</span>`;
+    const corredorFila = x.corredor ? `<span class="corredor-fila" title="${esc(x.corredor)}">${esc(t('corredor_etiqueta'))}</span>` : '';
+    li.querySelector('.quien').innerHTML = `<button class="enlace-empresa" data-empresa="${esc(x.quien)}" title="${esc(t('ficha_ver'))}">${esc(x.quien)}</button>${x.pais ? `<small>${esc(pais(x.pais))}</small>` : ''} <span class="cat">${esc(mayuscula(t('cat_' + x.categoria)))}</span> ${cuentaFila}${corredorFila ? ' ' + corredorFila : ''}`;
     // The site may be shortened; its counts never are.
+    li.querySelector('.linea').title = x.sitio;
     li.querySelector('.linea').innerHTML = `<span class="mono">${esc(x.sitio)}</span><span class="cuenta">${esc(x.cortadas > 0 ? t('escudo_cortadas_de', { c: n(x.cortadas), n: n(x.vistas) }) : tn('escudo_peticiones', x.vistas, { n: n(x.vistas) }))}</span>`;
     // What holds now, in one chip: the person's rule when there is one, else cut, partly or not.
     const [estado, color] = x.regla === 'tuya' || x.regla === 'permitido' ? [t('regla_' + x.regla), 'tuya']
@@ -139,6 +145,8 @@
       cajaSw.classList.toggle('cortado', corta);
       cajaSw.classList.remove('ocupado');
       cajaSw.querySelector('.interruptor-estado').textContent = parcial ? t('escudo_parcial') : t(corta ? 'interruptor_cortado' : 'interruptor_permitido');
+      // Why it is cut, in the title of its word (5 Nov 2026: the row keeps one height in every state).
+      cajaSw.querySelector('.interruptor-estado').title = por ? t('motivo_' + por) : '';
     }
     sw.disabled = !acc.interruptor;
     if (acc.interruptor) { sw.dataset.accion = acc.interruptor[0]; sw.title = t(acc.interruptor[1] + '_titulo'); sw.setAttribute('aria-label', t(acc.interruptor[1])); }
@@ -203,6 +211,22 @@
     const empresas = new Set(lista.map((x) => x.quien));
     const cortadas = new Set(lista.filter((x) => x.ahora !== 'pasa').map((x) => x.quien));
     $('e-lista-resumen').textContent = `${tn('escudo_lista_empresas', empresas.size, { n: n(empresas.size) })} · ${tn('escudo_lista_cortadas', cortadas.size, { n: n(cortadas.size) })}`;
+    // 5 Nov 2026: one segment per company (cut red, cut in part amber, let through green), up to 12; beyond, in proportion.
+    const estadoDe = new Map();
+    for (const x of lista) {
+      const e = x.ahora === 'cortado' ? 'cortado' : x.ahora === 'parcial' ? 'parcial' : 'pasa';
+      const antes = estadoDe.get(x.quien);
+      estadoDe.set(x.quien, !antes || antes === e ? e : 'parcial');
+    }
+    const cuenta = { cortado: 0, parcial: 0, pasa: 0 };
+    estadoDe.forEach((e) => { cuenta[e]++; });
+    const total = estadoDe.size, tramos = Math.min(total, 12);
+    const reparte = (k) => (total <= 12 ? cuenta[k] : Math.round((cuenta[k] * tramos) / total));
+    const segs = [...Array(reparte('cortado')).fill('cortado'), ...Array(reparte('parcial')).fill('parcial'), ...Array(Math.max(0, tramos - reparte('cortado') - reparte('parcial'))).fill('pasa')];
+    $('z2-reparto-barra').innerHTML = segs.map((e) => `<i class="${e === 'cortado' ? '' : e}"></i>`).join('');
+    $('z2-reparto').classList.toggle('oculto', !lista.length);
+    $('z2-cuantas').textContent = lista.length ? n(empresas.size) : '';
+    pintaUltimos(lista);
     $('e-lista-caja').classList.toggle('oculto', !lista.length);
     $('e-vacio').classList.toggle('oculto', lista.length > 0);
   }
@@ -210,6 +234,10 @@
   // Today, across the whole browser, at the top of the shield: refreshed while it is open.
   en('hoy', (m) => {
     const h = m.hoy || {};
+    // The folded rail says the day under the page (5 Nov 2026).
+    $('carril-hoy-n').textContent = n(h.cortadas || 0);
+    const webs = Number(m.webs_cortes || 0);
+    $('carril-hoy-que').textContent = tn('z2_hoy_webs', h.cortadas || 0, { webs: tn('z1_webs', webs, { n: n(webs) }) });
     $('e-dia').classList.toggle('apagada', !m.cortando);
     $('e-dia-frase').innerHTML = h.empresas
       ? `${esc(tn('escudo_dia_frase', h.empresas, { empresas: n(h.empresas) }))} <b>${esc(tn('escudo_dia_cortadas', h.empresas_cortadas, { cortadas: n(h.empresas_cortadas) }))}</b>`
@@ -242,6 +270,46 @@
     while (historia.length > 1 && ahora - historia[0][0] > 60000) historia.shift();
     return Math.max(0, total - historia[0][1]);
   }
+  // 5 Nov 2026 (the redesign): the beat of the last minute, one bar each 3 s, from how the page's figure grew while the
+  // panel was watching (the same samples as the amber of now; never guessed): red when something was cut in those 3 s,
+  // amber the last one, the moment now. Redrawn every 3 s so it moves on even when nothing new arrives.
+  let latidoMirando = false;
+  const BARRAS = 20, PASO = 3000;
+  function totalEn(ts) {
+    let v = null;
+    for (const [t0, x] of historia) { if (t0 <= ts) v = x; else break; }
+    return v;
+  }
+  function pintaLatido() {
+    const caja = $('z2-latido');
+    if (!caja) return;
+    if (caja.children.length !== BARRAS) caja.innerHTML = '<i></i>'.repeat(BARRAS);
+    const ahora = Date.now();
+    const sube = [];
+    for (let b = 0; b < BARRAS; b++) {
+      const desde = ahora - (BARRAS - b) * PASO, hasta = desde + PASO;
+      const a = totalEn(desde), z = totalEn(hasta);
+      sube.push(latidoMirando || z == null ? 0 : Math.max(0, z - (a == null ? (historia.length && historia[0][0] > desde ? historia[0][1] : z) : a)));
+    }
+    const mayor = Math.max(1, ...sube);
+    [...caja.children].forEach((i, b) => {
+      const v = sube[b];
+      i.className = v > 0 ? (b === BARRAS - 1 ? 'a' : 'c') : '';
+      i.style.height = v > 0 ? `${Math.round(45 + (55 * v) / mayor)}%` : '20%';
+    });
+  }
+  setInterval(() => { if (vista === 'escudo' || document.body.classList.contains('plegado')) pintaLatido(); }, PASO);
+  // The rail's «Últimos cortes»: the last companies of this page to which something is cut, newest first.
+  function pintaUltimos(lista) {
+    const vistos = new Set(), ult = [];
+    for (let i = lista.length - 1; i >= 0 && ult.length < 3; i--) {
+      const x = lista[i];
+      if ((x.ahora === 'cortado' || x.ahora === 'parcial') && !vistos.has(x.quien)) { vistos.add(x.quien); ult.push(x); }
+    }
+    $('carril-ultimos').innerHTML = ult.length
+      ? ult.map((x) => `<li class="${x.ahora === 'parcial' ? 'parcial' : ''}" title="${esc(x.sitio)}"><span>${esc(x.quien)}</span></li>`).join('')
+      : `<li class="nada">${esc(t('z2_ninguno'))}</li>`;
+  }
   function pintaCifra(m) {
     const r = m.resumen || {};
     const mirando = !m.cortando;
@@ -249,13 +317,17 @@
     const ambar = mirando ? 0 : ambarDe(m, cifra);
     $('z1-web').textContent = m.sitio || '';
     $('z1-n').textContent = n(cifra);
-    $('z1-que').textContent = mirando ? tn('z1_empresas_sin_cortar', cifra) : tn('z1_intentos_pagina', cifra);
+    $('z1-que').textContent = mirando ? tn('z1_empresas_sin_cortar', cifra) : tn('z2_intentos', cifra);
+    $('z2-que-sub').textContent = mirando ? t('z2_mirando_sub') : t('z2_antes_de_salir');
     $('franja-n').textContent = n(cifra);
-    $('franja-que').textContent = mirando ? t('z1_franja_empresas') : t('z1_franja_cortados');
-    if (window.ZeroEscudo) {
-      ZeroEscudo.dibuja($('z1-escudo'), { n: mirando ? 0 : cifra, ambar, minimo: 30, maximo: 120, semilla: 8 });
-      ZeroEscudo.dibuja($('franja-escudo'), { n: mirando ? 0 : cifra, ambar, minimo: 12, maximo: 30, semilla: 8 });
+    $('franja-que').textContent = mirando ? t('z1_franja_empresas') : tn('z2_carril_cortados', cifra);
+    for (const id of ['z2-vivo', 'carril-vivo']) {
+      $(id).textContent = mirando ? t('z1_estado_mirando') : t('z2_en_directo');
+      $(id).classList.toggle('mirando', mirando);
     }
+    latidoMirando = mirando;
+    void ambar;
+    pintaLatido();
     // «Permitir en esta web»: the standard switch, «Permitido» when the lists cut nothing here.
     const caja = $('z1-permitir');
     caja.classList.toggle('oculto', !m.sitio);
@@ -274,16 +346,18 @@
     }
   }
   $('franja').addEventListener('click', () => manda({ tipo: 'panel', vista: 'escudo' }));
+  $('carril-emblema').addEventListener('click', () => manda({ tipo: 'panel', vista: 'escudo' }));
   $('z1-plegar').addEventListener('click', () => manda({ tipo: 'panel', vista: null }));
   $('z1-recibo').addEventListener('click', () => manda({ tipo: 'recibo_pagina' }));
-  // Esc folds the summary, as ✕ does (the design system: panels close with ✕, Esc or a click
-  // outside; the click on the web is told by the page itself).
+  // Esc folds the summary into its rail, as its button does. Since 5 Nov 2026 a click on the web no longer folds it (the
+  // owner: the shield comes open, showing what is being cut, and stays so).
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && vista === 'escudo' && !document.body.classList.contains('plegado')) manda({ tipo: 'panel', vista: null });
   });
   en('marco', (m) => {
     const l = Number(m.lateral || 0);
-    document.body.classList.toggle('plegado', l > 0 && l <= 56);
+    // 5 Nov 2026: folded is the rail of 152 px (it was a strip of 56); open is 384.
+    document.body.classList.toggle('plegado', l > 0 && l < 240);
     if (ultimoEscudo) requestAnimationFrame(() => pintaCifra(ultimoEscudo));
   });
   window.addEventListener('resize', () => { if (ultimoEscudo) pintaCifra(ultimoEscudo); });
@@ -508,7 +582,19 @@
   $('b-si').addEventListener('click', () => manda({ tipo: 'bienvenida', cortar: true }));
   $('b-no').addEventListener('click', () => manda({ tipo: 'bienvenida', cortar: false }));
 
+  // 5 Nov 2026: the switch's word gets the width of the longest of its words in the language, so a row's switch never
+  // moves and its word is never cut short («en parte cor» in 1.0.55).
+  function anchoEstados() {
+    const c = document.createElement('canvas').getContext('2d');
+    if (!c) return;
+    c.font = `600 12.5px ${getComputedStyle(document.body).getPropertyValue('--texto') || 'sans-serif'}`;
+    const palabras = ['interruptor_cortado', 'interruptor_permitido', 'escudo_parcial', 'interruptor_cortando', 'interruptor_permitiendo'].map((k) => t(k));
+    const w = Math.ceil(Math.max(...palabras.map((p) => c.measureText(p).width))) + 2;
+    if (w > 2) document.documentElement.style.setProperty('--ancho-estado', `${w}px`);
+  }
   en('textos', () => {
+    anchoEstados();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(anchoEstados);
     try { const dn = new Intl.DisplayNames([document.documentElement.lang], { type: 'region' }); pais = (c) => { try { return dn.of(c); } catch (_) { return c; } }; } catch (_) {}
     if (vista) muestra(vista);
     if (lic) pintaLicencia(lic);

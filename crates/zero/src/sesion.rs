@@ -79,16 +79,19 @@ pub const CORTES: &str = "https://zero.guardiana/cortes.html";
 /// A company's profile (`?e=<its name>`).
 pub const EMPRESA: &str = "https://zero.guardiana/empresa.html";
 /// 1.0.46 layout, in CSS pixels: the top row alone (Comunicaciones), the whole bar of the
-/// browser (top row `--s-barra` 56, tabs `--s-fila2` 44, address 44), the glass strip beside a
+/// browser (top row `--s-barra` 56, tabs `--s-fila2` 44, address 44), the shield folded beside a
 /// web (`--s-cristal`) and the side view (`--s-cristal-abierto`): the design system's tokens
-/// (`interfaz/diseno.css`, «SISTEMA 1.0.46»).
+/// (`interfaz/diseno.css`, «SISTEMA 1.0.46»). 5 Nov 2026 (the owner: «a la derecha se ve pequeño
+/// el tema del escudo… que al minimizar no se vea así tan pequeño»): folded, the shield is a rail
+/// of 152 (it was a strip of 56), and open it takes 384 (it was 360), so nothing in it is cut
+/// short.
 pub const ALTO_ARRIBA: i32 = 56;
 /// See [`ALTO_ARRIBA`].
 pub const ALTO_ZERO: i32 = 144;
 /// See [`ALTO_ARRIBA`].
-pub const ANCHO_FRANJA: i32 = 56;
+pub const ANCHO_CARRIL: i32 = 152;
 /// See [`ALTO_ARRIBA`].
-pub const ANCHO_LATERAL: i32 = 360;
+pub const ANCHO_LATERAL: i32 = 384;
 
 /// Whether an address is one of the browser's own pages.
 #[must_use]
@@ -264,8 +267,8 @@ pub enum Orden {
     /// 1.0.46, one navigation only: how the window is laid out for what is in front. `barra` is
     /// the height of the bar in CSS pixels (0 on GUARDIANA's own panel, which draws its own top
     /// row; 56 for Comunicaciones, only the top row; 144 for the browser: top row, tabs and
-    /// address). `lateral` is the width of ZERO's side view: 0, 56 (the glass strip beside a
-    /// web) or 360 (the side summary or another view, open).
+    /// address). `lateral` is the width of ZERO's side view: 0, 152 (the shield folded into its
+    /// rail beside a web) or 384 (the shield or another view, open).
     Marco {
         /// Height of the bar.
         barra: i32,
@@ -1856,9 +1859,9 @@ impl Sesion {
         };
         let m = self.msg_escudo(p);
         let mut o = vec![envia(Origen::Barra, &m)];
-        // The glass strip beside a web shows the page's figure even with the summary closed.
-        let franja = self.marco().1 == ANCHO_FRANJA;
-        if tambien_panel || franja || self.panel.as_deref() == Some("escudo") {
+        // The rail beside a web shows the page's figure even with the shield folded.
+        let carril = self.marco().1 == ANCHO_CARRIL;
+        if tambien_panel || carril || self.panel.as_deref() == Some("escudo") {
             o.push(envia(Origen::Panel, &m));
         }
         o
@@ -2032,7 +2035,7 @@ impl Sesion {
         let lateral = match self.panel.as_deref() {
             Some("escudo") if !web => 0,
             Some(_) => ANCHO_LATERAL,
-            None if web => ANCHO_FRANJA,
+            None if web => ANCHO_CARRIL,
             None => 0,
         };
         (barra, lateral)
@@ -2461,17 +2464,6 @@ impl Sesion {
                     .any(|p| p.fija && es_orbita(&p.url) && p.sin_red))
     }
 
-    /// A click on the web in front while its side summary is open (Z1-b): it folds back into
-    /// the glass strip, as with ✕, and stays folded like that until the browser closes.
-    fn toque(&mut self, id: u32) -> Vec<Orden> {
-        if id != self.activa || self.panel.as_deref() != Some("escudo") {
-            return Vec::new();
-        }
-        self.escudo_cerrado = true;
-        self.panel = None;
-        self.cierra_del_todo()
-    }
-
     /// «Permitir en esta web» (Z1-b): the lists cut nothing on the web in front, or again.
     fn permitir_web(&mut self, si: bool) -> Vec<Orden> {
         let Some(sitio_web) = self
@@ -2893,9 +2885,12 @@ impl Sesion {
                     "zg_enlace" => self.enlace(id, &m),
                     "zg_emergente" => self.emergente(id, &m),
                     "zg_molesta" => self.molesta(id),
-                    // 1.0.46 (Z1-b): a click on the web folds its side summary back into the
-                    // glass strip, as ✕ and Esc do («clic fuera»).
-                    "zg_toque" => self.toque(id),
+                    // 1.0.46 (Z1-b): a click on the web folded the shield into its strip for the
+                    // rest of the session («clic fuera»), so it was nearly always small. Since 5 Nov
+                    // 2026 (the owner: «tiene que venir configurado ya la versión donde se está
+                    // viendo lo que estás cortando») it stays open beside the web; only its own
+                    // button or Esc fold it. A page with an older script may still say it.
+                    "zg_toque" => Vec::new(),
                     "zg_huella" => self.huella(id, fuente, &m, false),
                     "zg_escribe" => self.escribe(id, fuente, false),
                     // 1.0.46: GUARDIANA's own panel, open in this tab, asks for another product

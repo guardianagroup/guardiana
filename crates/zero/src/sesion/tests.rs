@@ -320,7 +320,8 @@ fn the_shield_is_open_at_every_start_and_closing_it_lasts_one_session() {
     assert!(!escrito.contains("escudo_cerrado"), "{escrito}");
     let mut s = reabre(datos.as_path());
     assert!(abierto_al_empezar(&mut s));
-    // A click on the web folds it for the session too, and the next start opens it again.
+    // A click on the web no longer folds it (5 Nov 2026, the owner: the shield comes open,
+    // showing what is being cut, and stays so).
     let id = s.activa();
     let _ = abre_pagina(&mut s, id, "https://www.eltiempo.com/");
     let o = s.mensaje(
@@ -328,8 +329,8 @@ fn the_shield_is_open_at_every_start_and_closing_it_lasts_one_session() {
         "https://www.eltiempo.com/",
         r#"{"tipo":"zg_toque"}"#,
     );
-    assert!(o.contains(&Orden::Panel { abierto: false }));
-    assert!(!s.escudo_a_la_vista());
+    assert!(!o.contains(&Orden::Panel { abierto: false }));
+    assert!(s.escudo_a_la_vista());
     s.cierra();
     let mut s = reabre(datos.as_path());
     assert!(abierto_al_empezar(&mut s));
@@ -3868,11 +3869,12 @@ fn radiografias_without_the_panel_open_asks_the_shell_for_it() {
 }
 
 #[test]
-fn the_glass_strip_shows_beside_a_web_and_the_summary_opens_to_360() {
+fn the_shield_folds_into_a_rail_of_152_beside_a_web_and_opens_to_384() {
     let (mut s, _, id) = con_pagina(true);
     let _ = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":null}"#);
     let _ = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"panel","vista":null}"#);
-    assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_FRANJA));
+    assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_CARRIL));
+    assert_eq!((ANCHO_CARRIL, ANCHO_LATERAL), (152, 384));
     let _ = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"panel","vista":"escudo"}"#);
     assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_LATERAL));
     // On the new tab the summary steps aside: the day's diary is there in full (Z1-a).
@@ -3882,16 +3884,22 @@ fn the_glass_strip_shows_beside_a_web_and_the_summary_opens_to_360() {
 }
 
 #[test]
-fn a_click_on_the_web_folds_its_summary_into_the_glass_strip() {
+fn a_click_on_the_web_keeps_its_shield_open() {
     let (mut s, _, id) = con_pagina(true);
     let _ = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"panel","vista":"escudo"}"#);
     assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_LATERAL));
-    let _ = s.mensaje(
+    let o = s.mensaje(
         Origen::Pestana(id),
         "https://eltiempo.com/",
         r#"{"tipo":"zg_toque"}"#,
     );
-    assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_FRANJA));
+    assert!(o.is_empty(), "{o:?}");
+    assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_LATERAL));
+    // Its own button folds it into the rail, and the rail opens it again.
+    let _ = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"panel","vista":null}"#);
+    assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_CARRIL));
+    let _ = s.mensaje(Origen::Panel, PANEL, r#"{"tipo":"panel","vista":"escudo"}"#);
+    assert_eq!(s.marco(), (ALTO_ZERO, ANCHO_LATERAL));
     // Another view the person opened (settings) is not folded by a click on the page.
     let _ = s.mensaje(
         Origen::Barra,

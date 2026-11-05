@@ -158,75 +158,158 @@ p { margin: 0 0 10px; }
 #aviso { position: fixed; left: 16px; right: 16px; bottom: 14px; padding: 10px 14px; border-radius: 10px; background: var(--tinta); color: var(--hoja); font-size: 13px; box-shadow: var(--sombra); opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; pointer-events: none; }
 #aviso.visto { opacity: 1; transform: none; }
 
-/* 1.0.46 (zero-1.0.46), Z1-b: the side summary of a web, the owner's choice. Beside a web it
-   rests as a glass strip of 56 px with a small shield and the page's figure; pressed, it opens to
-   360 px: this web's shield, its attempts (domain · company · category, and the switch), the
-   signed receipt of the page and «Permitir en esta web». The rest of the shield (the day, the
+/* 5 Nov 2026 (the owner: «a la derecha se ve pequeño el tema del escudo. Tiene que venir configurado ya la versión
+   donde se está viendo lo que estás cortando… que al minimizar no se vea así tan pequeño… hagas un rediseño en esa
+   parte… incluso el escudo también»): the shield beside a web, redesigned after his mockup. It rests OPEN at 384 px
+   (it no longer folds by itself at a click on the web); folded by its button or Esc, it is a rail of 152 px, never a
+   strip: the emblem, the page's figure, the latest companies cut and the day. The emblem is a shield engraved like a
+   seal with GUARDIANA's padlock (#g-emblema), in place of the shield of dots. The rest of the shield (the day, the
    protection, what the page's pixels said) follows below, as before. */
 body.vidrio { background: var(--card); border-left: 1px solid var(--line); }
 body.vidrio.en-escudo header { display: none; }
-body.vidrio.en-escudo main { padding: var(--e5) var(--e5) var(--e6); }
-#franja { display: none; }
+body.vidrio.en-escudo main { padding: var(--e4) 20px var(--e6); }
+#carril { display: none; }
 body.plegado header, body.plegado main, body.plegado #aviso { display: none !important; }
-body.plegado #franja { display: flex; flex-direction: column; align-items: center; gap: var(--e2); width: 100%; height: 100%; padding: var(--e4) 0; border: 0; background: none; color: var(--tinta); cursor: pointer; transition: background-color var(--m-rapido); }
-body.plegado #franja:hover { background: var(--campo); }
-#franja canvas { width: 32px; height: 36px; display: block; }
-#franja b { font: 600 var(--t-15); font-variant-numeric: tabular-nums; }
-#franja span { font: var(--t-12); color: var(--gris); text-align: center; padding: 0 var(--e1); }
-#franja .flecha { margin-top: var(--e2); color: var(--muted-2); }
-.z1-cab { display: flex; align-items: flex-start; gap: var(--e3); }
-.z1-cap { font: 600 var(--t-12); letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2); }
-.z1-web { font: 400 13px/18px var(--mono); margin-top: var(--e1); word-break: break-all; }
-#z1-plegar { margin-left: auto; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--linea); background: var(--bg); color: var(--gris); display: grid; place-items: center; flex: none; padding: 0; }
+body.plegado #carril { display: flex; flex-direction: column; align-items: stretch; gap: var(--e3); height: 100%; padding: var(--e4) var(--e3) var(--e4); overflow: hidden; }
+.carril-arriba { display: flex; flex-direction: column; align-items: center; gap: var(--e2); text-align: center; }
+.carril-emblema { border: 0; background: none; padding: 0; color: inherit; display: block; }
+.carril-emblema svg { display: block; }
+#franja-n { font: 600 40px/1 var(--texto); letter-spacing: -.04em; font-variant-numeric: tabular-nums; margin-top: var(--e1); }
+.carril-que { font: 500 13px/1.3 var(--texto); color: var(--tinta); }
+.carril-que small { display: block; font: 400 12px/1.3 var(--texto); color: var(--gris); }
+.carril-sep { height: 1px; background: var(--linea); flex: none; }
+.carril-rotulo { font: 600 10.5px/1.2 var(--texto); letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); text-align: center; }
+#carril-ultimos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
+#carril-ultimos li { display: flex; align-items: center; gap: var(--e2); min-width: 0; font: 500 12.5px/1.25 var(--texto); }
+#carril-ultimos li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#carril-ultimos li::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--rojo); flex: none; }
+#carril-ultimos li.parcial::before { background: var(--ambar); }
+#carril-ultimos li.nada { color: var(--gris); font-weight: 400; justify-content: center; }
+#carril-ultimos li.nada::before { display: none; }
+.carril-hoy { text-align: center; font: 400 12px/1.3 var(--texto); color: var(--gris); }
+.carril-hoy b { display: block; font: 600 17px/1.25 var(--texto); color: var(--tinta); font-variant-numeric: tabular-nums; }
+#franja { margin-top: auto; width: 100%; }
+/* «En directo» / «Solo mirando»: what the shield is doing now, in words and colour. */
+.z2-vivo { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: var(--r-pill); background: var(--verde-suave); color: var(--verde); font: 600 11px/1 var(--texto); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.z2-vivo::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.z2-vivo.mirando { background: var(--ambar-suave); color: var(--ambar); }
+.z1-cab { display: flex; align-items: center; gap: var(--e3); }
+.z2-emblema { flex: none; display: block; }
+.z2-nom { flex: 1; min-width: 0; }
+.z2-tit { display: flex; align-items: center; gap: var(--e2); font: 600 16px/1.2 var(--texto); }
+.z1-web { font: 400 12.5px/1.3 var(--mono); color: var(--gris); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#z1-plegar { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--linea); background: var(--bg); color: var(--gris); display: grid; place-items: center; flex: none; padding: 0; }
 #z1-plegar:hover { color: var(--tinta); border-color: #3A4656; }
-.z1-cifra { display: flex; align-items: center; gap: var(--e4); margin-top: var(--e5); }
-#z1-escudo { width: 76px; height: 88px; flex: none; }
-#z1-n { font: 600 40px/44px var(--texto); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-#z1-que { margin-top: var(--e1); font: var(--t-13); color: var(--gris); }
-.z1-columnas { display: flex; margin-top: var(--e5); font: 600 var(--t-12); letter-spacing: .06em; text-transform: uppercase; color: var(--muted-2); }
-.z1-columnas span:last-child { margin-left: auto; }
-body.vidrio .terceros .tercero { padding: var(--e2) 0; border-bottom: 1px solid var(--line); grid-template-columns: minmax(0, max-content) minmax(0, 1fr) 8.75rem; grid-template-rows: auto auto; row-gap: 2px; column-gap: var(--e2); }
-body.vidrio .terceros .tercero::before { display: none; }
-body.vidrio .tercero .linea { grid-column: 1 / -1; grid-row: 1; font: var(--t-13); color: var(--tinta); }
+/* The page's figure: the number, the beat of the last minute (one bar each 3 s, red when something was cut, amber the
+   moment now) and how many of its companies are cut. */
+.z2-cifra { margin-top: var(--e4); border: 1px solid var(--linea); border-radius: var(--r-burbuja); padding: var(--e4) var(--e4) var(--e3); background: var(--bg); }
+.z2-cifra-fila { display: flex; align-items: flex-end; gap: var(--e3); }
+#z1-n { font: 600 56px/.9 var(--texto); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.z2-cifra-txt { padding-bottom: 3px; min-width: 0; font: 500 14px/1.3 var(--texto); }
+.z2-cifra-txt small { display: block; margin-top: 2px; font: 400 12.5px/1.35 var(--texto); color: var(--gris); }
+.z2-latido { display: flex; align-items: flex-end; gap: 3px; height: 30px; margin-top: var(--e3); }
+.z2-latido i { flex: 1; height: 20%; border-radius: 2px; background: color-mix(in srgb, var(--azul) 18%, transparent); transition: height var(--m-normal) var(--m-curva); }
+.z2-latido i.c { background: var(--rojo); }
+.z2-latido i.a { background: var(--ambar); }
+.z2-latido-pie { display: flex; justify-content: space-between; margin-top: 6px; font: 400 11px/1 var(--texto); color: var(--muted-2); }
+.z2-reparto { display: flex; align-items: center; gap: var(--e3); margin-top: var(--e3); padding-top: var(--e3); border-top: 1px solid var(--linea); }
+.z2-reparto-barra { display: flex; gap: 3px; width: 104px; flex: none; }
+.z2-reparto-barra i { height: 6px; flex: 1; border-radius: 3px; background: var(--rojo); }
+.z2-reparto-barra i.parcial { background: var(--ambar); }
+.z2-reparto-barra i.pasa { background: var(--verde); }
+body.vidrio .z2-reparto .lista-resumen { margin: 0; font: 400 12.5px/1.35 var(--texto); color: var(--gris); }
+.z1-columnas { display: flex; align-items: baseline; justify-content: space-between; margin-top: var(--e5); font: 600 11.5px/1.2 var(--texto); letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); }
+.z1-columnas span:last-child { letter-spacing: 0; text-transform: none; font-weight: 500; font-size: 12px; font-variant-numeric: tabular-nums; }
+/* One row per company: on the left, a dot, its domain and, under it, who it is, what it does and what was cut; on the
+   right, a column of fixed width with the place of «Cortar todo» and the switch, and under the switch its word. Every
+   place has a fixed size, the same in every state, so pressing a switch never changes the row's height nor moves its
+   buttons (the owner, 10 Oct 2026: rows that move lose the person's place). The column is as wide as the longest of the
+   switch's words in the language (--ancho-estado, measured by panel.js), so the word is never cut short. «Cortar todo» (a
+   row cut only in part) is a round button with the cut icon, its words in its title; its place stays, empty, in the
+   other rows. Why a row is cut is said in the title of its word. */
+body.vidrio .terceros { margin-top: var(--e1); }
+body.vidrio .terceros .tercero { padding: var(--e3) 0; border-bottom: 1px solid var(--linea); grid-template-columns: 8px minmax(0, 1fr) auto; grid-template-rows: 26px auto; row-gap: 2px; column-gap: 10px; align-items: start; }
+body.vidrio .terceros .tercero::before { position: static; display: block; grid-column: 1; grid-row: 1; align-self: center; width: 8px; height: 8px; border-radius: 50%; background: transparent; border: 1.5px solid var(--verde); box-sizing: border-box; }
+body.vidrio .terceros .tercero.cortado::before { background: var(--rojo); border-color: var(--rojo); }
+body.vidrio .terceros .tercero.parcial::before { background: var(--ambar); border-color: var(--ambar); }
+body.vidrio .terceros .tercero.sigue::before { border-color: var(--ambar); }
+body.vidrio .tercero .linea { grid-column: 2; grid-row: 1; align-self: center; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 13px/1.25 var(--mono); color: var(--tinta); }
 body.vidrio .tercero .linea .mono { font-size: 13px; }
 body.vidrio .tercero .linea .cuenta { display: none; }
-body.vidrio .tercero .quien { grid-column: 1; grid-row: 2; font: var(--t-12); color: var(--gris); }
-/* What else holds for the row (the person's rule, a broker, why) on the same line: a row never
-   changes height when its switch is flipped. */
-body.vidrio .tercero .quien .enlace-empresa { color: var(--gris); }
-body.vidrio .tercero .quien .cat::before { content: ' · '; }
-body.vidrio .tercero .botones { grid-column: 3; grid-row: 2; grid-template-rows: auto; }
-body.vidrio .tercero .botones .boton.vacio { display: none; }
-body.vidrio .tercero .chips { grid-column: 2; grid-row: 2; font: var(--t-12); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-body.vidrio .tercero .chips .chip.estado, body.vidrio .tercero .chips .chip.cat { display: none; }
-body.vidrio .tercero .nota-dato { grid-row: 3; }
-body.vidrio .tercero.cortado .interruptor-estado { color: var(--rojo); font-weight: 600; }
+body.vidrio .tercero .botones { grid-column: 3; grid-row: 1 / span 2; align-self: start; display: grid; grid-template-columns: auto auto; grid-template-rows: 26px auto; justify-content: end; justify-items: end; align-items: center; column-gap: 6px; row-gap: 2px; min-width: max(var(--ancho-estado, 7.5em), 68px); }
+body.vidrio .tercero .interruptor-caja { display: contents; }
+body.vidrio .tercero .interruptor { grid-column: 2; grid-row: 1; }
+body.vidrio .tercero .interruptor-estado { grid-column: 1 / 3; grid-row: 2; width: var(--ancho-estado, 7.5em); text-align: right; white-space: nowrap; font: 600 12.5px/1.3 var(--texto); }
+body.vidrio .tercero .interruptor-motivo { grid-column: 1 / 3; grid-row: 3; }
+body.vidrio .tercero.cortado .interruptor-estado { color: var(--rojo); }
+body.vidrio .tercero.parcial .interruptor-estado { color: var(--ambar); }
+body.vidrio .tercero .botones > .boton { grid-column: 1; grid-row: 1; flex: none; width: 26px; min-width: 26px; height: 26px; min-height: 26px; padding: 0; border-radius: 50%; font-size: 0; gap: 0; color: var(--gris); }
+body.vidrio .tercero .botones > .boton::before { content: ""; width: 14px; height: 14px; flex: none; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.2'/%3E%3Cpath d='M3.7 12.3 12.3 3.7'/%3E%3C/svg%3E") center/contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.2'/%3E%3Cpath d='M3.7 12.3 12.3 3.7'/%3E%3C/svg%3E") center/contain no-repeat; }
+body.vidrio .tercero .botones > .boton:hover { color: var(--rojo); border-color: var(--rojo); }
+body.vidrio .tercero .botones > .boton.vacio { visibility: hidden; }
+body.vidrio .tercero .quien { grid-column: 2; grid-row: 2; align-self: start; min-width: 0; white-space: normal; overflow: visible; font: 400 12.5px/1.35 var(--texto); color: var(--gris); }
+body.vidrio .tercero .quien .enlace-empresa { color: #C9D3DD; font-weight: 500; }
+body.vidrio .tercero .quien .cat::before, body.vidrio .tercero .quien .cuenta-fila::before, body.vidrio .tercero .quien .corredor-fila::before { content: '· '; color: var(--gris); }
+body.vidrio .tercero .quien .cuenta-fila.rojo, body.vidrio .tercero .quien .corredor-fila { color: var(--rojo); }
+body.vidrio .tercero .quien .cuenta-fila, body.vidrio .tercero .quien .cat { white-space: nowrap; }
+body.vidrio .tercero .quien .cuenta-fila.ambar { color: var(--ambar); }
+body.vidrio .tercero .chips { display: none; }
+body.vidrio .tercero .nota-dato { grid-column: 2 / 4; grid-row: 3; }
 body.vidrio .lista-resumen { margin: var(--e3) 0 0; font: var(--t-12); color: var(--gris); }
 .z1-acciones { margin-top: var(--e5); display: grid; gap: var(--e3); }
 .z1-acciones .boton.principal { width: 100%; min-height: var(--h-boton); }
-.z1-permitir { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); min-height: var(--h-boton); padding: 0 var(--e3) 0 var(--e4); border: 1px solid var(--linea); border-radius: var(--r-pill); }
-.z1-permitir label { font: 500 var(--t-15); }
+.z1-permitir { display: flex; align-items: center; justify-content: space-between; gap: var(--e3); min-height: 44px; padding: 0 var(--e3) 0 var(--e4); border: 1px solid var(--linea); border-radius: var(--r-pill); }
+.z1-permitir label { font: 500 14px/1.3 var(--texto); }
 .z1-mas { margin: var(--e6) 0 var(--e3); padding-top: var(--e4); border-top: 1px solid var(--linea); }
 #zero-subasta:not([hidden]) { margin-top: var(--e5); }
 body.vidrio #e-pagina-cab, body.vidrio #e-sitio, body.vidrio #e-resumen, body.vidrio .tercero .quien small { display: none; }
 </style>
 </head>
 <body>
-<button id="franja" type="button" data-t-title="z1_franja_titulo"><canvas id="franja-escudo"></canvas><b id="franja-n">0</b><span id="franja-que"></span><svg class="flecha" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<linearGradient id="g-filo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4F0FA"/><stop offset=".55" stop-color="#9CC3E4"/><stop offset="1" stop-color="#5E7F9E"/></linearGradient>
+<radialGradient id="g-fondo" cx=".5" cy=".38" r=".7"><stop offset="0" stop-color="#16263A"/><stop offset="1" stop-color="#0A111A"/></radialGradient>
+<clipPath id="g-dentro"><path d="M32 4.5C40.6 8.6 49.6 10 57.5 10V30.5C57.5 48.6 47 61.3 32 68.2 17 61.3 6.5 48.6 6.5 30.5V10C14.4 10 23.4 8.6 32 4.5Z"/></clipPath>
+<symbol id="g-emblema" viewBox="0 0 64 72">
+<path d="M32 2.5C41 6.8 50.4 8.3 59 8.3V30.6C59 49.6 48 62.9 32 70.2 16 62.9 5 49.6 5 30.6V8.3C13.6 8.3 23 6.8 32 2.5Z" fill="url(#g-fondo)" stroke="url(#g-filo)" stroke-width="1.6"/>
+<g clip-path="url(#g-dentro)" fill="none" stroke="#9CC3E4" stroke-width=".45" opacity=".42"><ellipse cx="32" cy="36" rx="25" ry="8.5"/><ellipse cx="32" cy="36" rx="25" ry="8.5" transform="rotate(15 32 36)"/><ellipse cx="32" cy="36" rx="25" ry="8.5" transform="rotate(30 32 36)"/><ellipse cx="32" cy="36" rx="25" ry="8.5" transform="rotate(45 32 36)"/><ellipse cx="32" cy="36" rx="25" ry="8.5" transform="rotate(60 32 36)"/><ellipse cx="32" cy="36" rx="25" ry="8.5" transform="rotate(75 32 36)"/><ellipse cx="32" cy="36" rx="25" ry="8.5" transform="rotate(90 32 36)"/><ellipse cx="32" cy="36" rx="25" ry="8.5" transform="rotate(105 32 36)"/><ellipse cx="32" cy="36" rx="25" ry="8.5" transform="rotate(120 32 36)"/><ellipse cx="32" cy="36" rx="25" ry="8.5" transform="rotate(135 32 36)"/><ellipse cx="32" cy="36" rx="25" ry="8.5" transform="rotate(150 32 36)"/><ellipse cx="32" cy="36" rx="25" ry="8.5" transform="rotate(165 32 36)"/></g>
+<path d="M32 9.2C39.2 12.6 46.7 13.9 53.4 14V30.8C53.4 45.6 45 56.3 32 62.6 19 56.3 10.6 45.6 10.6 30.8V14C17.3 13.9 24.8 12.6 32 9.2Z" fill="none" stroke="#9CC3E4" stroke-width=".8" opacity=".55"/>
+<circle cx="32" cy="36" r="11.5" fill="#0A111A" stroke="#9CC3E4" stroke-width=".8"/>
+<path d="M27.6 34.2V31.4a4.4 4.4 0 0 1 8.8 0v2.8" fill="none" stroke="#E8ECF1" stroke-width="1.9" stroke-linecap="round"/>
+<rect x="25" y="33.6" width="14" height="10.6" rx="2.6" fill="#9CC3E4"/>
+<path d="M34.6 37.4v-.6c0-.4-.5-.5-1-.5h-2.6c-1.3 0-1.9.6-1.9 1.9v2.3c0 1.3.6 1.9 1.9 1.9h2.6c.5 0 1-.1 1-.5v-1.8h-2.2" fill="none" stroke="#0A111A" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>
+</symbol></defs></svg>
+<div id="carril">
+  <div class="carril-arriba">
+    <button class="carril-emblema" id="carril-emblema" type="button" data-t-title="z1_franja_titulo"><svg width="60" height="68" viewBox="0 0 64 72" aria-hidden="true"><use href="#g-emblema"/></svg></button>
+    <span class="z2-vivo" id="carril-vivo"></span>
+    <b id="franja-n">0</b>
+    <span class="carril-que"><span id="franja-que"></span><small data-t="z2_en_esta_pagina"></small></span>
+  </div>
+  <div class="carril-sep"></div>
+  <div class="carril-rotulo" data-t="z2_ultimos"></div>
+  <ul id="carril-ultimos"></ul>
+  <div class="carril-sep"></div>
+  <div class="carril-hoy"><b id="carril-hoy-n">0</b><span id="carril-hoy-que"></span></div>
+  <button id="franja" class="boton chico" type="button" data-t-title="z1_franja_titulo"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg><span data-t="z2_ver_escudo"></span></button>
+</div>
 <header><h1 id="titulo"></h1><button id="cerrar" data-t-title="cerrar"><svg viewBox="0 0 14 14" width="12" height="12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9"/></svg></button></header>
 <main>
 
 <section class="vista" id="v-escudo" data-titulo="escudo_titulo">
   <div class="z1-cab">
-    <div><div class="z1-cap" data-t="z1_escudo_web"></div><div class="z1-web" id="z1-web"></div></div>
+    <svg class="z2-emblema" width="40" height="45" viewBox="0 0 64 72" aria-hidden="true"><use href="#g-emblema"/></svg>
+    <div class="z2-nom"><div class="z2-tit"><span data-t="z2_escudo"></span><span class="z2-vivo" id="z2-vivo"></span></div><div class="z1-web" id="z1-web"></div></div>
     <button id="z1-plegar" type="button" data-t-title="z1_plegar"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5 10.5 8 6 12.5"/></svg></button>
   </div>
-  <div class="z1-cifra">
-    <canvas id="z1-escudo"></canvas>
-    <div><div id="z1-n">0</div><div id="z1-que"></div></div>
+  <div class="z2-cifra">
+    <div class="z2-cifra-fila"><div id="z1-n">0</div><div class="z2-cifra-txt"><span id="z1-que"></span><small id="z2-que-sub"></small></div></div>
+    <div class="z2-latido" id="z2-latido" aria-hidden="true"></div>
+    <div class="z2-latido-pie" aria-hidden="true"><span data-t="z2_hace_minuto"></span><span data-t="z2_ahora"></span></div>
+    <div class="z2-reparto" id="z2-reparto"><div class="z2-reparto-barra" id="z2-reparto-barra" aria-hidden="true"></div><p class="lista-resumen" id="e-lista-resumen" role="status"></p></div>
   </div>
-  <div class="z1-columnas"><span data-t="z1_columnas"></span><span data-t="z1_estado"></span></div>
-  <div id="e-lista-caja" class="oculto"><ul class="terceros" id="e-terceros"></ul><p class="lista-resumen" id="e-lista-resumen" role="status"></p></div>
+  <div class="z1-columnas"><span data-t="z2_quien"></span><span id="z2-cuantas"></span></div>
+  <div id="e-lista-caja" class="oculto"><ul class="terceros" id="e-terceros"></ul></div>
   <p class="vacio oculto" id="e-vacio" data-t="escudo_vacio"></p>
   <div class="recarga oculto" id="e-recarga"><span data-t="escudo_recarga"></span><button class="boton chico" id="e-recargar" data-t="recargar"></button></div>
   <div class="z1-acciones">
@@ -399,7 +482,6 @@ body.vidrio #e-pagina-cab, body.vidrio #e-sitio, body.vidrio #e-resumen, body.vi
 <div id="aviso" role="status" aria-live="polite"></div>
 <script src="interruptor.js"></script>
 <script src="puente.js"></script>
-<script src="escudo-puntos.js"></script>
 <script src="panel.js"></script>
 <!-- 1.0.46 subastas-1.0.46: fills #zero-subasta (window.ZeroSubasta) and the «Subastas y huella» settings -->
 <script src="subasta.js"></script>
