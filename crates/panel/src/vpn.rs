@@ -730,6 +730,10 @@ impl Vpn {
         #[cfg(windows)]
         {
             let Some(d) = guardado_para_reconciliar(estricto::lee_si_se_puede(&datos())) else {
+                // lo que Windows tenga, para que «Desconectar» esté a mano mientras tanto (revisión final de la 1.0.56:
+                // sin esto la página decía «apagada» con el bloqueo puesto y sin internet)
+                let quedan = guardiana_apps::corte_vpn::en_windows().map_or(true, |en| en.alguno());
+                self.bloqueado.store(quedan, Ordering::SeqCst);
                 eprintln!(
                     "guardiana: lo guardado de la VPN no se puede leer ahora; se vuelve a mirar en un minuto"
                 );

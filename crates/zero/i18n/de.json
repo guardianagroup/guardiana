@@ -1354,7 +1354,7 @@
   "vpn_sin_respuesta": "VPN antwortet nicht",
   "vpn_desconectar": "Trennen",
   "vpn_desconectando": "Wird getrennt…",
-  "vpn_sin_respuesta_explica": "Der VPN-Server antwortet nicht. Solange geht von Ihren Programmen nichts außerhalb des Tunnels hinaus, daher gibt es kein Internet. „Trennen“ schließt ihn und kehrt zu Ihrer normalen Verbindung zurück.",
+  "vpn_sin_respuesta_explica": "Der VPN-Server antwortet nicht. Solange geht von Ihren Windows-Programmen nichts außerhalb des Tunnels hinaus, daher gibt es kein Internet. „Trennen“ schließt ihn und kehrt zu Ihrer normalen Verbindung zurück.",
   "vpn_espera_conectar": "Verbindet noch: versuchen Sie es in ein paar Sekunden erneut",
   "vpn_no_desconecta": "Trennen nicht möglich: versuchen Sie es erneut",
   "vpn_sin_panel": "GUARDIANA antwortet auf diesem Computer nicht: Von hier aus lässt sich nicht trennen. Um das VPN auszuschalten, öffnen Sie im Startmenü „Turn off GUARDIANA's VPN“",

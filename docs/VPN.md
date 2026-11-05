@@ -128,9 +128,10 @@ conmutadores virtuales con NAT, así que ese tráfico pasa por ahí. **Lo que no
 real:** WSL2 (con NAT o en modo «mirrored»), ni Hyper-V, Windows Sandbox o Docker Desktop cuando el NAT lo hace el propio
 conmutador virtual de Hyper-V sin que la pila IP de Windows lo reenvíe (Mullvad vio así el tráfico de WSL, solo como
 tramas Ethernet); ni las máquinas en un conmutador externo, que son de la red y no de este equipo. Su tráfico puede salir
-fuera del túnel, también con el modo estricto, y la pantalla de la VPN lo dice. Siguiente paso: el cortafuegos de Hyper-V
-(Windows 11 22H2 y posteriores), como hace Mullvad. Lo que la integración continua comprueba es que Windows acepta estos
-filtros y los quita; no tiene WSL, ni Hyper-V, ni ICS para probar tráfico reenviado de verdad.
+fuera del túnel, también con el modo estricto, y la pantalla de la VPN solo promete lo de «tus programas de Windows».
+Siguiente paso: el cortafuegos de Hyper-V (Windows 11 22H2 y posteriores), como hace Mullvad. Lo que la integración
+continua comprueba es que Windows acepta estos filtros y los quita; no tiene WSL, ni Hyper-V, ni ICS para probar tráfico
+reenviado de verdad.
 
 Las pruebas del plan, en todos los sistemas, le preguntan qué decide para cada conexión como lo decide Windows dentro de
 una subcapa (el peso más alto entre los filtros que casan; dos condiciones del mismo campo valen cualquiera de las dos):

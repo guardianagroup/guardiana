@@ -1354,7 +1354,7 @@
   "vpn_sin_respuesta": "VPN 응답 없음",
   "vpn_desconectar": "연결 끊기",
   "vpn_desconectando": "연결 끊는 중…",
-  "vpn_sin_respuesta_explica": "VPN 서버가 응답하지 않아요. 그동안 내 프로그램에서는 터널 밖으로 아무것도 나가지 않아서 인터넷을 쓸 수 없어요. ‘연결 끊기’를 누르면 터널을 닫고 평소 연결로 돌아가요.",
+  "vpn_sin_respuesta_explica": "VPN 서버가 응답하지 않아요. 그동안 내 Windows 프로그램에서는 터널 밖으로 아무것도 나가지 않아서 인터넷을 쓸 수 없어요. ‘연결 끊기’를 누르면 터널을 닫고 평소 연결로 돌아가요.",
   "vpn_espera_conectar": "아직 연결 중이에요. 몇 초 후에 다시 시도하세요",
   "vpn_no_desconecta": "연결을 끊지 못했어요. 다시 시도하세요",
   "vpn_sin_panel": "이 컴퓨터에서 GUARDIANA가 응답하지 않아요. 여기서는 연결을 끊을 수 없어요. VPN을 끄려면 시작 메뉴에서 ‘Turn off GUARDIANA's VPN’을 여세요",

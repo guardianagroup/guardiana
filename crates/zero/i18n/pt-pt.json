@@ -1354,7 +1354,7 @@
   "vpn_sin_respuesta": "VPN sem resposta",
   "vpn_desconectar": "Desligar",
   "vpn_desconectando": "A desligar…",
-  "vpn_sin_respuesta_explica": "O servidor da VPN não responde. Entretanto nada dos teus programas sai fora do túnel, por isso não há internet. «Desligar» fecha-o e volta à tua ligação normal.",
+  "vpn_sin_respuesta_explica": "O servidor da VPN não responde. Entretanto nada dos teus programas do Windows sai fora do túnel, por isso não há internet. «Desligar» fecha-o e volta à tua ligação normal.",
   "vpn_espera_conectar": "Ainda a ligar: tenta de novo daqui a uns segundos",
   "vpn_no_desconecta": "Não foi possível desligar: tenta outra vez",
   "vpn_sin_panel": "A GUARDIANA não responde neste computador: não é possível desligar daqui. Para desligar a VPN, abre «Desligar a VPN da GUARDIANA» no menu Iniciar",

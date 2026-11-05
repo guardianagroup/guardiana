@@ -1354,7 +1354,7 @@
   "vpn_sin_respuesta": "La VPN non risponde",
   "vpn_desconectar": "Disconnetti",
   "vpn_desconectando": "Disconnessione…",
-  "vpn_sin_respuesta_explica": "Il server della VPN non risponde. Nel frattempo dai tuoi programmi non esce nulla fuori dal tunnel, quindi non c’è internet. «Disconnetti» lo chiude e torna alla tua connessione normale.",
+  "vpn_sin_respuesta_explica": "Il server della VPN non risponde. Nel frattempo dai tuoi programmi di Windows non esce nulla fuori dal tunnel, quindi non c’è internet. «Disconnetti» lo chiude e torna alla tua connessione normale.",
   "vpn_espera_conectar": "Ancora in connessione: riprova tra qualche secondo",
   "vpn_no_desconecta": "Impossibile disconnettere: riprova",
   "vpn_sin_panel": "GUARDIANA non risponde su questo computer: non si può disconnettere da qui. Per spegnere la VPN, apri «Turn off GUARDIANA's VPN» nel menu Start",
