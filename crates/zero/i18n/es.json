@@ -1360,6 +1360,8 @@
   "vpn_no_desconecta": "No se pudo desconectar: inténtalo otra vez",
   "vpn_sin_panel": "GUARDIANA no contesta en este equipo: desde aquí no se puede desconectar. Para apagar la VPN, abre «Apagar la VPN de GUARDIANA» en el menú Inicio",
   "vpn_reconectando": "VPN: no conecta",
+  "vpn_bloqueo_puesto": "VPN parada, con su bloqueo puesto",
+  "vpn_bloqueo_puesto_explica": "La VPN no pudo seguir y su bloqueo sigue en Windows: tus programas no salen a internet hasta que pulses «Desconectar», que lo quita y vuelve a tu conexión normal.",
   "vpn_estricto_no_conecta": "La VPN no conecta: no sale nada de tus programas fuera del túnel hasta que vuelva o la apagues tú. «Desconectar» la apaga y vuelve a tu conexión normal.",
   "z1_franja_titulo": "Abrir el escudo de esta web",
   "z1_escudo_web": "Escudo de esta web",

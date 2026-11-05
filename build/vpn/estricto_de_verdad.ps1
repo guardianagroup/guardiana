@@ -758,6 +758,49 @@ try {
             if ($conectada) { $null = LaDireccion $hel }
         }
 
+        # 2b. El interruptor del modo estricto con el túnel puesto (segunda revisión de la 1.0.56, «N1»): apagarlo y
+        # encenderlo con Helsinki conectada no corta el túnel ni apaga la VPN; apagado, el bloqueo persistente y el de
+        # arranque se van de Windows y el tráfico sigue por el túnel; encendido, vuelven. Varias veces seguidas, porque la
+        # carrera que se cerró (el vigía leía lo guardado antes de tomar el candado de la conexión) era de cada pocas.
+        Fase '2b. El interruptor del modo estricto con el túnel puesto' 180
+        if (-not $conectada) {
+            Omite 'el interruptor del modo estricto con el túnel puesto: no hay túnel a Helsinki'
+        } else {
+            $vueltasN1 = 6
+            $malas = [System.Collections.Generic.List[string]]::new()
+            for ($i = 1; $i -le $vueltasN1; $i++) {
+                foreach ($activo in @($false, $true)) {
+                    $r = Panel 'POST' '/api/vpn/estricto' @{ activo = $activo }
+                    if (($null -eq $r) -or ($r.ok -ne $true) -or ($r.estricto -ne $activo)) { $malas.Add("vuelta $i, activo=$($activo): contestó $(Json $r)"); continue }
+                    # el vigía mira cada 10 s: se espera un poco más que eso alguna vez, para que mire con cada estado
+                    Start-Sleep -Milliseconds $(if ($i % 2 -eq 0) { 11000 } else { 1500 })
+                    $v = Panel 'GET' '/api/vpn'
+                    $e = Estado
+                    if (($null -eq $v) -or ($v.fase -ne 'conectada') -or ($v.estricto -ne $activo)) { $malas.Add("vuelta $i, activo=$($activo): GET /api/vpn $(Json $v)"); continue }
+                    # en el modo normal lo guardado no pide la VPN al arrancar (encendida: false); en el estricto, sí
+                    if (($null -eq $e) -or ($activo -and -not $e.encendida)) { $malas.Add("vuelta $i, activo=$($activo): lo guardado no la pide encendida: $(Json $e)"); continue }
+                    $hayBloqueo = ($e.persistentes -gt 0) -and ($e.arranque -gt 0)
+                    if ($activo -ne $hayBloqueo) { $malas.Add(('vuelta {0}, activo={1}: en Windows {2} persistentes y {3} de arranque' -f $i, $activo, $e.persistentes, $e.arranque)) }
+                }
+            }
+            Bien ($malas.Count -eq 0) ('el modo estricto, apagado y encendido {0} veces con el túnel puesto: la VPN sigue conectada a Helsinki, y el bloqueo de Windows se va y vuelve con él' -f $vueltasN1) ($malas -join ' | ')
+            # apagado otra vez un momento: el tráfico sigue por el túnel, con la dirección de Helsinki
+            $r = Panel 'POST' '/api/vpn/estricto' @{ activo = $false }
+            if (($null -ne $r) -and ($r.ok -eq $true)) {
+                Start-Sleep -Milliseconds 1500
+                $null = LaDireccion $hel
+                $e = Estado
+                Bien (($null -ne $e) -and ($e.persistentes -eq 0) -and ($e.arranque -eq 0)) 'con el modo estricto apagado y el túnel puesto, nada del bloqueo persistente ni del de arranque en Windows' (Json $e)
+            } else { Bien $false 'el modo estricto, apagado otra vez para mirar la dirección' "contestó: $(Json $r)" }
+            # y encendido de nuevo, como lo esperan los pasos siguientes
+            $r = Panel 'POST' '/api/vpn/estricto' @{ activo = $true }
+            $ok = ($null -ne $r) -and ($r.ok -eq $true) -and (Espera 15 { $e = Estado; ($null -ne $e) -and ($e.persistentes -gt 0) -and ($e.arranque -gt 0) })
+            Bien $ok 'el modo estricto, encendido otra vez con el túnel puesto: el bloqueo vuelve a Windows' "contestó: $(Json $r)"
+            $v = Panel 'GET' '/api/vpn'
+            $conectada = ($null -ne $v) -and ($v.fase -eq 'conectada')
+            Bien $conectada 'y la VPN sigue conectada' (Json $v)
+        }
+
         # 3. El servicio muerto con el túnel puesto
         Fase '3. El servicio muerto con el túnel puesto' 150
         if (-not $conectada) {

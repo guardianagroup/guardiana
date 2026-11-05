@@ -4747,6 +4747,34 @@ fn the_strict_vpn_reconnecting_keeps_the_chip_and_its_way_out() {
         json!({ "fase": "reconectando", "estricto": false })
     )
     .is_empty());
+    // 5 Nov 2026 (second review of 1.0.56): stopped by an error with its block still in Windows, the service says
+    // «desconectar»: the chip stays with it, the top row comes over GUARDIANA's pages, and it is read again until the
+    // block is gone.
+    pasa(3_500);
+    let n = lectura(&s.tic()).unwrap_or_default();
+    let v = vpn(&responde(
+        &mut s,
+        n,
+        json!({ "fase": "error", "estricto": true, "desconectar": true }),
+    ));
+    assert_eq!(
+        (v["fase"].as_str(), v["desconectar"].as_bool()),
+        (Some("error"), Some(true))
+    );
+    assert_eq!(s.marco(), (ALTO_ARRIBA, 0));
+    pasa(3_500);
+    let n = lectura(&s.tic()).unwrap_or_default();
+    assert!(n > 0);
+    let v = vpn(&responde(
+        &mut s,
+        n,
+        json!({ "fase": "apagada", "estricto": true, "desconectar": false }),
+    ));
+    assert_eq!(v["desconectar"], false);
+    assert_eq!(s.marco(), (0, 0));
+    // Off and nothing left: not read again until something says it may have moved.
+    pasa(3_500);
+    assert_eq!(lectura(&s.tic()), None);
 }
 
 /// A measure, not a check (1.0.55, «más rápido»): how long the session takes to decide one request, over a page's

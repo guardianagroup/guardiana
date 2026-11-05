@@ -533,6 +533,9 @@ struct Vpn {
     fase: String,
     /// Strict mode is on (the service's `estricto`): with its server silent, nothing leaves until it answers.
     estricto: bool,
+    /// The service says «Desconectar» is needed (its `desconectar`, second review of 1.0.56): the VPN on, or its block
+    /// still in Windows after an error, when no page can load and the bar's chip is the way out.
+    desconectar: bool,
     /// The reading in flight: its number and when it left.
     pedida: Option<(u64, i64)>,
     /// The «Desconectar» in flight: its number and when it left.
@@ -2335,6 +2338,7 @@ impl Sesion {
             "tipo": "vpn",
             "fase": self.vpn.fase,
             "estricto": self.vpn.estricto,
+            "desconectar": self.vpn.desconectar,
             "desconectando": self.vpn.desconectando.is_some(),
             "aviso": self.vpn.aviso,
         })
@@ -2410,6 +2414,7 @@ impl Sesion {
             _ => "",
         };
         let estricto = datos.get("estricto").and_then(Value::as_bool) == Some(true);
+        let desconectar = datos.get("desconectar").and_then(Value::as_bool) == Some(true);
         if estado != 200 || fase.is_empty() {
             // The panel could not answer (its session not ready, the service starting): later, each time a little later.
             let espera = VPN_REINTENTO_MS.saturating_mul(1 << self.vpn.fallos.min(4));
@@ -2418,12 +2423,16 @@ impl Sesion {
             return Vec::new();
         }
         self.vpn.fallos = 0;
-        self.vpn.proxima = if vpn_activa(fase) {
+        // Read again while it is on, and while its block stays after an error, until «Desconectar» is no longer needed.
+        self.vpn.proxima = if vpn_activa(fase) || desconectar {
             ahora + VPN_CADA_MS
         } else {
             i64::MAX
         };
-        if fase == self.vpn.fase && estricto == self.vpn.estricto {
+        if fase == self.vpn.fase
+            && estricto == self.vpn.estricto
+            && desconectar == self.vpn.desconectar
+        {
             return Vec::new();
         }
         if fase != self.vpn.fase {
@@ -2431,6 +2440,7 @@ impl Sesion {
         }
         self.vpn.fase = fase.to_owned();
         self.vpn.estricto = estricto;
+        self.vpn.desconectar = desconectar;
         vec![envia(Origen::Barra, &self.msg_vpn())]
     }
 
@@ -2457,6 +2467,8 @@ impl Sesion {
     /// while its server does not answer, or while GUARDIANA's web cannot load with the VPN on.
     fn vpn_sobre_todo(&self) -> bool {
         vpn_callada(&self.vpn.fase)
+            // its block still in Windows after an error: no page loads, «Desconectar» must be at hand
+            || (self.vpn.desconectar && !vpn_activa(&self.vpn.fase))
             || (vpn_activa(&self.vpn.fase)
                 && self
                     .pestanas

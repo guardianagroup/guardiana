@@ -271,7 +271,10 @@
   function pintaVpn(m) {
     vpnUltimo = m;
     const caja = $('vpn');
-    const clave = VPN_FASES[m.fase];
+    // 5 Nov 2026 (second review of 1.0.56): with the VPN stopped by an error and its block still in Windows, the chip
+    // stays with «Desconectar», the only way out while no page can load.
+    const bloqueada = !VPN_FASES[m.fase] && !!m.desconectar;
+    const clave = VPN_FASES[m.fase] || (bloqueada ? 'vpn_bloqueo_puesto' : null);
     caja.classList.toggle('oculto', !clave);
     document.body.classList.toggle('con-vpn', !!clave);
     if (!clave) return;
@@ -284,7 +287,7 @@
     b.disabled = !!m.desconectando;
     b.textContent = t(m.desconectando ? 'vpn_desconectando' : 'vpn_desconectar');
     const callada = m.fase === 'sin_respuesta' || m.fase === 'reconectando';
-    caja.title = callada ? t(m.estricto ? 'vpn_estricto_no_conecta' : 'vpn_sin_respuesta_explica') : '';
+    caja.title = callada ? t(m.estricto ? 'vpn_estricto_no_conecta' : 'vpn_sin_respuesta_explica') : bloqueada ? t('vpn_bloqueo_puesto_explica') : '';
   }
   $('vpn-desconectar').addEventListener('click', () => manda({ tipo: 'vpn_desconectar' }));
   en('vpn', pintaVpn);

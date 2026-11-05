@@ -1583,7 +1583,6 @@ impl Vpn {
             if self.generacion.load(Ordering::SeqCst) != gen {
                 return;
             }
-            let apagada_fuera = self.apagada_desde_fuera();
             let ahora = ahora_ms();
             despierto = estricto::desde_tras_vistazo(despierto, antes, ahora, cada);
             antes = ahora;
@@ -1594,6 +1593,11 @@ impl Vpn {
             let Some(c) = g.as_ref() else {
                 return;
             };
+            // Lo guardado se lee con el candado de la conexión ya tomado (segunda revisión de la 1.0.56, «N1»): quien
+            // cambia de modo (`cambia_estricto`) lo guarda sin soltarlo, así que aquí nunca se mezcla el túnel nuevo con
+            // lo guardado de antes. Leído antes del candado, encender el estricto con el túnel abierto podía verse como
+            // «apagada desde fuera» y apagar la VPN entera.
+            let apagada_fuera = self.apagada_desde_fuera();
             if apagada_fuera && c.tunel.es_estricto() {
                 drop(g);
                 let _ = self.apaga();
