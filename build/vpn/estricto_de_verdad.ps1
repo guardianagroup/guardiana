@@ -14,13 +14,19 @@
 #     el paso 2 («salida no disponible, se omite»), sin fallo.
 #  1. El modo estricto encendido y Helsinki: el túnel arriba, el bloqueo en Windows, HTTPS a internet, y la dirección
 #     pública que ve un eco es la de la salida (62.238.17.121) y no la del equipo; por la tarjeta, nada sale (WSAEACCES).
+#     Y el bloqueo visto por fuera del programa, sitio por sitio: en `netsh wfp show state` y en lo que Windows guarda
+#     para el próximo arranque (la política de BFE en el registro). `netsh wfp show filters` no lista los 4 persistentes
+#     «todo lo demás» (gemelos exactos, sin condiciones y con peso efectivo 0, de los de arranque): se dice, y no cuenta.
 #  2. Núremberg y Miami (si su alta contestó), cada una con su dirección, con el bloqueo puesto durante todo el cambio;
 #     y vuelta a Helsinki.
-#  3. El proceso del servicio, muerto (taskkill /F) con el túnel puesto: mientras está muerto, nada sale (WSAEACCES) y
-#     el bloqueo sigue; arrancado otra vez, vuelve a conectar solo y la dirección vuelve a ser la del servidor.
+#  3. El proceso del servicio, muerto (taskkill /F) con el túnel puesto: mientras está muerto (unos 12 s), nada sale
+#     (WSAEACCES), ni hacia el HTTPS del servidor desde otro programa, y el bloqueo sigue. Luego, solo el bloqueo
+#     persistente, como tras arrancar el equipo (los de arranque dejan de valer cuando el servicio de filtrado carga los
+#     persistentes, y GUARDIANA aún no está): la prueba quita los de arranque y nada sale tampoco. Arrancado otra vez, el
+#     servicio vuelve a poner el bloqueo entero, conecta solo y la dirección vuelve a ser la del servidor.
 #  4. «Desconectar» (`POST /api/vpn/desconecta`): la red de siempre (la dirección del equipo) y nada de GUARDIANA en el
-#     Filtering Platform (`netsh wfp show filters` y `show state`: ni filtros persistentes ni de arranque, ni su
-#     proveedor ni su subcapa), frente a lo que `netsh` veía con el bloqueo puesto.
+#     Filtering Platform (`netsh wfp show filters` y `show state`: ni filtros persistentes, ni de arranque, ni dinámicos,
+#     ni su proveedor ni su subcapa) ni guardado para el próximo arranque.
 #  5. Otra vez conectada, el servicio parado (el bloqueo se queda: nada sale) y la orden de emergencia, la de «Apagar la
 #     VPN de GUARDIANA» del menú Inicio (`guardiana vpn apaga --menu`, con su Intro al final): la red vuelve y no queda
 #     nada; y el servicio, arrancado otra vez, no vuelve a poner el bloqueo.
@@ -29,7 +35,7 @@
 # fallaron (también en el resumen de la ejecución) y el código 1 si alguna falló.
 #
 # El equipo de pruebas habla con GitHub por la red: con el túnel puesto, por el túnel; sin túnel y con el bloqueo, no
-# habla. Esos ratos son cortos (el más largo, el servicio muerto, unos 15 s), y un vigilante aparte
+# habla. Esos ratos son cortos (el más largo, el servicio muerto, unos 20 s), y un vigilante aparte
 # (build/vpn/vigilante_vpn.ps1), con un plazo por fase, apaga la VPN, quita el bloqueo y para el servicio si una fase se
 # pasa de su plazo. Al terminar, pase lo que pase, la VPN se apaga y el servicio se quita.
 param(
@@ -385,8 +391,10 @@ function Wfp([string]$cuando, [switch]$Detalle) {
         # Para ver lo que netsh enseña y lo que no: los «todo lo demás» (los únicos sin condiciones) de cada volcado
         foreach ($caso in @(@{ Que = 'show state'; Archivo = $s }, @{ Que = 'show filters'; Archivo = $f })) {
             try {
+                # show state trae varios elementos raíz seguidos: van dentro de uno
+                $contenido = [System.IO.File]::ReadAllText($caso.Archivo) -replace '<\?xml[^>]*\?>', ''
                 $d = [System.Xml.XmlDocument]::new()
-                $d.Load($caso.Archivo)
+                $d.LoadXml("<raiz>$contenido</raiz>")
                 $vistos = foreach ($i in $d.SelectNodes("//*[local-name()='item'][*[local-name()='filterKey']]")) {
                     $nombre = "$($i.SelectSingleNode("*[local-name()='displayData']/*[local-name()='name']").InnerText)"
                     if ($nombre -ne 'GUARDIANA VPN: todo lo demás') { continue }
@@ -618,18 +626,28 @@ function ElBloqueoPorFuera($e) {
     }
 }
 
-# Quita de Windows los filtros de arranque del modo estricto, por sus claves fijas (solo la prueba, con el servicio
-# muerto): así queda lo que está en vigor tras arrancar el equipo, cuando el servicio de filtrado ya cargó los
-# persistentes y los de arranque dejan de valer, y GUARDIANA aún no ha arrancado. El servicio los vuelve a poner al
-# arrancar. Cuántos quitó, y lo que Windows dijo de otros.
-function QuitaLosDeArranque {
-    if (-not ('Guardiana.PruebaWfp' -as [type])) {
+# Las tres llamadas del Filtering Platform que usa QuitaLosDeArranque. Compilarlas tarda unos segundos: se hace antes
+# de cortar nada.
+function PreparaWfp {
+    if ('Guardiana.PruebaWfp' -as [type]) { return }
+    try {
         Add-Type -Namespace Guardiana -Name PruebaWfp -MemberDefinition @'
 [DllImport("fwpuclnt.dll")] public static extern uint FwpmEngineOpen0(System.IntPtr serverName, uint authnService, System.IntPtr authIdentity, System.IntPtr session, out System.IntPtr engineHandle);
 [DllImport("fwpuclnt.dll")] public static extern uint FwpmFilterDeleteByKey0(System.IntPtr engineHandle, ref System.Guid key);
 [DllImport("fwpuclnt.dll")] public static extern uint FwpmEngineClose0(System.IntPtr engineHandle);
 '@
+    } catch {
+        Linea "     (no se pudieron preparar las llamadas al Filtering Platform: $($_.Exception.Message))"
     }
+}
+
+# Quita de Windows los filtros de arranque del modo estricto, por sus claves fijas (solo la prueba, con el servicio
+# muerto): así queda lo que está en vigor tras arrancar el equipo, cuando el servicio de filtrado ya cargó los
+# persistentes y los de arranque dejan de valer, y GUARDIANA aún no ha arrancado. El servicio los vuelve a poner al
+# arrancar. Cuántos quitó, y lo que Windows dijo de otros.
+function QuitaLosDeArranque {
+    PreparaWfp
+    if (-not ('Guardiana.PruebaWfp' -as [type])) { return [pscustomobject]@{ Quitados = 0; Fallo = 'sin las llamadas al Filtering Platform' } }
     $motor = [IntPtr]::Zero
     # RPC_C_AUTHN_WINNT, como el programa (crates/apps/src/corte_vpn.rs)
     $r = [Guardiana.PruebaWfp]::FwpmEngineOpen0([IntPtr]::Zero, 10, [IntPtr]::Zero, [IntPtr]::Zero, [ref]$motor)
@@ -691,6 +709,7 @@ try {
     Bien ($listo -and ($script:v0.fase -eq 'apagada') -and ($script:v0.bloqueado -eq $false)) 'la VPN, disponible y apagada, sin bloqueo'
     $sal = Panel 'GET' '/api/vpn/salidas' -segundos 60
     Linea "     GET /api/vpn/salidas (medido por el servicio, sin VPN): $(Json $sal)"
+    PreparaWfp
 
     if (-not $listo) {
         Bien $false 'la VPN no está disponible en el panel: no se sigue' $script:panelFallo

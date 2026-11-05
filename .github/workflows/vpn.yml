@@ -401,18 +401,21 @@ jobs:
 
   # Strict mode against the real servers, with GUARDIANA's real service (docs/VPN.md, «El modo estricto» and «Las
   # salidas»): only when launched by hand (gh workflow run vpn.yml), never on a push. «estricto» above has the real
-  # service with a server that never answers, and «de_verdad» the real server in normal mode; here both together, through
-  # the panel's API as the page does it (build/vpn/estricto_de_verdad.ps1): strict mode on and Helsinki (the tunnel up,
-  # the block in Windows, HTTPS out, the public address an echo sees is the server's and not the runner's, nothing out by
-  # the network card); Nuremberg and Miami, only when their sign-up answers from outside at the start (otherwise «salida
-  # no disponible, se omite», not a failure), and back to Helsinki; the service's process killed (taskkill /F) with the
-  # tunnel up: nothing out (WSAEACCES) while it is dead, and once started again it reconnects by itself; «Desconectar»:
-  # the runner's own address back and nothing of GUARDIANA left in the Filtering Platform (netsh wfp show filters and
-  # show state); and `guardiana vpn apaga --menu` (the Start menu's «Apagar la VPN de GUARDIANA»), with the service
-  # stopped and the block on. Every check prints BIEN or MAL. Safe for the runner: a watchdog with a time limit per phase
-  # (build/vpn/vigilante_vpn.ps1) turns the VPN off, takes the block out of Windows and stops the service; each moment
-  # without network is short (the longest, the service dead, ~15 s; with the tunnel up the runner's traffic goes through
-  # it); and the last step, whatever happens, leaves the network as it was and shows it.
+  # service with a server that never answers, and «de_verdad» the real server in normal mode; here both together,
+  # through the panel's API as the page does it (build/vpn/estricto_de_verdad.ps1): strict mode on and Helsinki (the
+  # tunnel up, the block in Windows, HTTPS out, the public address an echo sees is the server's and not the runner's,
+  # nothing out by the network card); Nuremberg and Miami, only when their sign-up answers from outside at the start
+  # (otherwise «salida no disponible, se omite», not a failure), and back to Helsinki; the service's process killed
+  # (taskkill /F) with the tunnel up: nothing out (WSAEACCES) while it is dead, also with only the persistent block (the
+  # test takes the boot-time filters out, as they are once Windows' filtering service has loaded the persistent ones
+  # after a restart), and once started again it reconnects by itself; «Desconectar»: the runner's own address back and
+  # nothing of GUARDIANA left in the Filtering Platform (netsh wfp show filters and show state) nor kept for the next
+  # start (BFE's policy in the registry); and `guardiana vpn apaga --menu` (the Start menu's «Apagar la VPN de
+  # GUARDIANA»), with the service stopped and the block on. Every check prints BIEN or MAL. Safe for the runner: a
+  # watchdog with a time limit per phase (build/vpn/vigilante_vpn.ps1) turns the VPN off, takes the block out of Windows
+  # and stops the service; each moment without network is short (the longest, the service dead, ~20 s; with the tunnel
+  # up the runner's traffic goes through it); and the last step, whatever happens, leaves the network as it was and
+  # shows it.
   estricto_de_verdad:
     name: el modo estricto con el servicio de verdad y los servidores de verdad (solo a mano)
     if: github.event_name == 'workflow_dispatch'
