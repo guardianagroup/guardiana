@@ -178,7 +178,8 @@ body.plegado #carril { display: flex; flex-direction: column; align-items: stret
 .carril-que { font: 500 13px/1.3 var(--texto); color: var(--tinta); }
 .carril-que small { display: block; font: 400 12px/1.3 var(--texto); color: var(--gris); }
 .carril-sep { height: 1px; background: var(--linea); flex: none; }
-.carril-rotulo { font: 600 10.5px/1.2 var(--texto); letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); text-align: center; }
+/* A 11 px, nunca menos (apiñamientos, 5 nov 2026). */
+.carril-rotulo { font: 600 11px/1.2 var(--texto); letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); text-align: center; }
 #carril-ultimos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e2); }
 #carril-ultimos li { display: flex; align-items: center; gap: var(--e2); min-width: 0; font: 500 12.5px/1.25 var(--texto); }
 #carril-ultimos li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
