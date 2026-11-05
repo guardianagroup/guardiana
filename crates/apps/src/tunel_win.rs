@@ -6,7 +6,8 @@
 //! 2. its address, its routes, its settings and its resolver (`red_vpn`);
 //! 3. the cut-off switch (`corte_vpn`, with `guardiana_tunel::corte`'s plan): nothing leaves outside the tunnel but
 //!    the encrypted packets to the server (UDP, its address and its port; since 1.0.55 nothing else of the service's
-//!    either), and the answers of Home Mode's connections to the house;
+//!    either), and the answers of Home Mode's connections to the house; and nothing Windows forwards for its virtual
+//!    machines or a shared connection goes anywhere but into the tunnel (1.0.56);
 //! 4. the adapter up.
 //!
 //! Before any of it, with everything inside, this computer's LAN address is read while the default route is still the
@@ -590,6 +591,16 @@ mod tests {
         std::thread::sleep(Duration::from_secs(1));
         let en = en_windows().unwrap();
         assert_eq!(en.persistentes, plan.persistentes.len(), "{en:?}");
+        // y el bloqueo de lo que Windows reenvía (las máquinas virtuales, la conexión compartida), en sus dos capas
+        let reenvio = |p: &[corte::Filtro]| p.iter().filter(|f| f.capa.es_reenvio()).count();
+        let esperado = reenvio(&plan.persistentes)
+            + if puesto.arranque.is_ok() {
+                reenvio(&plan.arranque)
+            } else {
+                0
+            };
+        assert_eq!(reenvio(&plan.persistentes), 2);
+        assert_eq!(en.reenvio, esperado, "{en:?}");
         let r = TcpStream::connect_timeout(&fuera, Duration::from_secs(3));
         assert_eq!(
             r.as_ref().err().and_then(std::io::Error::raw_os_error),

@@ -3,7 +3,8 @@
 # Authenticode signature checked before anything loads it, and crates/apps/src/wireguard_nt.rs's real test: an adapter
 # created, configured with crates/tunel/src/nt.rs's bytes, brought up and down, and closed. And corte_vpn.rs's: every
 # permit filter of the cut-off switch accepted by Windows, in a dynamic session closed at once (the blocking ones are
-# left out, so the runner's own network is never cut). GitHub's Windows runners run as administrators.
+# left out, so the runner's own network is never cut, but for the block on what Windows forwards, which the runner does
+# not use: 1.0.56). GitHub's Windows runners run as administrators.
 # And the antivirus cuts' (crates/panel/src/antivirus.rs, reviews of vpn-1055b, arreglos-1055 and arreglos-1056): a panel
 # rebuilt while the old one's state is still alive keeps the cuts in Windows' filter engine, once the old state is gone
 # too; a let-through goes through with a filter already gone; putting a cut back with fewer paths keeps the earlier ones;
@@ -118,8 +119,10 @@ jobs:
   # the service killed, and then stopped as an update stops it: the block stays (persistent filters, outliving the
   # process); «Desconectar» (POST /api/vpn/desconecta) takes it all away and the network is back; a block left with
   # strict mode off in what is kept is removed by the service's start; and `guardiana vpn apaga`, with the service
-  # stopped, removes it too. The runner's network is cut for those moments (its link with GitHub may pause), and
-  # whatever happens, the last step takes the block and the service away.
+  # stopped, removes it too. The block on what Windows forwards (WSL2, Hyper-V, Docker, ICS; 1.0.56) is read in
+  # Windows' own list of filters (netsh wfp show filters): in both forwarding layers, persistent and boot-time, through
+  # the service's death and stop, and gone with each way out. The runner's network is cut for those moments (its link
+  # with GitHub may pause), and whatever happens, the last step takes the block and the service away.
   estricto:
     name: el modo estricto con el servicio de verdad y un servidor que no contesta
     runs-on: windows-latest
@@ -192,6 +195,29 @@ jobs:
           function Arranca { & $g service start | Out-Null; Espera 60 { (Get-Service guardiana).Status -eq 'Running' } }
           function Bloqueado { $e = Estado; $e.persistentes -gt 0 }
           function Limpio { $e = Estado; $e.persistentes -eq 0 -and $e.arranque -eq 0 -and -not $e.objetos }
+          # GUARDIANA's filters in the forwarding layers (FWPM_LAYER_IPFORWARD_V4 and _V6), as Windows itself lists them:
+          # how many in each layer, how many persistent and boot-time; and how many of others there, for the record
+          function Reenvio {
+            $f = Join-Path $env:RUNNER_TEMP 'filtros-wfp.xml'
+            Remove-Item $f -ErrorAction SilentlyContinue
+            netsh wfp show filters file="$f" | Out-Null
+            $n = [ordered]@{ v4 = 0; v6 = 0; persistentes = 0; arranque = 0; otros = 0; lista = $true }
+            if (-not (Test-Path $f)) { $n.lista = $false; return [pscustomobject]$n }
+            $x = New-Object System.Xml.XmlDocument
+            $x.Load($f)
+            $capas = @{ 'FWPM_LAYER_IPFORWARD_V4' = 'v4'; '{a82acc24-4ee1-4ee1-b465-fd1d25cb10a4}' = 'v4'; 'FWPM_LAYER_IPFORWARD_V6' = 'v6'; '{7b964818-19c7-493a-b71f-832c3684d28c}' = 'v6' }
+            foreach ($i in $x.SelectNodes('//item[layerKey]')) {
+              $capa = $capas["$($i.SelectSingleNode('layerKey').InnerText)".Trim()]
+              if (-not $capa) { continue }
+              if (-not "$($i.SelectSingleNode('displayData/name').InnerText)".StartsWith('GUARDIANA VPN')) { $n.otros++; continue }
+              $n[$capa]++
+              $marcas = "$($i.SelectSingleNode('flags').InnerText)"
+              if ($marcas -match 'PERSISTENT') { $n.persistentes++ }
+              if ($marcas -match 'BOOTTIME') { $n.arranque++ }
+            }
+            [pscustomobject]$n
+          }
+          function SinReenvio { $r = Reenvio; $r.lista -and $r.v4 -eq 0 -and $r.v6 -eq 0 }
           try {
             Bien ((Fuera) -eq 'conecta') 'antes, la red sale'
             # 1. the VPN on in strict mode, with a server that never answers: the service's start puts the block
@@ -200,6 +226,10 @@ jobs:
             Bien (Espera 60 { Bloqueado }) 'al arrancar, el servicio pone el bloqueo del modo estricto'
             Linea "estado: $(Estado | ConvertTo-Json -Compress)"
             Bien ((Estado).arranque -gt 0) 'con sus filtros de arranque'
+            $r = Reenvio
+            Linea "capas de reenvío de Windows (netsh wfp show filters): $($r | ConvertTo-Json -Compress)"
+            Bien ($r.v4 -ge 2 -and $r.v6 -ge 2) 'el bloqueo de lo que Windows reenvía, en sus dos capas de reenvío (IPv4 e IPv6)'
+            Bien ($r.persistentes -ge 2 -and $r.arranque -ge 2) 'el bloqueo de lo reenviado, persistente y de arranque'
             Bien ((Fuera) -eq 'cortada') 'con el servidor sin contestar, nada sale por la tarjeta (WSAEACCES)'
             Bien (Espera 90 { try { (Panel 'GET' '/api/vpn').fase -eq 'reconectando' } catch { $false } }) 'el panel dice «reconectando»'
             $v = Panel 'GET' '/api/vpn'
@@ -211,17 +241,22 @@ jobs:
             Start-Sleep -Seconds 2
             Bien (Bloqueado) 'el servicio muerto: el bloqueo sigue'
             Bien ((Fuera) -eq 'cortada') 'el servicio muerto: nada sale'
+            $r = Reenvio
+            Bien ($r.v4 -ge 1 -and $r.v6 -ge 1) "el servicio muerto: el bloqueo de lo reenviado sigue ($($r | ConvertTo-Json -Compress))"
             Bien (Espera 90 { (Get-Service guardiana).Status -eq 'Running' }) 'Windows vuelve a arrancar el servicio'
             # 3. stopped, as an update stops it: the block stays
             Bien (Para) 'parado'
             Bien (Bloqueado) 'parado (una actualización): el bloqueo sigue'
             Bien ((Fuera) -eq 'cortada') 'parado: nada sale'
+            $r = Reenvio
+            Bien ($r.v4 -ge 1 -and $r.v6 -ge 1) "parado: el bloqueo de lo reenviado sigue ($($r | ConvertTo-Json -Compress))"
             # 4. «Desconectar»: everything goes, the normal connection is back
             Bien (Arranca) 'arrancado otra vez'
             Bien (Espera 60 { try { $null -ne (Panel 'GET' '/api/vpn').fase } catch { $false } }) 'el panel contesta'
             $r = Panel 'POST' '/api/vpn/desconecta'
             Bien ($r.ok -eq $true) "Desconectar: $($r | ConvertTo-Json -Compress)"
             Bien (Limpio) 'Desconectar quita el bloqueo entero'
+            Bien (SinReenvio) 'Desconectar quita también el bloqueo de lo reenviado (en la lista de Windows)'
             Bien (-not (Estado).encendida) 'y la VPN queda apagada en lo guardado'
             Bien (Espera 30 { (Fuera) -eq 'conecta' }) 'tras Desconectar, la red sale otra vez'
             # 5. a block left behind and strict mode off in what is kept: the service's start removes it
@@ -231,6 +266,7 @@ jobs:
             Pon $false $true
             Bien (Arranca) 'arrancado con el modo estricto apagado'
             Bien (Espera 60 { Limpio }) 'al arrancar, el servicio quita lo que quedó del modo estricto'
+            Bien (SinReenvio) 'también el bloqueo de lo reenviado'
             Bien (Espera 30 { (Fuera) -eq 'conecta' }) 'y la red sale'
             # 6. `guardiana vpn apaga` with the service stopped
             Pon $true $true
@@ -239,6 +275,7 @@ jobs:
             & $g vpn apaga
             Bien ($LASTEXITCODE -eq 0) 'guardiana vpn apaga termina bien'
             Bien (Limpio) 'guardiana vpn apaga, con el servicio parado, lo quita todo'
+            Bien (SinReenvio) 'también el bloqueo de lo reenviado'
             Bien (-not (Estado).encendida) 'y deja la VPN apagada en lo guardado'
             Bien (Espera 30 { (Fuera) -eq 'conecta' }) 'y la red sale'
           } finally {
