@@ -433,3 +433,101 @@ jobs:
           Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' | Format-Table InterfaceAlias, NextHop, RouteMetric -AutoSize
           Resolve-DnsName github.com -Type A -ErrorAction SilentlyContinue | Select-Object -First 2 | Format-Table Name, IPAddress -AutoSize
           try { "dirección pública: " + (Invoke-RestMethod -Uri 'https://api.ipify.org' -TimeoutSec 15) } catch { "sin dirección pública: $_" }
+
+  # Strict mode against the real servers, with GUARDIANA's real service (docs/VPN.md, «El modo estricto» and «Las
+  # salidas»): only when launched by hand (gh workflow run vpn.yml), never on a push. «estricto» above has the real
+  # service with a server that never answers, and «de_verdad» the real server in normal mode; here both together,
+  # through the panel's API as the page does it (build/vpn/estricto_de_verdad.ps1): strict mode on and Helsinki (the
+  # tunnel up, the block in Windows, HTTPS out, the public address an echo sees is the server's and not the runner's,
+  # nothing out by the network card); Nuremberg and Miami, only when their sign-up answers from outside at the start
+  # (otherwise «salida no disponible, se omite», not a failure), and back to Helsinki; the service's process killed
+  # (taskkill /F) with the tunnel up: nothing out (WSAEACCES) while it is dead, also with only the persistent block (the
+  # test takes the boot-time filters out, as they are once Windows' filtering service has loaded the persistent ones
+  # after a restart), and once started again it reconnects by itself; «Desconectar»: the runner's own address back and
+  # nothing of GUARDIANA left in the Filtering Platform (netsh wfp show filters and show state) nor kept for the next
+  # start (BFE's policy in the registry); and `guardiana vpn apaga --menu` (the Start menu's «Apagar la VPN de
+  # GUARDIANA»), with the service stopped and the block on. Every check prints BIEN or MAL. Safe for the runner: a
+  # watchdog with a time limit per phase (build/vpn/vigilante_vpn.ps1) turns the VPN off, takes the block out of Windows
+  # and stops the service; each moment without network is short (the longest, the service dead, ~20 s; with the tunnel
+  # up the runner's traffic goes through it); and the last step, whatever happens, leaves the network as it was and
+  # shows it.
+  estricto_de_verdad:
+    name: el modo estricto con el servicio de verdad y los servidores de verdad (solo a mano)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          # launched by hand, and a failed run is the one launched again: its build is kept anyway
+          cache-on-failure: true
+      - name: wireguard.dll firmada por WireGuard LLC
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP 'wireguard-nt.zip'
+          $dir = Join-Path $env:RUNNER_TEMP 'wireguard-nt'
+          Invoke-WebRequest -Uri 'https://download.wireguard.com/wireguard-nt/wireguard-nt-1.1.zip' -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          $dll = Get-ChildItem -Path $dir -Recurse -Filter wireguard.dll | Where-Object { $_.FullName -match '\\amd64\\' } | Select-Object -First 1
+          if (-not $dll) { Write-Output '::error title=wireguard.dll::no está en el .zip (bin\amd64)'; exit 1 }
+          $huella = (Get-FileHash -Path $dll.FullName -Algorithm SHA256).Hash
+          $firma = Get-AuthenticodeSignature -FilePath $dll.FullName
+          $quien = if ($firma.SignerCertificate) { $firma.SignerCertificate.Subject } else { '' }
+          Write-Output "firma: $($firma.Status) · $quien"
+          Write-Output "sha256: $huella"
+          if ($huella -ne 'B1B85E072C45D81358BE29D94C599DC76652F912BE8C0F0A41E2D5D89A6461D3' -or $firma.Status -ne 'Valid' -or $quien -notmatch 'WireGuard LLC') {
+            Write-Output "::error title=wireguard.dll::otra compilación o firma no válida ($huella, $($firma.Status), $quien)"
+            exit 1
+          }
+          "GUARDIANA_WG_DLL=$($dll.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      # Built before anything is cut.
+      - name: compilar guardiana.exe
+        run: cargo build -p guardiana-cli --locked
+      - name: el modo estricto, conectado de verdad
+        timeout-minutes: 15
+        shell: pwsh
+        run: |
+          $g = Join-Path $env:GITHUB_WORKSPACE 'target\debug\guardiana.exe'
+          Copy-Item $env:GUARDIANA_WG_DLL (Join-Path (Split-Path $g) 'wireguard.dll') -Force
+          & ./build/vpn/estricto_de_verdad.ps1 -Exe $g -Trabajo (Join-Path $env:RUNNER_TEMP 'estricto-de-verdad')
+          exit $LASTEXITCODE
+      - name: la red como estaba, y lo que quede (siempre)
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          $g = Join-Path $env:GITHUB_WORKSPACE 'target\debug\guardiana.exe'
+          $trabajo = Join-Path $env:RUNNER_TEMP 'estricto-de-verdad'
+          # the watchdog, told to end, and ended if it is still there
+          New-Item -ItemType Directory -Force -Path $trabajo | Out-Null
+          Set-Content -LiteralPath (Join-Path $trabajo 'fin.txt') -Value 'fin'
+          Get-CimInstance Win32_Process -Filter "Name='pwsh.exe'" | Where-Object { $_.CommandLine -like '*vigilante_vpn.ps1*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+          if (Test-Path $g) {
+            & $g vpn apaga
+            & $g service uninstall
+            & $g vpn estado --json
+          }
+          $vigilante = Join-Path $trabajo 'vigilante.log'
+          if (Test-Path $vigilante) { Get-Content $vigilante | ForEach-Object { "vigilante: $_" } }
+          Get-NetAdapter -IncludeHidden | Format-Table Name, Status, InterfaceDescription -AutoSize
+          Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' | Format-Table InterfaceAlias, NextHop, RouteMetric -AutoSize
+          Get-DnsClientServerAddress -AddressFamily IPv4 | Where-Object { $_.ServerAddresses } | Format-Table InterfaceAlias, ServerAddresses -AutoSize
+          $filtros = Join-Path $env:RUNNER_TEMP 'filtros-al-final.xml'
+          netsh wfp show filters "file=$filtros" | Out-Null
+          if (Test-Path $filtros) { "filtros con nombre de GUARDIANA en Windows: $(([regex]::Matches((Get-Content -Raw $filtros), '<name>GUARDIANA[^<]*</name>')).Count)" }
+          try { "dirección pública: " + (Invoke-RestMethod -Uri 'https://api.ipify.org' -TimeoutSec 15) } catch { "sin dirección pública: $_" }
+      # What netsh showed at each moment (show filters and show state), and the watchdog's log, to look at afterwards.
+      - name: lo que vio netsh, para mirarlo después (siempre)
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: estricto-de-verdad
+          path: ${{ runner.temp }}/estricto-de-verdad/
+          retention-days: 7
+          if-no-files-found: ignore
