@@ -110,17 +110,17 @@
     const cuentaFila = x.cortadas > 0
       ? `<span class="cuenta-fila ${parcial ? 'ambar' : 'rojo'}">${esc(t('escudo_cortadas_de', { c: n(x.cortadas), n: n(x.vistas) }))}</span>`
       : `<span class="cuenta-fila">${esc(tn('escudo_peticiones', x.vistas, { n: n(x.vistas) }))}</span>`;
-    li.querySelector('.quien').innerHTML = `<button class="enlace-empresa" data-empresa="${esc(x.quien)}" title="${esc(t('ficha_ver'))}">${esc(x.quien)}</button>${x.pais ? `<small>${esc(pais(x.pais))}</small>` : ''}<span class="cat">${esc(mayuscula(t('cat_' + x.categoria)))}</span>${cuentaFila}`;
+    const corredorFila = x.corredor ? `<span class="corredor-fila" title="${esc(x.corredor)}">${esc(t('corredor_etiqueta'))}</span>` : '';
+    li.querySelector('.quien').innerHTML = `<button class="enlace-empresa" data-empresa="${esc(x.quien)}" title="${esc(t('ficha_ver'))}">${esc(x.quien)}</button>${x.pais ? `<small>${esc(pais(x.pais))}</small>` : ''} <span class="cat">${esc(mayuscula(t('cat_' + x.categoria)))}</span> ${cuentaFila}${corredorFila ? ' ' + corredorFila : ''}`;
     // The site may be shortened; its counts never are.
+    li.querySelector('.linea').title = x.sitio;
     li.querySelector('.linea').innerHTML = `<span class="mono">${esc(x.sitio)}</span><span class="cuenta">${esc(x.cortadas > 0 ? t('escudo_cortadas_de', { c: n(x.cortadas), n: n(x.vistas) }) : tn('escudo_peticiones', x.vistas, { n: n(x.vistas) }))}</span>`;
     // What holds now, in one chip: the person's rule when there is one, else cut, partly or not.
     const [estado, color] = x.regla === 'tuya' || x.regla === 'permitido' ? [t('regla_' + x.regla), 'tuya']
       : parcial ? [t('escudo_parcial'), 'ambar'] : corta ? [t('escudo_estado_cortado'), 'rojo'] : [t('escudo_estado_pasa'), ''];
     // Why it is cut now: printed only when the chips do not say it already.
     const por = corta ? (x.por || x.motivo) : null;
-    const chips = li.querySelector('.chips');
-    chips.classList.toggle('sin-mas', !x.corredor && !(por && !['rastreador', 'publicidad', 'corredor', 'corte_tuyo', 'telemetria'].includes(por)));
-    chips.innerHTML = [
+    li.querySelector('.chips').innerHTML = [
       `<span class="chip estado ${color}">${esc(estado)}</span>`,
       `<span class="chip cat ${COLOR_CAT[x.categoria] || ''}">${esc(t('cat_' + x.categoria))}</span>`,
       x.corredor ? `<span class="chip rojo" title="${esc(x.corredor)}">${esc(t('corredor_etiqueta'))}</span>` : '',
@@ -145,6 +145,8 @@
       cajaSw.classList.toggle('cortado', corta);
       cajaSw.classList.remove('ocupado');
       cajaSw.querySelector('.interruptor-estado').textContent = parcial ? t('escudo_parcial') : t(corta ? 'interruptor_cortado' : 'interruptor_permitido');
+      // Why it is cut, in the title of its word (5 Nov 2026: the row keeps one height in every state).
+      cajaSw.querySelector('.interruptor-estado').title = por ? t('motivo_' + por) : '';
     }
     sw.disabled = !acc.interruptor;
     if (acc.interruptor) { sw.dataset.accion = acc.interruptor[0]; sw.title = t(acc.interruptor[1] + '_titulo'); sw.setAttribute('aria-label', t(acc.interruptor[1])); }
@@ -580,7 +582,19 @@
   $('b-si').addEventListener('click', () => manda({ tipo: 'bienvenida', cortar: true }));
   $('b-no').addEventListener('click', () => manda({ tipo: 'bienvenida', cortar: false }));
 
+  // 5 Nov 2026: the switch's word gets the width of the longest of its words in the language, so a row's switch never
+  // moves and its word is never cut short («en parte cor» in 1.0.55).
+  function anchoEstados() {
+    const c = document.createElement('canvas').getContext('2d');
+    if (!c) return;
+    c.font = `600 12.5px ${getComputedStyle(document.body).getPropertyValue('--texto') || 'sans-serif'}`;
+    const palabras = ['interruptor_cortado', 'interruptor_permitido', 'escudo_parcial', 'interruptor_cortando', 'interruptor_permitiendo'].map((k) => t(k));
+    const w = Math.ceil(Math.max(...palabras.map((p) => c.measureText(p).width))) + 2;
+    if (w > 2) document.documentElement.style.setProperty('--ancho-estado', `${w}px`);
+  }
   en('textos', () => {
+    anchoEstados();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(anchoEstados);
     try { const dn = new Intl.DisplayNames([document.documentElement.lang], { type: 'region' }); pais = (c) => { try { return dn.of(c); } catch (_) { return c; } }; } catch (_) {}
     if (vista) muestra(vista);
     if (lic) pintaLicencia(lic);

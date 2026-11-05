@@ -167,7 +167,7 @@ p { margin: 0 0 10px; }
    protection, what the page's pixels said) follows below, as before. */
 body.vidrio { background: var(--card); border-left: 1px solid var(--line); }
 body.vidrio.en-escudo header { display: none; }
-body.vidrio.en-escudo main { padding: var(--e4) var(--e5) var(--e6); }
+body.vidrio.en-escudo main { padding: var(--e4) 20px var(--e6); }
 #carril { display: none; }
 body.plegado header, body.plegado main, body.plegado #aviso { display: none !important; }
 body.plegado #carril { display: flex; flex-direction: column; align-items: stretch; gap: var(--e3); height: 100%; padding: var(--e4) var(--e3) var(--e4); overflow: hidden; }
@@ -220,34 +220,41 @@ body.plegado #carril { display: flex; flex-direction: column; align-items: stret
 body.vidrio .z2-reparto .lista-resumen { margin: 0; font: 400 12.5px/1.35 var(--texto); color: var(--gris); }
 .z1-columnas { display: flex; align-items: baseline; justify-content: space-between; margin-top: var(--e5); font: 600 11.5px/1.2 var(--texto); letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); }
 .z1-columnas span:last-child { letter-spacing: 0; text-transform: none; font-weight: 500; font-size: 12px; font-variant-numeric: tabular-nums; }
-/* One row per company: a dot, its domain and its switch on the first line; who it is, what it does and what was cut on
-   the second; «Cortar todo» on a third when only part of it is cut. Nothing is cut short: the domain shortens with
-   «…», never the words of the switch. */
+/* One row per company: on the left, a dot, its domain and, under it, who it is, what it does and what was cut; on the
+   right, a column of fixed width with the place of «Cortar todo» and the switch, and under the switch its word. Every
+   place has a fixed size, the same in every state, so pressing a switch never changes the row's height nor moves its
+   buttons (the owner, 10 Oct 2026: rows that move lose the person's place). The column is as wide as the longest of the
+   switch's words in the language (--ancho-estado, measured by panel.js), so the word is never cut short. «Cortar todo» (a
+   row cut only in part) is a round button with the cut icon, its words in its title; its place stays, empty, in the
+   other rows. Why a row is cut is said in the title of its word. */
 body.vidrio .terceros { margin-top: var(--e1); }
-body.vidrio .terceros .tercero { padding: var(--e3) 0; border-bottom: 1px solid var(--linea); grid-template-columns: 10px minmax(0, 1fr) auto; grid-template-rows: auto; row-gap: 3px; column-gap: 10px; align-items: center; }
-body.vidrio .terceros .tercero::before { position: static; display: block; grid-column: 1; grid-row: 1; width: 8px; height: 8px; border-radius: 50%; background: transparent; border: 1.5px solid var(--verde); box-sizing: border-box; }
+body.vidrio .terceros .tercero { padding: var(--e3) 0; border-bottom: 1px solid var(--linea); grid-template-columns: 8px minmax(0, 1fr) auto; grid-template-rows: 26px auto; row-gap: 2px; column-gap: 10px; align-items: start; }
+body.vidrio .terceros .tercero::before { position: static; display: block; grid-column: 1; grid-row: 1; align-self: center; width: 8px; height: 8px; border-radius: 50%; background: transparent; border: 1.5px solid var(--verde); box-sizing: border-box; }
 body.vidrio .terceros .tercero.cortado::before { background: var(--rojo); border-color: var(--rojo); }
 body.vidrio .terceros .tercero.parcial::before { background: var(--ambar); border-color: var(--ambar); }
 body.vidrio .terceros .tercero.sigue::before { border-color: var(--ambar); }
-body.vidrio .tercero .linea { grid-column: 2; grid-row: 1; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 13.5px/1.25 var(--mono); color: var(--tinta); }
-body.vidrio .tercero .linea .mono { font-size: 13.5px; }
+body.vidrio .tercero .linea { grid-column: 2; grid-row: 1; align-self: center; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 13px/1.25 var(--mono); color: var(--tinta); }
+body.vidrio .tercero .linea .mono { font-size: 13px; }
 body.vidrio .tercero .linea .cuenta { display: none; }
-body.vidrio .tercero .botones { display: contents; }
-body.vidrio .tercero .interruptor-caja { grid-column: 3; grid-row: 1; justify-self: end; }
-body.vidrio .tercero .interruptor-estado { min-width: 4.5em; text-align: right; white-space: nowrap; font-weight: 600; }
+body.vidrio .tercero .botones { grid-column: 3; grid-row: 1 / span 2; align-self: start; display: grid; grid-template-columns: auto auto; grid-template-rows: 26px auto; justify-content: end; justify-items: end; align-items: center; column-gap: 6px; row-gap: 2px; min-width: max(var(--ancho-estado, 7.5em), 68px); }
+body.vidrio .tercero .interruptor-caja { display: contents; }
+body.vidrio .tercero .interruptor { grid-column: 2; grid-row: 1; }
+body.vidrio .tercero .interruptor-estado { grid-column: 1 / 3; grid-row: 2; width: var(--ancho-estado, 7.5em); text-align: right; white-space: nowrap; font: 600 12.5px/1.3 var(--texto); }
+body.vidrio .tercero .interruptor-motivo { grid-column: 1 / 3; grid-row: 3; }
 body.vidrio .tercero.cortado .interruptor-estado { color: var(--rojo); }
 body.vidrio .tercero.parcial .interruptor-estado { color: var(--ambar); }
-body.vidrio .tercero .quien { grid-column: 2 / 4; grid-row: 2; min-width: 0; white-space: normal; overflow: visible; font: 400 12.5px/1.35 var(--texto); color: var(--gris); }
+body.vidrio .tercero .botones > .boton { grid-column: 1; grid-row: 1; flex: none; width: 26px; min-width: 26px; height: 26px; min-height: 26px; padding: 0; border-radius: 50%; font-size: 0; gap: 0; color: var(--gris); }
+body.vidrio .tercero .botones > .boton::before { content: ""; width: 14px; height: 14px; flex: none; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.2'/%3E%3Cpath d='M3.7 12.3 12.3 3.7'/%3E%3C/svg%3E") center/contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.2'/%3E%3Cpath d='M3.7 12.3 12.3 3.7'/%3E%3C/svg%3E") center/contain no-repeat; }
+body.vidrio .tercero .botones > .boton:hover { color: var(--rojo); border-color: var(--rojo); }
+body.vidrio .tercero .botones > .boton.vacio { visibility: hidden; }
+body.vidrio .tercero .quien { grid-column: 2; grid-row: 2; align-self: start; min-width: 0; white-space: normal; overflow: visible; font: 400 12.5px/1.35 var(--texto); color: var(--gris); }
 body.vidrio .tercero .quien .enlace-empresa { color: #C9D3DD; font-weight: 500; }
-body.vidrio .tercero .quien .cat::before, body.vidrio .tercero .quien .cuenta-fila::before { content: ' · '; color: var(--gris); }
-body.vidrio .tercero .quien .cuenta-fila.rojo { color: var(--rojo); }
+body.vidrio .tercero .quien .cat::before, body.vidrio .tercero .quien .cuenta-fila::before, body.vidrio .tercero .quien .corredor-fila::before { content: '· '; color: var(--gris); }
+body.vidrio .tercero .quien .cuenta-fila.rojo, body.vidrio .tercero .quien .corredor-fila { color: var(--rojo); }
+body.vidrio .tercero .quien .cuenta-fila, body.vidrio .tercero .quien .cat { white-space: nowrap; }
 body.vidrio .tercero .quien .cuenta-fila.ambar { color: var(--ambar); }
-body.vidrio .tercero .botones > .boton { grid-column: 2 / 4; grid-row: 3; justify-self: start; width: auto; min-width: 0; margin-top: var(--e1); }
-body.vidrio .tercero .botones > .boton.vacio { display: none; }
-body.vidrio .tercero .chips { grid-column: 2 / 4; grid-row: 4; min-width: 0; font: 400 12px/1.35 var(--texto); color: var(--gris); white-space: normal; }
-body.vidrio .tercero .chips.sin-mas { display: none; }
-body.vidrio .tercero .chips .chip.estado, body.vidrio .tercero .chips .chip.cat { display: none; }
-body.vidrio .tercero .nota-dato { grid-column: 2 / 4; grid-row: 5; }
+body.vidrio .tercero .chips { display: none; }
+body.vidrio .tercero .nota-dato { grid-column: 2 / 4; grid-row: 3; }
 body.vidrio .lista-resumen { margin: var(--e3) 0 0; font: var(--t-12); color: var(--gris); }
 .z1-acciones { margin-top: var(--e5); display: grid; gap: var(--e3); }
 .z1-acciones .boton.principal { width: 100%; min-height: var(--h-boton); }
