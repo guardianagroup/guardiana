@@ -316,7 +316,7 @@
     $('z1-web').textContent = m.sitio || '';
     $('z1-n').textContent = n(cifra);
     $('z1-que').textContent = mirando ? tn('z1_empresas_sin_cortar', cifra) : tn('z2_intentos', cifra);
-    $('z2-que-sub').textContent = mirando ? t('z1_solo_mira') : t('z2_antes_de_salir');
+    $('z2-que-sub').textContent = mirando ? t('z2_mirando_sub') : t('z2_antes_de_salir');
     $('franja-n').textContent = n(cifra);
     $('franja-que').textContent = mirando ? t('z1_franja_empresas') : tn('z2_carril_cortados', cifra);
     for (const id of ['z2-vivo', 'carril-vivo']) {
