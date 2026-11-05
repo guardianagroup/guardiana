@@ -260,8 +260,12 @@ VPN debe estar encendida, nada sale del equipo fuera del túnel, también cuando
   la reconciliación no sale bien (Windows no deja quitar lo que sobra), se repite cada minuto hasta que salga, como la
   mirada a los cortes del antivirus (`guardiana_panel::comprueba_la_vpn`); y si falta `wireguard.dll`, la VPN no puede
   volver: no se pone otra vez el bloqueo (el que Windows ya tenga sigue, y «Desconectar» lo quita), el estado lo dice
-  (`"fase": "error"` con el motivo) y se vuelve a mirar cada minuto. Si Windows no acepta los filtros de arranque, el
-  bloqueo vale desde que arranca su servicio de filtrado: se anota y `GET /api/vpn` lo dice (`"aviso_arranque"`).
+  (`"fase": "error"` con el motivo) y se vuelve a mirar cada minuto. Si en ese momento lo guardado no se puede leer
+  (otro programa tiene el archivo), no se toma por la VPN apagada: ni se quita ni se pone nada y se vuelve a mirar cada
+  minuto (segunda revisión, con «N2»: hasta entonces se leía como apagada y se quitaba un bloqueo que la persona quería;
+  un archivo que se lee pero no se entiende sigue contando como la VPN apagada). Si Windows no acepta los filtros de
+  arranque, el bloqueo vale desde que arranca su servicio de filtrado: se anota y `GET /api/vpn` lo dice
+  (`"aviso_arranque"`).
 - **Sin vuelta a la conexión normal.** Si el servidor no contesta al primer saludo (los 8 s de siempre), el túnel se
   cierra, el bloqueo sigue y se vuelve a intentar (alta nueva, túnel nuevo; entre un intento fallido y el siguiente, 5 s,
   luego 15 s dos veces y después 30 s cada vez: `estricto::espera_tras`, contando el fallo antes de esperar); si deja de
@@ -273,7 +277,18 @@ VPN debe estar encendida, nada sale del equipo fuera del túnel, también cuando
   Cambiar de servidor (`POST /api/vpn/conecta` con otro) mantiene el bloqueo todo el rato; con el túnel caído ningún
   nombre resuelve, así que va a la dirección que ya se sabe de esa salida (lo guardado o lo medido con la VPN apagada) y,
   si no se sabe ninguna, la respuesta lo dice (`{"ok": false, "motivo": …}`) y nada cambia. Hasta la revisión de la
-  1.0.56 contestaba que sí y seguía en silencio con el servidor de antes, aunque estuviera caído.
+  1.0.56 contestaba que sí y seguía en silencio con el servidor de antes, aunque estuviera caído. Si el cambio ya empezado
+  no puede seguir con el túnel caído (no hay dirección, o no se puede guardar), la VPN sigue reconectando con la salida
+  de antes, la que dice lo guardado, con el bloqueo puesto como estaba; si en ese momento lo guardado no se puede leer,
+  el bloqueo sigue y lo hace la mirada de cada minuto, en cuanto se pueda leer (segunda revisión, «N2»: hasta entonces el
+  bloqueo se quedaba sin nadie que reconectara).
+- **Cambiar de salida sin el modo estricto** (segunda revisión de la 1.0.56): la conexión de antes se cierra, y su corte
+  con ella, y después se hace la nueva entera: el nombre de la salida resuelto, el alta por HTTPS, el túnel nuevo con su
+  corte y la espera del primer saludo (hasta 8 s). Durante esos segundos no hay túnel ni corte: lo que sale de los
+  programas sale por la conexión normal, y la página dice «Conectando». No hay un arreglo sencillo y seguro: abrir el
+  túnel nuevo antes de cerrar el viejo no sirve, porque el corte del viejo no deja salir los paquetes encriptados hacia
+  el servidor nuevo, y sostener un bloqueo durante el cambio es justo lo que hace el modo estricto (encendido salvo que
+  la persona lo apague), con el que no sale nada de los programas fuera del túnel mientras cambia de salida.
 - **El DNS y el IPv6**, como siempre: cada salida con su resolutor (Unbound en `10.66.0.1`, por el túnel), ningún DNS
   fuera del túnel, nada de IPv6 fuera de él salvo lo del enlace.
 - **La licencia**: conectar sigue siendo de Plus; la VPN que el servicio levanta al arrancar es la que la persona ya tenía
@@ -291,20 +306,30 @@ Las salidas, siempre (tan importantes como el bloqueo):
    Windows o de un cierre a mitad de la primera conexión, y en esos casos dejarla apagada sería que los programas
    salieran fuera del túnel sin que la persona lo pidiera; así que la vuelve a levantar con su bloqueo, y es al apagar
    donde se hace todo para que quede escrito. Solo si ni se escribe ni se quita el archivo y el servicio se reinicia antes
-   de conseguirlo, la VPN vuelve con su bloqueo, y «Desconectar» ya lo había dicho. Lo mismo al apagar el modo estricto.
+   de conseguirlo, la VPN vuelve con su bloqueo, y «Desconectar» ya lo había dicho. El archivo solo se quita cuando sin él
+   queda justo lo que se quería guardar (sin archivo, la VPN está apagada y el modo estricto encendido; segunda revisión,
+   «N3»).
 2. **`guardiana vpn apaga`**, también con el servicio parado: le pide al servicio que desconecte (con la llave del panel) y,
    siempre, lo quita directamente por sus claves fijas y deja la VPN apagada en lo guardado. La llave solo va al servicio
-   de GUARDIANA: antes de mandarla se pregunta al gestor de servicios de Windows si el servicio «guardiana» está en marcha,
-   y si no, se va directamente por el otro camino (revisión de la 1.0.56: con el servicio parado, cualquier programa de
-   cualquier cuenta podría escuchar en 127.0.0.1:7443 y llevarse la llave que manda un administrador). Necesita
-   administrador; **la entrada «Apagar la VPN de GUARDIANA» del menú Inicio** lo ejecuta y, sin permisos, se los pide a
-   Windows ella misma. `guardiana vpn estado [--json]` dice lo guardado y lo que Windows tiene.
+   de GUARDIANA: antes de mandarla se pregunta al gestor de servicios de Windows si el servicio «guardiana» está en marcha
+   y en qué proceso (`QueryServiceStatusEx`), y a Windows qué proceso escucha en 127.0.0.1:7443 (`GetExtendedTcpTable`,
+   la tabla de los que escuchan; tiene que ser el único en ese puerto, ahí o en todas las direcciones); si no son el
+   mismo, o no se puede saber, se va directamente por el otro camino (revisión de la 1.0.56 y su segunda revisión: con
+   el servicio parado, o si otro programa tomó el puerto antes de que el servicio arrancara, cualquier programa de
+   cualquier cuenta podría escuchar ahí y llevarse la llave que manda un administrador). Necesita administrador; **la
+   entrada «Apagar la VPN de GUARDIANA» del menú Inicio** lo ejecuta y, sin permisos, se los pide a Windows ella misma.
+   `guardiana vpn estado [--json]` dice lo guardado y lo que Windows tiene (con `--json`, también
+   `"panel_del_servicio"`: si quien escucha en el puerto del panel es el servicio).
 3. **El arranque del servicio**, cuando el modo estricto ya no se quiere (lo apagaron, o la VPN quedó apagada): quita lo
    que quedó.
 4. **El interruptor**: apagar el modo estricto con el servidor sin contestar es volver a la conexión normal, como haría la
    VPN sin él; con el túnel abierto, el cambio no deja ni un momento sin corte (primero el corte nuevo, luego se va el
    viejo). Si en ese momento Windows no deja quitar el bloqueo, el estado lo dice (sin decir que la conexión del equipo
-   sigue como estaba) y `"desconectar": true` deja a la página enseñar «Desconectar», que lo vuelve a intentar.
+   sigue como estaba) y `"desconectar": true` deja a la página enseñar «Desconectar», que lo vuelve a intentar. Al
+   apagarlo, lo guardado va primero: si no se puede escribir, nada cambia (ni el túnel ni el bloqueo) y la respuesta lo
+   dice (segunda revisión, «N3»: hasta entonces se cambiaba y luego, sin poder escribir, se quitaba el archivo, que deja
+   el modo estricto encendido en lo guardado; con el túnel ya en el modo normal, `GET /api/vpn` decía `"estricto": true`
+   sin serlo).
 5. **La desinstalación**: el instalador ejecuta `guardiana vpn apaga --desinstalando` después de parar el servicio (no al
    actualizar ni al reparar), y `guardiana service uninstall` lo hace también. Si algo fallara, el proveedor nombra el
    servicio: sin él, Windows no carga los filtros persistentes en el siguiente arranque.

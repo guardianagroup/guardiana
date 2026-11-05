@@ -510,6 +510,50 @@ pub fn pid_de_tabla(tabla: &[u32], ip: [u8; 4], puerto: u16) -> Option<u32> {
     None
 }
 
+/// El proceso que escucha en `ip:puerto`, en la tabla de Windows de los que escuchan (`MIB_TCPTABLE_OWNER_PID`, leída como
+/// en [`pid_de_tabla`]), solo si no hay duda de que es él quien contesta ahí: una escucha justo en `ip:puerto`, y ninguna
+/// de otro proceso en ese puerto, ni en `ip` (Windows deja a dos a la vez con `SO_REUSEADDR`) ni en todas las
+/// direcciones (`0.0.0.0`). Las de otras direcciones del equipo no cuentan.
+#[must_use]
+pub fn pid_que_escucha(tabla: &[u32], ip: [u8; 4], puerto: u16) -> Option<u32> {
+    let n = usize::try_from(*tabla.first()?).ok()?;
+    let mut quien = None;
+    let mut en_ip = false;
+    for i in 0..n.min(200_000) {
+        let inicio = 1 + i * 6;
+        let fila = tabla.get(inicio..inicio + 6)?;
+        if let [_, local, puerto_local, _, _, pid] = *fila {
+            let p = puerto_local.to_ne_bytes();
+            let local = local.to_ne_bytes();
+            if u16::from_be_bytes([p[0], p[1]]) != puerto || (local != ip && local != [0; 4]) {
+                continue;
+            }
+            if quien.is_some_and(|q| q != pid) {
+                return None;
+            }
+            quien = Some(pid);
+            en_ip |= local == ip;
+        }
+    }
+    quien.filter(|_| en_ip)
+}
+
+/// El proceso que escucha conexiones TCP en `ip:puerto`, sin duda de que es el único ahí ([`pid_que_escucha`];
+/// revisión de la VPN de la 1.0.56): `guardiana vpn apaga` solo le manda la llave del panel a 127.0.0.1 si es el
+/// proceso del servicio de GUARDIANA. Solo Windows lo dice; en los demás sistemas, `None`.
+#[must_use]
+pub fn escucha_en(ip: std::net::Ipv4Addr, puerto: u16) -> Option<u32> {
+    #[cfg(windows)]
+    {
+        win::escucha(ip.octets(), puerto)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (ip, puerto);
+        None
+    }
+}
+
 /// El navegador que abrió la conexión de `cliente` (la otra punta de una petición que llegó al
 /// panel). Solo Windows lo dice; en los demás sistemas, `None`.
 #[must_use]
@@ -1554,6 +1598,59 @@ mod tests {
         // Una tabla que dice tener más filas de las que trae no se lee fuera de sí.
         assert_eq!(pid_de_tabla(&[9, 1, 2], [127, 0, 0, 1], 1), None);
         assert_eq!(pid_de_tabla(&[], [127, 0, 0, 1], 1), None);
+    }
+
+    /// Revisión de la VPN de la 1.0.56: en la tabla de los que escuchan, quien escucha en 127.0.0.1:7443 solo si es el
+    /// único en ese puerto (allí o en todas las direcciones); las escuchas en otras direcciones del equipo no cuentan.
+    #[test]
+    fn quien_escucha_solo_si_es_el_unico_en_el_puerto() {
+        // una escucha (estado 2, LISTEN) de `pid` en `a:p`, como la escribe Windows
+        fn fila(a: [u8; 4], p: u16, pid: u32) -> [u32; 6] {
+            let b = p.to_be_bytes();
+            [
+                2,
+                u32::from_ne_bytes(a),
+                u32::from_ne_bytes([b[0], b[1], 0, 0]),
+                0,
+                0,
+                pid,
+            ]
+        }
+        fn tabla(filas: &[[u32; 6]]) -> Vec<u32> {
+            let mut t = vec![u32::try_from(filas.len()).unwrap_or(u32::MAX)];
+            for f in filas {
+                t.extend_from_slice(f);
+            }
+            t
+        }
+        let local = [127, 0, 0, 1];
+        let lan = [192, 168, 1, 20];
+        // el servicio, en 127.0.0.1:7443 y en la red de casa; otro programa en otro puerto
+        let t = tabla(&[
+            fila(local, 7443, 1234),
+            fila(lan, 7443, 1234),
+            fila([0; 4], 445, 4),
+        ]);
+        assert_eq!(pid_que_escucha(&t, local, 7443), Some(1234));
+        assert_eq!(pid_que_escucha(&t, local, 7444), None);
+        // otro programa en otra dirección del equipo, en el mismo puerto: no contesta en 127.0.0.1
+        let t = tabla(&[fila(lan, 7443, 666), fila(local, 7443, 1234)]);
+        assert_eq!(pid_que_escucha(&t, local, 7443), Some(1234));
+        // otro programa en todas las direcciones, o en 127.0.0.1 a la vez: no se sabe quién contesta
+        let t = tabla(&[fila([0; 4], 7443, 666), fila(local, 7443, 1234)]);
+        assert_eq!(pid_que_escucha(&t, local, 7443), None);
+        let t = tabla(&[fila(local, 7443, 1234), fila(local, 7443, 666)]);
+        assert_eq!(pid_que_escucha(&t, local, 7443), None);
+        // solo en todas las direcciones: tampoco
+        let t = tabla(&[fila([0; 4], 7443, 1234)]);
+        assert_eq!(pid_que_escucha(&t, local, 7443), None);
+        // una tabla cortada, o vacía
+        let t = tabla(&[fila(local, 7443, 1234)]);
+        assert_eq!(pid_que_escucha(&t[..4], local, 7443), None);
+        assert_eq!(pid_que_escucha(&[], local, 7443), None);
+        // fuera de Windows no se sabe
+        #[cfg(not(windows))]
+        assert_eq!(escucha_en(std::net::Ipv4Addr::LOCALHOST, 7443), None);
     }
 
     #[test]
