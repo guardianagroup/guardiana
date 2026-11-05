@@ -6,4 +6,12 @@
   <String Id="AccesoDescripcion" Value="The browser that shows you what it protects you from" />
   <String Id="VersionMasNueva" Value="A newer version of GUARDIANA ZERO is already installed." />
   <String Id="ArchivoLeeme" Value="README.txt" />
+  <String Id="WelcomeEulaDlgLicenseAcceptedCheckBox" Value="I have read what the installation will do and I accept the Terms of use" />
+  <String Id="PasoPreparar" Value="Preparing the changes…" />
+  <String Id="PasoWindows" Value="Recording the changes in Windows…" />
+  <String Id="PasoQuitaArchivos" Value="Removing GUARDIANA ZERO’s files…" />
+  <String Id="PasoCopiaArchivos" Value="Copying GUARDIANA ZERO’s files…" />
+  <String Id="PasoAccesos" Value="Creating GUARDIANA ZERO’s shortcuts…" />
+  <String Id="PasoTerminar" Value="Finishing…" />
+  <String Id="PasoDeshacer" Value="Undoing the changes…" />
 </WixLocalization>

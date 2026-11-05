@@ -216,6 +216,7 @@ $limite = $inicio.AddSeconds($Segundos)
 $cerrado = $null   # cuándo terminó solo el proceso del instalador
 $abierto = $null   # la ventana de GUARDIANA que se abrió (de un proceso nuevo)
 $ultima = $null    # el botón de una última pantalla, si el instalador se quedó en una
+$aviso = $null     # el título de un aviso inesperado del instalador (no la pregunta por programas abiertos)
 $hechos = @{}
 while ((Get-Date) -lt $limite -and -not ($cerrado -and $abierto)) {
     $ws = MiraVentanas
@@ -277,7 +278,18 @@ while ((Get-Date) -lt $limite -and -not ($cerrado -and $abierto)) {
                     continue
                 }
             }
-            $cual = $sigue | Where-Object { $porNombre.ContainsKey($_) -and -not $hechos.ContainsKey("$($porNombre[$_].Current.NativeWindowHandle)|$_") } | Select-Object -First 1
+            # 5 nov 2026 (revisión): «Aceptar»/«OK» solo en la pregunta de Windows por programas abiertos (la que trae opciones).
+            # En cualquier otro aviso del instalador es un fallo que se apunta, no algo que se acepta sin mirar.
+            $sigueAqui = $sigue
+            if ($radios.Count -eq 0) {
+                $sigueAqui = @($sigue | Where-Object { $_ -notin @("Aceptar", "OK") })
+                if (($porNombre.ContainsKey("Aceptar") -or $porNombre.ContainsKey("OK")) -and -not $hechos.ContainsKey("aviso|$titulo")) {
+                    $hechos["aviso|$titulo"] = $true
+                    $aviso = $titulo
+                    Evento "FALLO: el instalador enseñó un aviso inesperado («$titulo»)"
+                }
+            }
+            $cual = $sigueAqui | Where-Object { $porNombre.ContainsKey($_) -and -not $hechos.ContainsKey("$($porNombre[$_].Current.NativeWindowHandle)|$_") } | Select-Object -First 1
             if ($cual) {
                 Start-Sleep -Seconds 2
                 if (Pulsa $porNombre[$cual] $cual) { $hechos["$($porNombre[$cual].Current.NativeWindowHandle)|$cual"] = $true }
@@ -291,13 +303,17 @@ while ((Get-Date) -lt $limite -and -not ($cerrado -and $abierto)) {
     Start-Sleep -Milliseconds 150
 }
 if (-not $cerrado -and $proceso -and $proceso.HasExited) { $cerrado = Get-Date; Evento "el instalador se cerró solo (código $($proceso.ExitCode))" }
-$bien = $cerrado -and $abierto -and -not $ultima
+# 5 nov 2026 (revisión): el instalador tiene que terminar con el código 0, no solo cerrarse.
+$codigo = if ($proceso -and $proceso.HasExited) { $proceso.ExitCode } else { $null }
+$bien = $cerrado -and $abierto -and -not $ultima -and -not $aviso -and ($codigo -eq 0)
 if ($bien) {
     $resultado = "bien: el instalador se cerró solo a los $([int]($cerrado - $inicio).TotalSeconds) s y se abrió GUARDIANA («$($abierto.nombre)») a los $([int]($abierto.t - $inicio).TotalSeconds) s, sin pulsar nada al final"
 } else {
     $que = @()
     if (-not $cerrado) { $que += "el instalador no se cerró solo en $Segundos s" }
     if ($ultima) { $que += "se quedó en una última pantalla con «$ultima»" }
+    if ($aviso) { $que += "enseñó un aviso inesperado («$aviso»)" }
+    if ($cerrado -and $codigo -ne 0) { $que += "terminó con el código $codigo" }
     if (-not $abierto) { $que += "no se abrió ninguna ventana de GUARDIANA" }
     $resultado = "FALLO: $($que -join '; ')"
 }

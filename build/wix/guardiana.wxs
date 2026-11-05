@@ -79,26 +79,31 @@
          que… se instale automáticamente todo»): hasta 1.0.56 el panel se abría solo al pulsar «Finalizar» en la última
          pantalla, y quien la cerraba o no la veía se quedaba sin nada abierto. Ahora GUARDIANA se abre sola al terminar de
          instalar y la ventana del instalador se cierra sola: ya no hay última pantalla.
-         LaunchPanel corre en la secuencia de la interfaz, justo después de ExecuteAction: en el proceso del instalador que
-         abrió la persona, con su usuario y sin elevar (el UAC eleva solo la parte que instala), y solo si la instalación salió
-         bien (si ExecuteAction falla o se cancela, la secuencia termina ahí, en FatalError o UserExit, como siempre).
+         LaunchPanel corre en la secuencia de la interfaz, justo después de ExecuteAction, y solo si la instalación salió bien
+         (si ExecuteAction falla o se cancela, la secuencia termina ahí, en FatalError o UserExit, como siempre).
+         5 nov 2026 (revisión independiente de la 1.0.56): con WixUnelevatedShellExec, que lo abre a través del Explorador de la
+         sesión: como la persona y sin elevar, aunque el instalador se haya lanzado desde una consola de administrador o desde
+         una herramienta que lo corre como SYSTEM (WixShellExec lo abría con los permisos del instalador). Si no hay Explorador,
+         no se abre nada y la instalación sigue siendo buena.
          «NOT Installed AND NOT REMOVE»: al instalar por primera vez y al actualizar (una versión nueva es otro producto, así que
          Installed está vacío; WIX_UPGRADE_DETECTED tiene el producto anterior, y REMOVE=ALL es de la sesión que quita ese
          anterior, no de esta), nunca al reparar ni al quitar (Installed). Con /qn, /qb o /passive Windows no corre la
-         secuencia de la interfaz: una instalación en silencio no abre nada. Return="ignore": si abrirlo fallara, la
-         instalación, que ya terminó bien, no se da por fallida. WixShellExecTarget se pone tras CostFinalize, mucho antes. -->
-    <SetProperty Id="WixShellExecTarget" Value="[MenuDir]Guardiana.lnk" After="CostFinalize" Sequence="ui" />
-    <CustomAction Id="LaunchPanel" DllEntry="WixShellExec" Impersonate="yes" Return="ignore" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
-    <!-- La pantalla final de WixUI (ExitDialog) ya no sale al terminar bien. Quitar su fila (Suppress) no vale: Windows
-         Installer exige un diálogo o una acción en el puesto -1 de InstallUISequence (ICE20) y la compilación fallaría; la
-         fila se queda con una condición que nunca se cumple. Las de error (FatalError, -3) y cancelar (UserExit, -2) siguen
+         secuencia de la interfaz: una instalación en silencio no abre nada; y «UILevel = 5» deja fuera también la interfaz
+         reducida (/qr) de algunos despliegues de empresa. Return="ignore": si abrirlo fallara, la instalación, que ya terminó
+         bien, no se da por fallida. WixUnelevatedShellExecTarget se pone tras CostFinalize, mucho antes. -->
+    <SetProperty Id="WixUnelevatedShellExecTarget" Value="[MenuDir]Guardiana.lnk" After="CostFinalize" Sequence="ui" />
+    <CustomAction Id="LaunchPanel" DllEntry="WixUnelevatedShellExec" Impersonate="yes" Return="ignore" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
+    <!-- La pantalla final de WixUI (ExitDialog) ya no sale al instalar ni al actualizar. Quitar su fila (Suppress) no vale:
+         Windows Installer exige un diálogo o una acción en el puesto -1 de InstallUISequence (ICE20) y la compilación
+         fallaría. 5 nov 2026 (revisión): sale solo al reparar o quitar con la ventana (Installed), para que la persona vea que
+         terminó; antes la ventana se cerraba sin decir nada. Las de error (FatalError, -3) y cancelar (UserExit, -2) siguen
          como estaban. ProgressDlg, la ventana blanca de WixUI, sale solo al reparar o quitar (Installed); al instalar y al
          actualizar sale la página de GUARDIANA, InstalandoDlg. -->
     <InstallUISequence>
       <Show Dialog="override ProgressDlg" Before="ExecuteAction" Condition="Installed" />
       <Show Dialog="InstalandoDlg" After="ProgressDlg" Condition="NOT Installed" />
-      <Custom Action="LaunchPanel" After="ExecuteAction" Condition="NOT Installed AND NOT REMOVE" />
-      <Show Dialog="override ExitDialog" OnExit="success" Condition="0" />
+      <Custom Action="LaunchPanel" After="ExecuteAction" Condition="NOT Installed AND NOT REMOVE AND UILevel = 5" />
+      <Show Dialog="override ExitDialog" OnExit="success" Condition="Installed" />
     </InstallUISequence>
     <!-- 3 nov 2026 (el dueño, 09:23: «mientras se instala y tarda un poquito, que salga la pantalla de un instalador bien
          bonita… o una página entera de Guardiana se está instalando en tu programa. Algo muy profesional»): la pantalla
@@ -328,7 +333,7 @@
          de la comprobación de Windows que saca esos avisos (InstallValidate), y los avisos de ZERO corren sin ventana a la que
          pedirle que se cierre. Ahora, al pulsar «Instalar» y antes de esa comprobación, se le pide a ZERO que se cierre como con su
          X (guarda lo suyo) y, a los 3 s, lo que quede se termina. Solo al actualizar, reparar o desinstalar; sin ventana de consola
-         (WixQuietExec, que en una acción inmediata lee la línea de WixQuietExecCmdLine). Al terminar, LaunchPanel lo vuelve a abrir. -->
+         (WixQuietExec, que en una acción inmediata lee la línea de WixQuietExecCmdLine). Al terminar de instalar o actualizar, LaunchPanel lo vuelve a abrir; al reparar no se vuelve a abrir solo. -->
     <!-- (segunda revisión, 2 Nov 2026) solo los ZERO de quien instala (/FI USERNAME: ni los de otras cuentas ni, con ZERO=0, uno
          instalado aparte), con las rutas enteras, y sin dar un error en el registro cuando ZERO no estaba abierto (exit /b 0). -->
     <SetProperty Id="WixQuietExecCmdLine" Value="&quot;[System64Folder]cmd.exe&quot; /d /c &quot;&quot;%SystemRoot%\System32\taskkill.exe&quot; /FI &quot;USERNAME eq %USERDOMAIN%\%USERNAME%&quot; /IM &quot;GUARDIANA ZERO.exe&quot; &amp; &quot;%SystemRoot%\System32\PING.EXE&quot; -n 4 127.0.0.1 &gt;nul &amp; &quot;%SystemRoot%\System32\taskkill.exe&quot; /F /FI &quot;USERNAME eq %USERDOMAIN%\%USERNAME%&quot; /IM &quot;GUARDIANA ZERO.exe&quot; &amp; exit /b 0&quot;" Before="CierraZeroAntes" Sequence="execute" Condition="(Installed OR WIX_UPGRADE_DETECTED) AND NOT (ZERO=&quot;0&quot;)" />

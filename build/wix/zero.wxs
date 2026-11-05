@@ -56,16 +56,48 @@
          después de ExecuteAction, en el proceso del instalador que abrió la persona y con su usuario, solo si instalar salió
          bien; «NOT Installed AND NOT REMOVE»: la primera vez y al actualizar (el anterior se cerró para dejar sitio, y dejar a
          la persona sin nada abierto sería el «no se abre» del 10 oct 2026), nunca al reparar ni al quitar. Con /qn o /passive
-         no corre (Windows no pasa por la secuencia de la interfaz). Return="ignore": si abrirlo fallara, la instalación sigue
-         siendo buena. La fila de ExitDialog se queda con una condición que nunca se cumple (ICE20 pide algo en el -1). -->
-    <SetProperty Id="WixShellExecTarget" Value="[INSTALLFOLDER]GUARDIANA ZERO.exe" After="CostFinalize" Sequence="ui" />
-    <CustomAction Id="AbrirZero" DllEntry="WixShellExec" Impersonate="yes" Return="ignore" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
+         no corre (Windows no pasa por la secuencia de la interfaz), y «UILevel = 5» deja fuera también la interfaz reducida
+         (/qr). Return="ignore": si abrirlo fallara, la instalación sigue siendo buena.
+         5 nov 2026 (revisión independiente de la 1.0.56): WixUnelevatedShellExec lo abre a través del Explorador de la sesión,
+         como la persona y sin elevar, aunque el instalador se haya lanzado elevado o como SYSTEM. La fila de ExitDialog sale
+         solo al reparar o quitar con la ventana (Installed), para que se vea que terminó; ICE20 pide algo en el -1. -->
+    <SetProperty Id="WixUnelevatedShellExecTarget" Value="[INSTALLFOLDER]GUARDIANA ZERO.exe" After="CostFinalize" Sequence="ui" />
+    <CustomAction Id="AbrirZero" DllEntry="WixUnelevatedShellExec" Impersonate="yes" Return="ignore" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" />
     <InstallUISequence>
-      <Custom Action="AbrirZero" After="ExecuteAction" Condition="NOT Installed AND NOT REMOVE" />
-      <Show Dialog="override ExitDialog" OnExit="success" Condition="0" />
+      <Custom Action="AbrirZero" After="ExecuteAction" Condition="NOT Installed AND NOT REMOVE AND UILevel = 5" />
+      <Show Dialog="override ExitDialog" OnExit="success" Condition="Installed" />
     </InstallUISequence>
+    <!-- 5 nov 2026 (revisión): los pasos de Windows, en el idioma del instalador y sin plantillas a medio rellenar («Creating
+         shortcuts Shortcut: [1]» en el de español), como en guardiana.wxs. -->
     <UI>
       <ProgressText Action="AbrirZero" Message="!(loc.ProgresoAbrir)" />
+      <ProgressText Action="FindRelatedProducts" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="AppSearch" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="LaunchConditions" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="CostInitialize" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="FileCost" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="CostFinalize" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="MigrateFeatureStates" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="InstallValidate" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="RemoveExistingProducts" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="GenerateScript" Message="!(loc.PasoPreparar)" />
+      <ProgressText Action="ProcessComponents" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="UnpublishFeatures" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="RemoveRegistryValues" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="WriteRegistryValues" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="RegisterUser" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="RegisterProduct" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="PublishFeatures" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="PublishProduct" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="UnpublishProduct" Message="!(loc.PasoWindows)" />
+      <ProgressText Action="RemoveShortcuts" Message="!(loc.PasoQuitaArchivos)" />
+      <ProgressText Action="RemoveFiles" Message="!(loc.PasoQuitaArchivos)" />
+      <ProgressText Action="RemoveFolders" Message="!(loc.PasoQuitaArchivos)" />
+      <ProgressText Action="CreateFolders" Message="!(loc.PasoCopiaArchivos)" />
+      <ProgressText Action="InstallFiles" Message="!(loc.PasoCopiaArchivos)" />
+      <ProgressText Action="CreateShortcuts" Message="!(loc.PasoAccesos)" />
+      <ProgressText Action="RollbackCleanup" Message="!(loc.PasoTerminar)" />
+      <ProgressText Action="Rollback" Message="!(loc.PasoDeshacer)" />
     </UI>
     <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="!(loc.VersionMasNueva)" />
     <MediaTemplate EmbedCab="yes" />

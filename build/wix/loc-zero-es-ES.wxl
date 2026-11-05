@@ -6,4 +6,12 @@
   <String Id="AccesoDescripcion" Value="El navegador que te muestra de qué te protege" />
   <String Id="VersionMasNueva" Value="Ya hay una versión más nueva de GUARDIANA ZERO instalada." />
   <String Id="ArchivoLeeme" Value="LEEME.txt" />
+  <String Id="WelcomeEulaDlgLicenseAcceptedCheckBox" Value="He leído qué hará la instalación y acepto los Términos de uso" />
+  <String Id="PasoPreparar" Value="Preparando los cambios…" />
+  <String Id="PasoWindows" Value="Anotando los cambios en Windows…" />
+  <String Id="PasoQuitaArchivos" Value="Quitando los archivos de GUARDIANA ZERO…" />
+  <String Id="PasoCopiaArchivos" Value="Copiando los archivos de GUARDIANA ZERO…" />
+  <String Id="PasoAccesos" Value="Creando los accesos de GUARDIANA ZERO…" />
+  <String Id="PasoTerminar" Value="Terminando…" />
+  <String Id="PasoDeshacer" Value="Deshaciendo los cambios…" />
 </WixLocalization>
