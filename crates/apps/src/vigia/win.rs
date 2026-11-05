@@ -16,7 +16,7 @@ use windows_sys::Win32::Foundation::{
     CloseHandle, ERROR_INSUFFICIENT_BUFFER, INVALID_HANDLE_VALUE,
 };
 use windows_sys::Win32::NetworkManagement::IpHelper::{
-    GetExtendedTcpTable, TCP_TABLE_OWNER_PID_CONNECTIONS,
+    GetExtendedTcpTable, TCP_TABLE_OWNER_PID_CONNECTIONS, TCP_TABLE_OWNER_PID_LISTENER,
 };
 use windows_sys::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
@@ -262,6 +262,49 @@ pub(super) fn duenno(ip: [u8; 4], puerto: u16) -> Option<u32> {
         };
         if r == 0 {
             return super::pid_de_tabla(&buf, ip, puerto);
+        }
+        if r != ERROR_INSUFFICIENT_BUFFER {
+            return None;
+        }
+        tam = largo;
+    }
+    None
+}
+
+/// El proceso que escucha conexiones TCP en `ip:puerto`, si es el único ahí (revisión de la VPN de la 1.0.56): la tabla
+/// de Windows de los que escuchan, pedida como la de las conexiones en [`duenno`] (las filas son las mismas), y leída
+/// con [`super::pid_que_escucha`].
+pub(super) fn escucha(ip: [u8; 4], puerto: u16) -> Option<u32> {
+    let mut tam: u32 = 0;
+    // SAFETY: sin búfer, Windows solo dice en `tam` cuánto necesita.
+    unsafe {
+        GetExtendedTcpTable(
+            std::ptr::null_mut(),
+            &raw mut tam,
+            0,
+            AF_INET,
+            TCP_TABLE_OWNER_PID_LISTENER,
+            0,
+        )
+    };
+    // La tabla puede crecer entre una llamada y otra: tres intentos, con margen.
+    for _ in 0..3 {
+        let palabras = usize::try_from(tam).unwrap_or(0) / 4 + 1 + 6 * 64;
+        let mut buf = vec![0u32; palabras];
+        let mut largo = u32::try_from(palabras * 4).unwrap_or(u32::MAX);
+        // SAFETY: `buf` es nuestro, alineado a 4 bytes, y `largo` dice su tamaño en bytes.
+        let r = unsafe {
+            GetExtendedTcpTable(
+                buf.as_mut_ptr().cast(),
+                &raw mut largo,
+                0,
+                AF_INET,
+                TCP_TABLE_OWNER_PID_LISTENER,
+                0,
+            )
+        };
+        if r == 0 {
+            return super::pid_que_escucha(&buf, ip, puerto);
         }
         if r != ERROR_INSUFFICIENT_BUFFER {
             return None;

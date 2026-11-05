@@ -121,8 +121,9 @@ jobs:
   # stopped, removes it too. Review of the 1.0.56 VPN: the service starts after Windows' filtering service (BFE), also
   # one registered before without it; the panel says when «Desconectar» is needed and what of «what a website sees» was
   # really measured; and with wireguard.dll gone, the start does not put the block again, the panel says why, and
-  # «Desconectar» still takes away the block left. The runner's network is cut for those moments (its link with GitHub
-  # may pause), and whatever happens, the last step takes the block and the service away.
+  # «Desconectar» still takes away the block left. Second review: `guardiana vpn apaga` sends the panel's key only to the
+  # service's own process, not to another program that took the port. The runner's network is cut for those moments (its
+  # link with GitHub may pause), and whatever happens, the last step takes the block and the service away.
   estricto:
     name: el modo estricto con el servicio de verdad y un servidor que no contesta
     runs-on: windows-latest
@@ -212,6 +213,7 @@ jobs:
             Linea "GET /api/vpn: $($v | ConvertTo-Json -Compress)"
             Bien ($v.estricto -eq $true -and $v.bloqueado -eq $true -and "$($v.aviso)".StartsWith('La VPN no conecta')) 'con el modo estricto, el bloqueo y el aviso'
             Bien ($v.desconectar -eq $true) 'y «Desconectar» a la vista'
+            Bien ((Estado).panel_del_servicio -eq $true) 'quien escucha en 127.0.0.1:7443 es el proceso del servicio'
             $c = Panel 'GET' '/api/vpn/comprueba'
             Linea "GET /api/vpn/comprueba: $($c | ConvertTo-Json -Compress)"
             Bien ($null -ne $c.comprobado -and $c.comprobado.ip -eq $false -and $c.comprobado.dns -eq $false -and $c.comprobado.ipv6 -eq $false) 'lo que una web verá: nada dado por medido con el bloqueo puesto'
@@ -275,6 +277,21 @@ jobs:
               Bien (Espera 30 { (Fuera) -eq 'conecta' }) 'y la red sale'
             } finally {
               Move-Item "$dll.aparte" $dll -Force
+            }
+            # 8. another program took the panel's port before the service started (the service then runs without its
+            # panel): `guardiana vpn apaga` sends it nothing, not even a connection, and goes the way without the service
+            Bien (Para) 'parado'
+            $otro = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 7443)
+            $otro.Start()
+            try {
+              Bien (Arranca) 'arrancado con el puerto del panel tomado por otro programa'
+              Start-Sleep -Seconds 3
+              Bien (-not (Estado).panel_del_servicio) 'quien escucha en 127.0.0.1:7443 no es el servicio'
+              & $g vpn apaga | Out-Null
+              Bien ($LASTEXITCODE -eq 0) 'guardiana vpn apaga termina bien'
+              Bien (-not $otro.Pending()) 'y no le manda nada (ni la llave del panel) al otro programa'
+            } finally {
+              $otro.Stop()
             }
           } finally {
             & $g vpn apaga | Out-Null

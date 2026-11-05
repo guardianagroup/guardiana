@@ -172,6 +172,20 @@ mod imp {
             State::Stopped
         })
     }
+
+    pub(super) fn process_id() -> Option<u32> {
+        let manager = manager(ServiceManagerAccess::CONNECT).ok()?;
+        let service = manager
+            .open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS)
+            .ok()?;
+        // QueryServiceStatusEx: the process the service runs in, while it runs
+        let status = service.query_status().ok()?;
+        if status.current_state == ServiceState::Running {
+            status.process_id.filter(|pid| *pid != 0)
+        } else {
+            None
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -289,6 +303,10 @@ mod imp {
         } else {
             State::Stopped
         })
+    }
+
+    pub(super) fn process_id() -> Option<u32> {
+        None
     }
 }
 
@@ -416,6 +434,10 @@ mod imp {
             },
         )
     }
+
+    pub(super) fn process_id() -> Option<u32> {
+        None
+    }
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
@@ -438,6 +460,9 @@ mod imp {
     }
     pub(super) fn state() -> Result<State, Error> {
         Ok(State::NotInstalled)
+    }
+    pub(super) fn process_id() -> Option<u32> {
+        None
     }
 }
 
@@ -464,6 +489,15 @@ pub fn stop() -> Result<(), Error> {
 /// Current state.
 pub fn state() -> Result<State, Error> {
     imp::state()
+}
+
+/// The process GUARDIANA's service runs in, while it runs, as the system's service manager says (on Windows,
+/// `QueryServiceStatusEx`); `None` when it is not running, when that cannot be asked, and off Windows (review of the
+/// 1.0.56 VPN: `guardiana vpn apaga` sends the panel's key only when the one listening on 127.0.0.1:7443 is this
+/// process).
+#[must_use]
+pub fn process_id() -> Option<u32> {
+    imp::process_id()
 }
 
 #[cfg(test)]

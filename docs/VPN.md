@@ -277,11 +277,15 @@ Las salidas, siempre (tan importantes como el bloqueo):
    «N3»).
 2. **`guardiana vpn apaga`**, también con el servicio parado: le pide al servicio que desconecte (con la llave del panel) y,
    siempre, lo quita directamente por sus claves fijas y deja la VPN apagada en lo guardado. La llave solo va al servicio
-   de GUARDIANA: antes de mandarla se pregunta al gestor de servicios de Windows si el servicio «guardiana» está en marcha,
-   y si no, se va directamente por el otro camino (revisión de la 1.0.56: con el servicio parado, cualquier programa de
-   cualquier cuenta podría escuchar en 127.0.0.1:7443 y llevarse la llave que manda un administrador). Necesita
-   administrador; **la entrada «Apagar la VPN de GUARDIANA» del menú Inicio** lo ejecuta y, sin permisos, se los pide a
-   Windows ella misma. `guardiana vpn estado [--json]` dice lo guardado y lo que Windows tiene.
+   de GUARDIANA: antes de mandarla se pregunta al gestor de servicios de Windows si el servicio «guardiana» está en marcha
+   y en qué proceso (`QueryServiceStatusEx`), y a Windows qué proceso escucha en 127.0.0.1:7443 (`GetExtendedTcpTable`,
+   la tabla de los que escuchan; tiene que ser el único en ese puerto, ahí o en todas las direcciones); si no son el
+   mismo, o no se puede saber, se va directamente por el otro camino
+   (revisión de la 1.0.56 y su segunda revisión: con el servicio parado, o si otro programa tomó el puerto antes de que el
+   servicio arrancara, cualquier programa de cualquier cuenta podría escuchar ahí y llevarse la llave que manda un
+   administrador). Necesita administrador; **la entrada «Apagar la VPN de GUARDIANA» del menú Inicio** lo ejecuta y, sin
+   permisos, se los pide a Windows ella misma. `guardiana vpn estado [--json]` dice lo guardado y lo que Windows tiene
+   (con `--json`, también `"panel_del_servicio"`: si quien escucha en el puerto del panel es el servicio).
 3. **El arranque del servicio**, cuando el modo estricto ya no se quiere (lo apagaron, o la VPN quedó apagada): quita lo
    que quedó.
 4. **El interruptor**: apagar el modo estricto con el servidor sin contestar es volver a la conexión normal, como haría la

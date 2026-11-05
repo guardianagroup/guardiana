@@ -4,14 +4,17 @@
 //!
 //! 1. when the service answers on this computer, it is asked to switch the VPN off (`POST /api/vpn/desconecta`, with the
 //!    panel's key, as «Desconectar» does): it closes the tunnel and removes the block itself. The key goes only when the
-//!    system's service manager says GUARDIANA's service is running (review of the 1.0.56 VPN): with it stopped, any
-//!    program of any account could be listening on 127.0.0.1:7443 and take the key an administrator sends;
+//!    system's service manager says GUARDIANA's service is running and the one listening on 127.0.0.1:7443 is the
+//!    service's own process (review of the 1.0.56 VPN): otherwise any program of any account could be listening there
+//!    (with the service stopped, or having taken the port before the service started) and take the key an
+//!    administrator sends;
 //! 2. always, and directly: the VPN off in what is kept (`sistema/vpn.json`; `--desinstalando` removes the file) and every
 //!    filter, the sublayer and the provider of strict mode out of Windows, by their fixed keys
 //!    (`guardiana_panel::quita_el_bloqueo`). That needs an administrator: from the Start menu's entry (`--menu`) the
 //!    command asks Windows for the rights itself, and waits for Enter before its window closes.
 //!
-//! `estado` says what is kept and what Windows has (`--json` for the tests).
+//! `estado` says what is kept and what Windows has (`--json` for the tests, with whether the panel's port is the
+//! service's).
 //!
 //! Every sentence printed comes from `crates/panel/i18n/es.json` (`cli.vpn.*`).
 
@@ -96,7 +99,16 @@ fn apaga(t: &Texts, opts: &Opts) -> Result<(), Box<dyn Error>> {
 fn estado(t: &Texts, json: bool) {
     let e = guardiana_panel::estado_del_modo_estricto();
     if json {
-        println!("{}", serde_json::to_string(&e).unwrap_or_default());
+        // and whether the one listening on the panel's port is the service (what `apaga` looks at before sending it the
+        // panel's key)
+        let mut v = serde_json::to_value(&e).unwrap_or_default();
+        if let Some(o) = v.as_object_mut() {
+            o.insert(
+                "panel_del_servicio".to_owned(),
+                serde_json::Value::Bool(panel_del_servicio(guardiana_panel::DEFAULT_PORT)),
+            );
+        }
+        println!("{v}");
         return;
     }
     println!(
@@ -131,11 +143,14 @@ fn estado(t: &Texts, json: bool) {
 /// be read.
 ///
 /// Only to the service (review of the 1.0.56 VPN): before the key is even read, the system's service manager must say
-/// that GUARDIANA's service is running. With it stopped, whoever listens on 127.0.0.1:7443 could be any program of any
-/// account of this computer, and the key an administrator's `vpn apaga` sends would be theirs; then the way without the
-/// service, which needs no key, is taken alone.
+/// that GUARDIANA's service is running, and the one listening on 127.0.0.1:7443 must be that service's process (second
+/// review: a program can take the port while the service is stopped, and the service then runs without its panel).
+/// Otherwise whoever listens there could be any program of any account of this computer, and the key an
+/// administrator's `vpn apaga` sends would be theirs; then the way without the service, which needs no key, is taken
+/// alone.
 fn pide_al_servicio() -> bool {
-    if !en_marcha(guardiana_service::daemon::state()) {
+    let puerto = guardiana_panel::DEFAULT_PORT;
+    if !en_marcha(guardiana_service::daemon::state()) || !panel_del_servicio(puerto) {
         return false;
     }
     let Ok(llave) = std::fs::read_to_string(paths::data_dir().join(guardiana_panel::TOKEN_FILE))
@@ -146,7 +161,6 @@ fn pide_al_servicio() -> bool {
     if llave.len() != 64 || !llave.bytes().all(|b| b.is_ascii_hexdigit()) {
         return false;
     }
-    let puerto = guardiana_panel::DEFAULT_PORT;
     let Ok(mut s) = TcpStream::connect_timeout(
         &SocketAddr::from(([127, 0, 0, 1], puerto)),
         Duration::from_secs(2),
@@ -178,6 +192,23 @@ fn en_marcha(
     estado: Result<guardiana_service::daemon::State, guardiana_service::daemon::Error>,
 ) -> bool {
     matches!(estado, Ok(guardiana_service::daemon::State::Running))
+}
+
+/// Whether the one listening on 127.0.0.1:`puerto` is GUARDIANA's service: the process the system's service manager says
+/// the service runs in (`QueryServiceStatusEx`) against the one Windows' table of listening sockets names
+/// (`GetExtendedTcpTable`), which must be the only one listening on that port there or on every address. Off Windows,
+/// never (there is no VPN to turn off there).
+fn panel_del_servicio(puerto: u16) -> bool {
+    es_el_servicio(
+        guardiana_service::daemon::process_id(),
+        guardiana_apps::vigia::escucha_en(std::net::Ipv4Addr::LOCALHOST, puerto),
+    )
+}
+
+/// The decision, pure: the service's process (`servicio`) and the one listening (`escucha`) must both be known and be
+/// the same. Not knowing either is not the service.
+fn es_el_servicio(servicio: Option<u32>, escucha: Option<u32>) -> bool {
+    matches!((servicio, escucha), (Some(s), Some(e)) if s == e && s != 0)
 }
 
 /// From the Start menu's entry, without an administrator's rights: the same command again, with Windows asked for them
@@ -235,6 +266,21 @@ mod tests {
         assert!(!en_marcha(Ok(State::NotInstalled)));
         assert!(!en_marcha(Err(Error::Privileges)));
         assert!(!en_marcha(Err(Error::Unsupported)));
+    }
+
+    /// Second review of the 1.0.56 VPN: the panel's key goes only when the one listening on 127.0.0.1:7443 is the
+    /// service's own process; another process, or not knowing either of them, never.
+    #[test]
+    fn la_llave_solo_va_al_proceso_del_servicio() {
+        assert!(es_el_servicio(Some(1234), Some(1234)));
+        assert!(!es_el_servicio(Some(1234), Some(666)));
+        assert!(!es_el_servicio(Some(1234), None));
+        assert!(!es_el_servicio(None, Some(1234)));
+        assert!(!es_el_servicio(None, None));
+        assert!(!es_el_servicio(Some(0), Some(0)));
+        // off Windows the service's process is never known: the way without the service, alone
+        #[cfg(not(windows))]
+        assert!(!panel_del_servicio(guardiana_panel::DEFAULT_PORT));
     }
 
     /// Off Windows there is no block: `apaga` says the VPN was already off, and `estado` reads what is kept.
