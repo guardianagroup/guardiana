@@ -494,6 +494,7 @@ impl Vpn {
         estricto::lee_de(&datos())
     }
 
+    #[cfg_attr(not(windows), allow(dead_code))]
     fn guarda_deseo(&self, d: &Deseo) -> Result<(), String> {
         estricto::guarda_en(&datos(), d).map_err(|e| e.to_string())
     }
