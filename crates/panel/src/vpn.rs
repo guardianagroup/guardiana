@@ -2242,7 +2242,7 @@ mod tests {
         assert_eq!(f["desconectar"], true);
         assert_eq!(
             f["aviso"],
-            "La VPN no conecta: no sale nada de tus programas fuera del túnel hasta que vuelva o la apagues tú"
+            "La VPN no conecta: no sale nada de tus programas de Windows fuera del túnel hasta que vuelva o la apagues tú"
         );
         // en inglés, el mismo aviso en su idioma
         let f = v.foto_con(guardiana_core::i18n::en(), &Deseo::default());
