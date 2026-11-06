@@ -118,6 +118,13 @@ fn escapa(s: &str) -> String {
 /// A click on the notice or on the button opens [`ENLACE`].
 #[must_use]
 pub fn xml(titulo: &str, programa: &str, texto: &str) -> String {
+    xml_con(ENLACE, "Ver en el Antivirus", titulo, programa, texto)
+}
+
+/// [`xml`] opening `enlace` (a `guardiana:` link) instead, with `boton` as its button's words (5 Nov 2026: the VPN's
+/// notices, `crate::bandeja`).
+#[must_use]
+pub fn xml_con(enlace: &str, boton: &str, titulo: &str, programa: &str, texto: &str) -> String {
     let texto: String = texto.chars().take(LARGO).collect();
     let programa: String = programa.chars().take(80).collect();
     let linea = if programa.is_empty() {
@@ -125,13 +132,15 @@ pub fn xml(titulo: &str, programa: &str, texto: &str) -> String {
     } else {
         format!("<text>{}</text>", escapa(&programa))
     };
+    let enlace = escapa(enlace);
     format!(
-        "<toast launch=\"{ENLACE}\" activationType=\"protocol\" duration=\"long\">\
+        "<toast launch=\"{enlace}\" activationType=\"protocol\" duration=\"long\">\
          <visual><binding template=\"ToastGeneric\"><text>{}</text>{linea}<text>{}</text></binding></visual>\
-         <actions><action content=\"Ver en el Antivirus\" activationType=\"protocol\" arguments=\"{ENLACE}\"/></actions>\
+         <actions><action content=\"{}\" activationType=\"protocol\" arguments=\"{enlace}\"/></actions>\
          </toast>",
         escapa(titulo),
-        escapa(&texto)
+        escapa(&texto),
+        escapa(boton)
     )
 }
 
