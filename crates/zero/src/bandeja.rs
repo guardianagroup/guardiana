@@ -1,29 +1,38 @@
 //! The VPN next to Windows' clock (5 Nov 2026; the owner, 3 Nov 2026, on the icon and the notices of the VPN: «Hazlo
-//! claro»): GUARDIANA's icon in the notification area with the VPN's colour, the line under the pointer, its menu, and
-//! Windows' notices when the VPN connects, stops answering, comes back or goes off.
+//! claro»): GUARDIANA's icon in the notification area with the VPN's colour, the lines under the pointer, its menu, and
+//! Windows' notices when the VPN connects, stops answering, comes back, stops or goes off.
 //!
-//! Decided here, and tested on every system; `GUARDIANA ZERO.exe --avisos` (zero/navegador/src/avisos.rs, the process
-//! without a window that already shows the escudo's notices) draws it. It asks GUARDIANA's service on this computer as
-//! the CLI does (`crates/cli/src/vpn_cmd.rs`): `GET /api/vpn` on 127.0.0.1:7443 with the panel's key in
-//! `X-Guardiana-Token`, every [`CADA`]; and «Conectar» and «Desconectar» are the panel's own orders.
+//! Decided here, and tested on every system; `GUARDIANA ZERO.exe --avisos` (zero/navegador/src/avisos.rs) draws it: the
+//! process without a window that already shows el escudo's notices, started at every sign-in by the installer's Run
+//! entry and by every start of ZERO, one per session, so the icon stays with ZERO closed too. It asks GUARDIANA's
+//! service on this computer as the CLI does (`crates/cli/src/vpn_cmd.rs`): `GET /api/vpn` on 127.0.0.1:7443 with the
+//! panel's key in `X-Guardiana-Token`, every [`CADA`], and only when the one listening there is the service's own
+//! process ([`es_el_servicio`]); «Conectar» and «Desconectar» are the panel's own orders.
 //!
-//! - The colour ([`color`]): green connected, grey off, amber connecting, red when its server does not answer (then
-//!   the tunnel's cut-off keeps everything in: [`Fase::Callada`]).
-//! - The line under the pointer ([`linea`]): «GUARDIANA · VPN conectada: Finlandia · Helsinki».
-//! - The menu ([`menu`]): the state (not clickable), «Abrir la VPN», «Conectar (la más rápida)» or «Desconectar», and
-//!   «Abrir GUARDIANA».
-//! - The notices ([`aviso`]): one per change of state, so the same one never comes twice in a row, and none for what
-//!   the person has just ordered from this menu ([`PROPIO`]).
+//! The icon says what the VPN chip of ZERO's bar (zero/navegador/interfaz/barra.js) and Órbita's VPN page say, with the
+//! chip's own words (its texts, `vpn_*`) wherever the chip says it ([`Cara`]):
+//!
+//! - The colour ([`color`]): green connected; amber connecting; red while nothing of the computer's programs reaches the
+//!   internet (its server does not answer, strict mode trying again, or the VPN stopped with its block still in
+//!   Windows); grey off, not on this computer, or GUARDIANA not answering.
+//! - The lines under the pointer ([`linea`]): «GUARDIANA», the state, and where it goes out («Finlandia · Helsinki»,
+//!   written as the VPN page writes it).
+//! - The menu ([`menu`]): the state and the place (not clickable), «Abrir la VPN», «Conectar a la salida más rápida»
+//!   and «Desconectar» when the VPN page offers them, and «Abrir GUARDIANA».
+//! - The notices ([`aviso`]): one per change of what the icon says; none for the first reading or a service that stops
+//!   answering, and none for the connection or the disconnection the person has just ordered from this menu
+//!   ([`PROPIO`]).
 
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
+use std::path::Path;
 use std::time::Duration;
 
 use serde_json::Value;
 
-use crate::textos::Textos;
+use crate::textos::{Idioma, Textos};
 
-/// What a click on the icon or on a notice opens: Órbita on the VPN.
+/// What a click on the icon, on «Abrir la VPN» or on a notice opens: Órbita on the VPN.
 pub const ENLACE: &str = "guardiana://vpn";
 /// How often the icon asks the service.
 pub const CADA: Duration = Duration::from_secs(3);
@@ -31,11 +40,18 @@ pub const CADA: Duration = Duration::from_secs(3);
 pub const PROPIO: Duration = Duration::from_secs(60);
 /// The longest line under the pointer Windows keeps (`NOTIFYICONDATAW.szTip`: 128 UTF-16 units with its end).
 pub const LARGO_LINEA: usize = 127;
+/// How long a reading of the VPN may take.
+pub const ESPERA_LECTURA: Duration = Duration::from_secs(4);
+/// How long an order may take: closing the tunnel can take a few seconds (the CLI waits up to 40).
+pub const ESPERA_ORDEN: Duration = Duration::from_secs(40);
+/// The service's name in Windows (`guardiana_service::daemon::SERVICE_NAME`, build/wix/guardiana.wxs).
+pub const SERVICIO: &str = "guardiana";
 
-/// In what the VPN is, as the icon tells it.
+/// In what the VPN is, as the service says it (`crates/panel/src/vpn.rs`, `Fase`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Fase {
-    /// The service did not answer (it is starting, stopped, or the key could not be read).
+    /// The service did not answer (it is starting or stopped, the key could not be read, or someone else listens on
+    /// its port).
     #[default]
     Desconocida,
     /// Off.
@@ -44,8 +60,10 @@ pub enum Fase {
     Conectando,
     /// Connected and its server answering.
     Conectada,
-    /// Its server does not answer (`sin_respuesta`, or `reconectando` in strict mode): nothing leaves the computer.
-    Callada,
+    /// Its server stopped answering; the tunnel and its cut-off stay, so nothing leaves outside it.
+    SinRespuesta,
+    /// Strict mode: its server does not answer, the tunnel is closed and the block stays while it tries again.
+    Reconectando,
     /// It could not connect.
     Error,
 }
@@ -57,6 +75,8 @@ pub struct Vpn {
     pub fase: Fase,
     /// Strict mode is on.
     pub estricto: bool,
+    /// «Desconectar» is needed (`"desconectar"`): the VPN is on, or its block is still in Windows.
+    pub desconectar: bool,
     /// The exit's country, two letters (`FI`); empty when it is not one of GUARDIANA's exits.
     pub pais: String,
     /// The exit's city.
@@ -73,7 +93,8 @@ impl Vpn {
             "apagada" => Fase::Apagada,
             "conectando" => Fase::Conectando,
             "conectada" => Fase::Conectada,
-            "sin_respuesta" | "reconectando" => Fase::Callada,
+            "sin_respuesta" => Fase::SinRespuesta,
+            "reconectando" => Fase::Reconectando,
             "error" => Fase::Error,
             _ => return Self::default(),
         };
@@ -89,6 +110,7 @@ impl Vpn {
         Self {
             fase,
             estricto: v["estricto"].as_bool() == Some(true),
+            desconectar: v["desconectar"].as_bool() == Some(true),
             pais: if pais.len() == 2 && pais.bytes().all(|b| b.is_ascii_uppercase()) {
                 pais
             } else {
@@ -99,12 +121,85 @@ impl Vpn {
         }
     }
 
-    /// The VPN is on: connecting, connected or without its server.
+    /// The VPN is on: connecting, connected, or without its server.
     #[must_use]
     pub fn encendida(&self) -> bool {
         matches!(
             self.fase,
-            Fase::Conectando | Fase::Conectada | Fase::Callada
+            Fase::Conectando | Fase::Conectada | Fase::SinRespuesta | Fase::Reconectando
+        )
+    }
+
+    /// The VPN is not on but its block is still in Windows: no program of Windows reaches the internet until
+    /// «Desconectar» takes it away (the chip's «VPN parada, con su bloqueo puesto»).
+    #[must_use]
+    pub fn bloqueada(&self) -> bool {
+        self.desconectar && !self.encendida() && self.fase != Fase::Desconocida
+    }
+}
+
+/// What the icon says: the chip's states, and those the chip does not show because it hides while the VPN is off.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cara {
+    /// GUARDIANA's service does not answer on this computer.
+    SinServicio,
+    /// This computer cannot have the VPN.
+    NoDisponible,
+    /// Off.
+    Desconectada,
+    /// It could not connect, and nothing of it stayed in Windows.
+    Error,
+    /// Connecting.
+    Conectando,
+    /// Connected.
+    Conectada,
+    /// Its server does not answer.
+    SinRespuesta,
+    /// Strict mode: it does not connect and the block stays.
+    Reconectando,
+    /// Stopped, with its block still in Windows.
+    Bloqueada,
+}
+
+impl Cara {
+    /// What the icon says for `v`.
+    #[must_use]
+    pub fn de(v: &Vpn) -> Self {
+        match v.fase {
+            Fase::Desconocida => Self::SinServicio,
+            Fase::Conectando => Self::Conectando,
+            Fase::Conectada => Self::Conectada,
+            Fase::SinRespuesta => Self::SinRespuesta,
+            Fase::Reconectando => Self::Reconectando,
+            Fase::Apagada | Fase::Error if v.desconectar => Self::Bloqueada,
+            Fase::Apagada if !v.disponible => Self::NoDisponible,
+            Fase::Apagada => Self::Desconectada,
+            Fase::Error => Self::Error,
+        }
+    }
+
+    /// The key of its words: the chip's own text wherever the chip says it.
+    #[must_use]
+    pub fn clave(self) -> &'static str {
+        match self {
+            Self::SinServicio => "bandeja_sin_servicio",
+            Self::NoDisponible => "bandeja_no_disponible",
+            Self::Desconectada => "bandeja_desconectada",
+            Self::Error => "bandeja_error",
+            Self::Conectando => "vpn_conectando",
+            Self::Conectada => "vpn_conectada",
+            Self::SinRespuesta => "vpn_sin_respuesta",
+            Self::Reconectando => "vpn_reconectando",
+            Self::Bloqueada => "vpn_bloqueo_puesto",
+        }
+    }
+
+    /// Nothing of the computer's programs reaches the internet: its server is silent, or the block stays.
+    #[must_use]
+    pub fn sin_internet(self) -> bool {
+        matches!(
+            self,
+            Self::SinRespuesta | Self::Reconectando | Self::Bloqueada
         )
     }
 }
@@ -114,11 +209,11 @@ impl Vpn {
 pub enum Color {
     /// Connected.
     Verde,
-    /// Off, or the service does not answer.
+    /// Off, not on this computer, or GUARDIANA not answering.
     Gris,
     /// Connecting.
     Ambar,
-    /// Its server does not answer.
+    /// Nothing reaches the internet: its server does not answer, or its block stays.
     Rojo,
 }
 
@@ -138,50 +233,52 @@ impl Color {
 /// The icon's colour for `v`.
 #[must_use]
 pub fn color(v: &Vpn) -> Color {
-    match v.fase {
-        Fase::Conectada => Color::Verde,
-        Fase::Conectando => Color::Ambar,
-        Fase::Callada => Color::Rojo,
-        Fase::Desconocida | Fase::Apagada | Fase::Error => Color::Gris,
+    let c = Cara::de(v);
+    match c {
+        Cara::Conectada => Color::Verde,
+        Cara::Conectando => Color::Ambar,
+        _ if c.sin_internet() => Color::Rojo,
+        _ => Color::Gris,
     }
 }
 
-/// Where the VPN goes out, in words: «Finlandia · Helsinki»; empty when it is not one of GUARDIANA's exits.
+/// Where the VPN goes out, as Órbita's VPN page writes it: «Finlandia · Helsinki», the country by its name in the
+/// person's language (the panel's own list, `guardiana_core::i18n`); empty when it is not one of GUARDIANA's exits.
 #[must_use]
 pub fn lugar(v: &Vpn, t: &Textos) -> String {
-    if v.pais.is_empty() {
-        return v.ciudad.clone();
-    }
-    let clave = format!("pais_{}", v.pais.to_ascii_lowercase());
-    let pais = t.t(&clave);
-    let pais = if pais == clave { v.pais.clone() } else { pais };
-    if v.ciudad.is_empty() {
-        pais
+    let pais = if v.pais.is_empty() {
+        String::new()
     } else {
-        format!("{pais} · {}", v.ciudad)
-    }
+        let nombre = guardiana_core::i18n::by_code(t.idioma().codigo()).pais(&v.pais);
+        if nombre.is_empty() {
+            v.pais.clone()
+        } else {
+            nombre.to_owned()
+        }
+    };
+    [pais, v.ciudad.clone()]
+        .into_iter()
+        .filter(|x| !x.is_empty())
+        .collect::<Vec<_>>()
+        .join(" · ")
 }
 
-/// What the VPN is doing, in words, for the menu's first line and the line under the pointer.
+/// What the VPN is doing, in the chip's words, for the menu's first line, the line under the pointer and the notices.
 #[must_use]
 pub fn estado(v: &Vpn, t: &Textos) -> String {
-    let donde = lugar(v, t);
-    match v.fase {
-        Fase::Desconocida => t.t("bandeja_sin_servicio"),
-        Fase::Apagada if !v.disponible => t.t("bandeja_no_disponible"),
-        Fase::Apagada => t.t("bandeja_apagada"),
-        Fase::Conectando => t.t("bandeja_conectando"),
-        Fase::Conectada if donde.is_empty() => t.t("bandeja_conectada_sin_lugar"),
-        Fase::Conectada => t.tf("bandeja_conectada", &[("lugar", &donde)]),
-        Fase::Callada => t.t("bandeja_callada"),
-        Fase::Error => t.t("bandeja_error"),
-    }
+    t.t(Cara::de(v).clave())
 }
 
-/// The line under the pointer: «GUARDIANA · <state>», cut to what Windows keeps.
+/// The lines under the pointer: «GUARDIANA», the state and, when the service says it, where it goes out; cut to what
+/// Windows keeps.
 #[must_use]
 pub fn linea(v: &Vpn, t: &Textos) -> String {
-    let s = format!("GUARDIANA · {}", estado(v, t));
+    let mut s = format!("GUARDIANA\n{}", estado(v, t));
+    let donde = lugar(v, t);
+    if !donde.is_empty() {
+        s.push('\n');
+        s.push_str(&donde);
+    }
     let mut out = String::new();
     let mut unidades = 0;
     for c in s.chars() {
@@ -203,10 +300,12 @@ pub enum Orden {
     AbrirVpn,
     /// Connect to the fastest exit.
     Conectar,
-    /// Disconnect, in any phase.
+    /// Disconnect, in any phase: also the way out of a block that stayed.
     Desconectar,
     /// GUARDIANA's window.
     AbrirGuardiana,
+    /// Where it goes out, as a line that cannot be clicked.
+    Lugar,
 }
 
 impl Orden {
@@ -219,6 +318,7 @@ impl Orden {
             Self::Conectar => 3,
             Self::Desconectar => 4,
             Self::AbrirGuardiana => 5,
+            Self::Lugar => 6,
         }
     }
 
@@ -231,13 +331,14 @@ impl Orden {
             Self::Conectar,
             Self::Desconectar,
             Self::AbrirGuardiana,
+            Self::Lugar,
         ]
         .into_iter()
         .find(|o| o.id() == id)
     }
 }
 
-/// One line of the menu: the order, its words, and whether it can be chosen.
+/// One line of the menu: the order, its words, whether it can be chosen, and whether a separator goes before it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entrada {
     /// What it does.
@@ -246,33 +347,57 @@ pub struct Entrada {
     pub texto: String,
     /// It can be chosen.
     pub activa: bool,
+    /// A separator goes before it.
+    pub raya: bool,
 }
 
-/// The menu for `v`: the state; «Abrir la VPN»; «Desconectar» while it is on, or «Conectar (la más rápida)» when it can
-/// connect; «Abrir GUARDIANA».
+/// The menu for `v`, with `desconectando` while a «Desconectar» from it has not answered yet: the state and the place;
+/// «Abrir la VPN» (what a click on the icon does); «Conectar a la salida más rápida» when it can connect and
+/// «Desconectar» while it is on or its block stays, as the VPN page offers them; «Abrir GUARDIANA».
 #[must_use]
-pub fn menu(v: &Vpn, t: &Textos) -> Vec<Entrada> {
-    let entrada = |orden, clave: &str, activa| Entrada {
+pub fn menu(v: &Vpn, desconectando: bool, t: &Textos) -> Vec<Entrada> {
+    let entrada = |orden, texto: String, activa, raya| Entrada {
         orden,
-        texto: t.t(clave),
+        texto,
         activa,
+        raya,
     };
-    let mut m = vec![
-        Entrada {
-            orden: Orden::Estado,
-            texto: estado(v, t),
-            activa: false,
-        },
-        entrada(Orden::AbrirVpn, "bandeja_abrir_vpn", true),
-    ];
-    if v.encendida() {
-        m.push(entrada(Orden::Desconectar, "bandeja_desconectar", true));
-    } else if v.disponible && v.fase != Fase::Desconocida {
-        m.push(entrada(Orden::Conectar, "bandeja_conectar", true));
+    let mut m = vec![entrada(Orden::Estado, estado(v, t), false, false)];
+    let donde = lugar(v, t);
+    if !donde.is_empty() {
+        m.push(entrada(Orden::Lugar, donde, false, false));
+    }
+    m.push(entrada(
+        Orden::AbrirVpn,
+        t.t("bandeja_abrir_vpn"),
+        true,
+        true,
+    ));
+    if v.disponible && matches!(v.fase, Fase::Apagada | Fase::Error) {
+        m.push(entrada(
+            Orden::Conectar,
+            t.t("bandeja_conectar"),
+            true,
+            false,
+        ));
+    }
+    if v.encendida() || v.bloqueada() {
+        let clave = if desconectando {
+            "vpn_desconectando"
+        } else {
+            "vpn_desconectar"
+        };
+        m.push(entrada(
+            Orden::Desconectar,
+            t.t(clave),
+            !desconectando,
+            false,
+        ));
     }
     m.push(entrada(
         Orden::AbrirGuardiana,
-        "bandeja_abrir_guardiana",
+        t.t("bandeja_abrir_guardiana"),
+        true,
         true,
     ));
     m
@@ -281,66 +406,157 @@ pub fn menu(v: &Vpn, t: &Textos) -> Vec<Entrada> {
 /// A Windows notice of the VPN.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Aviso {
-    /// Its title.
+    /// Its title: the state, in the chip's words.
     pub titulo: String,
+    /// Where it goes out, on its own line (empty: no line).
+    pub lugar: String,
     /// Its text.
     pub texto: String,
 }
 
-/// The notice for the change from `antes` to `ahora`, if it deserves one. `propio`: the person ordered this change from
-/// the menu a moment ago ([`PROPIO`]), so connecting and disconnecting are not announced; a server that stops answering
-/// or comes back always is. The first reading (`antes` unknown) and a service that stops answering are not announced.
+/// The notice for the change from `antes` to `ahora`, if it deserves one. `propio`: the order the person gave from the
+/// menu a moment ago ([`PROPIO`]), whose own outcome is not announced (a connection or a disconnection); a server that
+/// stops answering or comes back, a block that stays and a connection that fails always are. The first reading
+/// (`antes` unknown) and a service that stops answering are not announced.
 #[must_use]
-pub fn aviso(antes: &Vpn, ahora: &Vpn, propio: bool, t: &Textos) -> Option<Aviso> {
-    if antes.fase == ahora.fase || antes.fase == Fase::Desconocida {
+pub fn aviso(antes: &Vpn, ahora: &Vpn, propio: Option<Orden>, t: &Textos) -> Option<Aviso> {
+    let (a, b) = (Cara::de(antes), Cara::de(ahora));
+    if a == b || a == Cara::SinServicio || b == Cara::SinServicio {
         return None;
     }
-    let donde = lugar(ahora, t);
-    let con = |titulo: &str, texto: &str, huecos: &[(&str, &str)]| {
-        Some(Aviso {
-            titulo: t.t(titulo),
-            texto: t.tf(texto, huecos),
-        })
+    let callada = |c: Cara| matches!(c, Cara::SinRespuesta | Cara::Reconectando);
+    let clave = match b {
+        _ if callada(b) && callada(a) => return None,
+        // the chip's own explanation when it is hovered
+        _ if callada(b) && ahora.estricto => "vpn_estricto_no_conecta",
+        _ if callada(b) => "vpn_sin_respuesta_explica",
+        Cara::Conectada if callada(a) => "aviso_vpn_vuelve",
+        Cara::Conectada if propio != Some(Orden::Conectar) => "aviso_vpn_conectada",
+        Cara::Bloqueada => "vpn_bloqueo_puesto_explica",
+        Cara::Error => "aviso_vpn_error",
+        Cara::Desconectada
+            if !matches!(a, Cara::Error | Cara::NoDisponible)
+                && propio != Some(Orden::Desconectar) =>
+        {
+            "aviso_vpn_apagada"
+        }
+        _ => return None,
     };
-    match (antes.fase, ahora.fase) {
-        (Fase::Callada, Fase::Conectada) => con(
-            "aviso_vpn_vuelve_t",
-            "aviso_vpn_vuelve",
-            &[("lugar", &donde)],
-        ),
-        (_, Fase::Callada) => con("aviso_vpn_callada_t", "aviso_vpn_callada", &[]),
-        (_, Fase::Conectada) if !propio => con(
-            "aviso_vpn_conectada_t",
-            "aviso_vpn_conectada",
-            &[("lugar", &donde)],
-        ),
-        (Fase::Conectada | Fase::Callada | Fase::Conectando, Fase::Apagada) if !propio => {
-            con("aviso_vpn_apagada_t", "aviso_vpn_apagada", &[])
-        }
-        (Fase::Conectando | Fase::Callada, Fase::Error) => {
-            con("aviso_vpn_error_t", "aviso_vpn_error", &[])
-        }
-        _ => None,
+    Some(Aviso {
+        titulo: estado(ahora, t),
+        lugar: if b == Cara::Conectada {
+            lugar(ahora, t)
+        } else {
+            String::new()
+        },
+        texto: t.t(clave),
+    })
+}
+
+/// The notice for an order of the menu the service did not take (`hecha` false), with the VPN as it was last read:
+/// «Desconectar» as the chip says it (`vpn_sin_panel` when GUARDIANA does not answer, with the Start menu's way out;
+/// `vpn_espera_conectar` while it is still connecting; else `vpn_no_desconecta`), «Conectar» as a connection that
+/// could not start, which left the computer as it was. `None` when the order was taken: what it does comes with the
+/// next readings.
+#[must_use]
+pub fn aviso_de_orden(o: Orden, hecha: bool, v: &Vpn, t: &Textos) -> Option<Aviso> {
+    if hecha {
+        return None;
     }
+    let (titulo, clave) = match o {
+        Orden::Desconectar => (
+            estado(v, t),
+            match v.fase {
+                Fase::Desconocida => "vpn_sin_panel",
+                Fase::Conectando => "vpn_espera_conectar",
+                _ => "vpn_no_desconecta",
+            },
+        ),
+        Orden::Conectar => (t.t("bandeja_error"), "aviso_vpn_error"),
+        _ => return None,
+    };
+    Some(Aviso {
+        titulo,
+        lugar: String::new(),
+        texto: t.t(clave),
+    })
 }
 
 /// The notice in Windows' toast schema: a click on it, or on its button, opens Órbita on the VPN ([`ENLACE`]).
 #[must_use]
 pub fn notificacion(a: &Aviso, t: &Textos) -> String {
-    crate::avisos::xml_con(ENLACE, &t.t("bandeja_abrir_vpn"), &a.titulo, "", &a.texto)
+    crate::avisos::xml_con(
+        ENLACE,
+        &t.t("bandeja_abrir_vpn"),
+        &a.titulo,
+        &a.lugar,
+        &a.texto,
+    )
+}
+
+/// The language of the icon: the one the person chose in ZERO (its `preferencias.json` in the data folder `datos`),
+/// else the system's (`sistema`, a tag like `es-CO`), as ZERO's window decides it (`Sesion::abre`).
+#[must_use]
+pub fn idioma(datos: &Path, sistema: &str) -> Idioma {
+    let elegido = std::fs::read_to_string(datos.join("preferencias.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+        .and_then(|v| v["idioma"].as_str().map(str::to_owned))
+        .filter(|x| !x.trim().is_empty());
+    Idioma::de_etiqueta(elegido.as_deref().unwrap_or(sistema))
+}
+
+/// What the icon keeps between readings: the last one, and the order the person gave from its menu, with when.
+#[derive(Debug, Clone, Default)]
+pub struct Memoria {
+    /// The last reading.
+    pub vpn: Vpn,
+    /// The last order from the menu that changes the VPN, with the moment it was given.
+    propio: Option<(Orden, std::time::Instant)>,
+}
+
+impl Memoria {
+    /// The person ordered `o` from the menu at `cuando`.
+    pub fn ordenada(&mut self, o: Orden, cuando: std::time::Instant) {
+        if matches!(o, Orden::Conectar | Orden::Desconectar) {
+            self.propio = Some((o, cuando));
+        }
+    }
+
+    /// The order from the menu still too recent to announce its own outcome at `ahora` ([`PROPIO`]).
+    #[must_use]
+    pub fn propio(&self, ahora: std::time::Instant) -> Option<Orden> {
+        self.propio
+            .filter(|(_, cuando)| ahora.saturating_duration_since(*cuando) < PROPIO)
+            .map(|(o, _)| o)
+    }
+
+    /// A new reading at `ahora`: the notice it deserves, if any. It is kept as the last one.
+    pub fn lectura(&mut self, nueva: Vpn, ahora: std::time::Instant, t: &Textos) -> Option<Aviso> {
+        let a = aviso(&self.vpn, &nueva, self.propio(ahora), t);
+        self.vpn = nueva;
+        a
+    }
 }
 
 /// The body of «Conectar» from the menu: the fastest exit the service measured.
 pub const CUERPO_CONECTAR: &str = "{\"salida\":\"rapida\"}";
 
 /// One request to GUARDIANA's service on this computer, with the panel's key, as the CLI makes it: its status code and
-/// its body, or `None` when it does not answer in time.
+/// its body, or `None` when it does not answer within `espera`. Only once [`es_el_servicio`] said the one listening is
+/// the service.
 #[must_use]
-pub fn pide(metodo: &str, ruta: &str, cuerpo: &str, llave: &str) -> Option<(u16, String)> {
+pub fn pide(
+    metodo: &str,
+    ruta: &str,
+    cuerpo: &str,
+    llave: &str,
+    espera: Duration,
+) -> Option<(u16, String)> {
     let puerto = crate::lanzador::PUERTO_PANEL;
     let dir = SocketAddr::from(([127, 0, 0, 1], puerto));
     let mut s = TcpStream::connect_timeout(&dir, Duration::from_millis(800)).ok()?;
-    s.set_read_timeout(Some(Duration::from_secs(4))).ok()?;
+    s.set_read_timeout(Some(espera)).ok()?;
     s.set_write_timeout(Some(Duration::from_secs(2))).ok()?;
     let peticion = format!(
         "{metodo} {ruta} HTTP/1.1\r\nHost: 127.0.0.1:{puerto}\r\nX-Guardiana-Token: {llave}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{cuerpo}",
@@ -401,7 +617,7 @@ pub fn lee(llave: Option<&str>) -> Vpn {
     let Some(llave) = llave else {
         return Vpn::default();
     };
-    match pide("GET", "/api/vpn", "", llave) {
+    match pide("GET", "/api/vpn", "", llave, ESPERA_LECTURA) {
         Some((200, cuerpo)) => serde_json::from_str::<Value>(&cuerpo)
             .map(|v| Vpn::de_json(&v))
             .unwrap_or_default(),
@@ -417,34 +633,129 @@ pub fn ordena(orden: Orden, llave: &str) -> bool {
         Orden::Desconectar => ("/api/vpn/desconecta", ""),
         _ => return false,
     };
-    pide("POST", ruta, cuerpo, llave).is_some_and(|(codigo, cuerpo)| {
+    pide("POST", ruta, cuerpo, llave, ESPERA_ORDEN).is_some_and(|(codigo, cuerpo)| {
         codigo == 200
             && serde_json::from_str::<Value>(&cuerpo).is_ok_and(|v| v["ok"].as_bool() == Some(true))
     })
+}
+
+/// Whether the one listening on the panel's port is GUARDIANA's service, as the CLI decides it before it sends the
+/// panel's key (review of the 1.0.56 VPN, `crates/cli/src/vpn_cmd.rs`): the process Windows' service manager says the
+/// service runs in (`servicio`) and the one Windows' table of listening sockets names (`escucha`) must both be known
+/// and be the same. Otherwise any program of any account could take the port while the service is stopped and receive
+/// the key every few seconds.
+#[must_use]
+pub fn es_el_servicio(servicio: Option<u32>, escucha: Option<u32>) -> bool {
+    matches!((servicio, escucha), (Some(s), Some(e)) if s == e && s != 0)
+}
+
+/// The process GUARDIANA's service runs in, from what Windows' service manager answers (`SERVICE_STATUS_PROCESS`, as
+/// `QueryServiceStatusEx` writes it: nine 32-bit words, the state second and the process eighth): only while it runs.
+#[must_use]
+pub fn pid_del_servicio(estado: &[u8]) -> Option<u32> {
+    let palabra = |i: usize| -> Option<u32> {
+        let b = estado.get(i * 4..i * 4 + 4)?;
+        Some(u32::from_ne_bytes([b[0], b[1], b[2], b[3]]))
+    };
+    // SERVICE_RUNNING
+    (palabra(1)? == 4)
+        .then_some(palabra(7)?)
+        .filter(|pid| *pid != 0)
+}
+
+/// The process that listens on `ip:puerto` in Windows' table of listening sockets (`MIB_TCPTABLE_OWNER_PID` as 32-bit
+/// words: their count, then six per row), only when there is no doubt it is the one that answers there: a listener on
+/// exactly `ip:puerto`, and none of another process on that port, on `ip` or on every address. The same reading as
+/// `guardiana_apps::vigia::pid_que_escucha`, which ZERO does not link.
+#[must_use]
+pub fn pid_que_escucha(tabla: &[u32], ip: [u8; 4], puerto: u16) -> Option<u32> {
+    let n = usize::try_from(*tabla.first()?).ok()?;
+    let mut quien = None;
+    let mut en_ip = false;
+    for i in 0..n.min(200_000) {
+        let inicio = 1 + i * 6;
+        let fila = tabla.get(inicio..inicio + 6)?;
+        if let [_, local, puerto_local, _, _, pid] = *fila {
+            let p = puerto_local.to_ne_bytes();
+            let local = local.to_ne_bytes();
+            if u16::from_be_bytes([p[0], p[1]]) != puerto || (local != ip && local != [0; 4]) {
+                continue;
+            }
+            if quien.is_some_and(|q| q != pid) {
+                return None;
+            }
+            quien = Some(pid);
+            en_ip |= local == ip;
+        }
+    }
+    quien.filter(|_| en_ip)
+}
+
+/// The image of an icon file (`.ico`) for a side of `lado` pixels: the smallest one at least that big, else the
+/// biggest; its bytes as `CreateIconFromResourceEx` takes them (PNG or DIB). `None` when the file is not an icon.
+#[must_use]
+pub fn imagen_ico(ico: &[u8], lado: u32) -> Option<&[u8]> {
+    let n = usize::from(u16::from_le_bytes([*ico.get(4)?, *ico.get(5)?]));
+    if ico.get(..4)? != [0, 0, 1, 0] || n == 0 {
+        return None;
+    }
+    let mut mejor: Option<(u32, &[u8])> = None;
+    for i in 0..n {
+        let e = ico.get(6 + i * 16..6 + i * 16 + 16)?;
+        let ancho = if e[0] == 0 { 256 } else { u32::from(e[0]) };
+        let largo = usize::try_from(u32::from_le_bytes([e[8], e[9], e[10], e[11]])).ok()?;
+        let desde = usize::try_from(u32::from_le_bytes([e[12], e[13], e[14], e[15]])).ok()?;
+        let bits = ico.get(desde..desde.checked_add(largo)?)?;
+        let vale = match mejor {
+            None => true,
+            Some((m, _)) if m >= lado => ancho >= lado && ancho < m,
+            Some((m, _)) => ancho > m,
+        };
+        if vale {
+            mejor = Some((ancho, bits));
+        }
+    }
+    mejor.map(|(_, bits)| bits)
 }
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::textos::Idioma;
     use serde_json::json;
 
     fn vpn(fase: &str) -> Vpn {
         Vpn::de_json(&json!({
             "disponible": true, "fase": fase, "estricto": true,
+            "desconectar": matches!(fase, "conectando" | "conectada" | "sin_respuesta" | "reconectando"),
             "salida": { "id": "hel", "pais": "FI", "ciudad": "Helsinki" }
         }))
+    }
+
+    fn sin_salida(fase: &str) -> Vpn {
+        Vpn {
+            pais: String::new(),
+            ciudad: String::new(),
+            ..vpn(fase)
+        }
+    }
+
+    /// The VPN stopped by an error with its block still in Windows (the chip's «VPN parada, con su bloqueo puesto»).
+    fn bloqueada() -> Vpn {
+        Vpn {
+            desconectar: true,
+            ..vpn("error")
+        }
     }
 
     #[test]
     fn lo_que_dice_el_servicio() {
         let v = vpn("conectada");
         assert_eq!(v.fase, Fase::Conectada);
-        assert!(v.estricto && v.disponible);
+        assert!(v.estricto && v.disponible && v.desconectar);
         assert_eq!((v.pais.as_str(), v.ciudad.as_str()), ("FI", "Helsinki"));
-        assert_eq!(vpn("sin_respuesta").fase, Fase::Callada);
-        assert_eq!(vpn("reconectando").fase, Fase::Callada);
+        assert_eq!(vpn("sin_respuesta").fase, Fase::SinRespuesta);
+        assert_eq!(vpn("reconectando").fase, Fase::Reconectando);
         assert_eq!(vpn("apagada").fase, Fase::Apagada);
         assert_eq!(vpn("otra cosa").fase, Fase::Desconocida);
         assert_eq!(Vpn::de_json(&json!("no")).fase, Fase::Desconocida);
@@ -456,6 +767,68 @@ mod tests {
         );
         assert!(v.pais.is_empty());
         assert_eq!(v.ciudad, "AB");
+        // el bloqueo que queda tras un error, o con lo guardado aún encendido
+        assert!(bloqueada().bloqueada());
+        assert!(!vpn("error").bloqueada() && !vpn("conectada").bloqueada());
+        assert!(!Vpn {
+            desconectar: true,
+            ..Vpn::default()
+        }
+        .bloqueada());
+    }
+
+    /// The icon says what the chip of ZERO's bar says, with the chip's own texts (barra.js, `VPN_FASES` and
+    /// `vpn_bloqueo_puesto`), and what the chip does not show while the VPN is off.
+    #[test]
+    fn las_palabras_del_chip() {
+        for (f, clave) in [
+            ("conectando", "vpn_conectando"),
+            ("conectada", "vpn_conectada"),
+            ("sin_respuesta", "vpn_sin_respuesta"),
+            ("reconectando", "vpn_reconectando"),
+        ] {
+            assert_eq!(Cara::de(&vpn(f)).clave(), clave, "{f}");
+        }
+        assert_eq!(Cara::de(&bloqueada()), Cara::Bloqueada);
+        assert_eq!(Cara::Bloqueada.clave(), "vpn_bloqueo_puesto");
+        let apagada_con_bloqueo = Vpn {
+            desconectar: true,
+            ..vpn("apagada")
+        };
+        assert_eq!(Cara::de(&apagada_con_bloqueo), Cara::Bloqueada);
+        assert_eq!(Cara::de(&vpn("apagada")), Cara::Desconectada);
+        assert_eq!(Cara::de(&vpn("error")), Cara::Error);
+        assert_eq!(Cara::de(&Vpn::default()), Cara::SinServicio);
+        let fuera = Vpn {
+            disponible: false,
+            ..vpn("apagada")
+        };
+        assert_eq!(Cara::de(&fuera), Cara::NoDisponible);
+        let es = Textos::de(Idioma::Es);
+        assert_eq!(estado(&vpn("conectada"), &es), "VPN conectada");
+        assert_eq!(estado(&vpn("reconectando"), &es), "VPN: no conecta");
+        assert_eq!(
+            estado(&bloqueada(), &es),
+            "VPN parada, con su bloqueo puesto"
+        );
+        // every state has its words in the three languages, and none promises more than «tus programas de Windows»
+        for idioma in [Idioma::Es, Idioma::En, Idioma::Pt] {
+            let t = Textos::de(idioma);
+            for v in [
+                Vpn::default(),
+                fuera.clone(),
+                vpn("apagada"),
+                vpn("error"),
+                vpn("conectando"),
+                vpn("conectada"),
+                vpn("sin_respuesta"),
+                vpn("reconectando"),
+                bloqueada(),
+            ] {
+                let k = Cara::de(&v).clave();
+                assert_ne!(t.t(k), k, "{idioma:?} {k}");
+            }
+        }
     }
 
     #[test]
@@ -464,46 +837,58 @@ mod tests {
         assert_eq!(color(&vpn("conectada")), Color::Verde);
         assert_eq!(color(&vpn("conectando")), Color::Ambar);
         assert_eq!(color(&vpn("sin_respuesta")), Color::Rojo);
+        assert_eq!(color(&vpn("reconectando")), Color::Rojo);
+        assert_eq!(color(&bloqueada()), Color::Rojo);
         assert_eq!(color(&vpn("apagada")), Color::Gris);
+        assert_eq!(color(&vpn("error")), Color::Gris);
         assert_eq!(color(&Vpn::default()), Color::Gris);
         assert_eq!(Color::Ambar.nombre(), "ambar");
         assert_eq!(
             linea(&vpn("conectada"), &es),
-            "GUARDIANA · VPN conectada: Finlandia · Helsinki"
+            "GUARDIANA\nVPN conectada\nFinlandia · Helsinki"
         );
-        assert!(linea(&vpn("conectada"), &Textos::de(Idioma::En)).contains("Finland · Helsinki"));
-        assert!(linea(&vpn("conectada"), &Textos::de(Idioma::Pt)).contains("Finlândia · Helsinki"));
+        assert_eq!(
+            linea(&sin_salida("apagada"), &es),
+            "GUARDIANA\nVPN desconectada"
+        );
+        assert!(linea(&vpn("conectada"), &Textos::de(Idioma::En))
+            .ends_with("VPN connected\nFinland · Helsinki"));
+        assert!(linea(&vpn("conectada"), &Textos::de(Idioma::Pt)).ends_with("Finlândia · Helsinki"));
         // a country without a name in the texts: its two letters
         let v = Vpn {
             pais: "ZZ".into(),
             ..vpn("conectada")
         };
-        assert!(lugar(&v, &es).starts_with("ZZ"));
+        assert_eq!(lugar(&v, &es), "ZZ · Helsinki");
         // never longer than what Windows keeps
         let v = Vpn {
             ciudad: "x".repeat(40),
             ..vpn("conectada")
         };
         for idioma in [Idioma::Es, Idioma::En, Idioma::Pt] {
-            let l = linea(&v, &Textos::de(idioma));
-            assert!(l.encode_utf16().count() <= LARGO_LINEA, "{l}");
+            let t = Textos::de(idioma);
+            for v in [v.clone(), Vpn::default(), bloqueada(), vpn("reconectando")] {
+                let l = linea(&v, &t);
+                assert!(l.encode_utf16().count() <= LARGO_LINEA, "{l}");
+                assert!(
+                    l.starts_with("GUARDIANA\n") && !l.contains("bandeja_") && !l.contains("vpn_"),
+                    "{l}"
+                );
+            }
         }
-        for f in ["apagada", "conectando", "sin_respuesta", "error"] {
-            let l = linea(&vpn(f), &es);
-            assert!(
-                l.starts_with("GUARDIANA · ") && !l.contains("bandeja_"),
-                "{l}"
-            );
-        }
-        assert!(!linea(&Vpn::default(), &es).contains("bandeja_"));
     }
 
     #[test]
     fn el_menu_segun_el_estado() {
         let es = Textos::de(Idioma::Es);
-        let ordenes = |v: &Vpn| menu(v, &es).iter().map(|e| e.orden).collect::<Vec<_>>();
+        let ordenes = |v: &Vpn| {
+            menu(v, false, &es)
+                .iter()
+                .map(|e| e.orden)
+                .collect::<Vec<_>>()
+        };
         assert_eq!(
-            ordenes(&vpn("apagada")),
+            ordenes(&sin_salida("apagada")),
             [
                 Orden::Estado,
                 Orden::AbrirVpn,
@@ -516,6 +901,7 @@ mod tests {
                 ordenes(&vpn(f)),
                 [
                     Orden::Estado,
+                    Orden::Lugar,
                     Orden::AbrirVpn,
                     Orden::Desconectar,
                     Orden::AbrirGuardiana
@@ -523,24 +909,60 @@ mod tests {
                 "{f}"
             );
         }
-        // without the service, or without the VPN on this computer, nothing to connect
-        assert!(!ordenes(&Vpn::default()).contains(&Orden::Conectar));
+        // stopped with its block in Windows: both ways, as the VPN page offers them
+        assert_eq!(
+            ordenes(&bloqueada()),
+            [
+                Orden::Estado,
+                Orden::Lugar,
+                Orden::AbrirVpn,
+                Orden::Conectar,
+                Orden::Desconectar,
+                Orden::AbrirGuardiana
+            ]
+        );
+        // without the service, or without the VPN on this computer, nothing to connect or disconnect
+        assert_eq!(
+            ordenes(&Vpn::default()),
+            [Orden::Estado, Orden::AbrirVpn, Orden::AbrirGuardiana]
+        );
         let v = Vpn {
             disponible: false,
             ..vpn("apagada")
         };
         assert!(!ordenes(&v).contains(&Orden::Conectar));
-        let m = menu(&vpn("conectada"), &es);
-        assert!(!m[0].activa && m[1..].iter().all(|e| e.activa));
-        assert!(m
-            .iter()
-            .all(|e| !e.texto.is_empty() && !e.texto.contains("bandeja_")));
+        let m = menu(&vpn("conectada"), false, &es);
+        assert_eq!(m[0].texto, "VPN conectada");
+        assert_eq!(m[1].texto, "Finlandia · Helsinki");
+        assert!(!m[0].activa && !m[1].activa && m[2..].iter().all(|e| e.activa));
+        assert!(m[2].raya && !m[3].raya && m[4].raya);
+        assert_eq!(m[3].texto, "Desconectar");
+        // a «Desconectar» from it still in flight: said with the chip's word, and not twice
+        let d = menu(&vpn("conectada"), true, &es);
+        assert_eq!(
+            (d[3].orden, d[3].texto.as_str(), d[3].activa),
+            (Orden::Desconectar, "Desconectando…", false)
+        );
+        for idioma in [Idioma::Es, Idioma::En, Idioma::Pt] {
+            let t = Textos::de(idioma);
+            for v in [bloqueada(), sin_salida("apagada"), Vpn::default()] {
+                for e in menu(&v, false, &t) {
+                    assert!(
+                        !e.texto.is_empty()
+                            && !e.texto.contains("bandeja_")
+                            && !e.texto.contains("vpn_"),
+                        "{e:?}"
+                    );
+                }
+            }
+        }
         for o in [
             Orden::Estado,
             Orden::AbrirVpn,
             Orden::Conectar,
             Orden::Desconectar,
             Orden::AbrirGuardiana,
+            Orden::Lugar,
         ] {
             assert_ne!(o.id(), 0);
             assert_eq!(Orden::de_id(o.id()), Some(o));
@@ -551,66 +973,233 @@ mod tests {
     #[test]
     fn un_aviso_por_cambio_y_ninguno_por_lo_que_uno_pulsa() {
         let es = Textos::de(Idioma::Es);
-        let av =
-            |a: &str, b: &str, propio: bool| aviso(&vpn(a), &vpn(b), propio, &es).map(|x| x.titulo);
-        // the server stops answering and comes back: always said
+        let av = |a: &Vpn, b: &Vpn, propio: Option<Orden>| {
+            aviso(a, b, propio, &es).map(|x| (x.titulo, x.texto))
+        };
+        let titulo = |a: &Vpn, b: &Vpn, propio| av(a, b, propio).map(|x| x.0);
+        // the server stops answering and comes back: always said, with the chip's words and its explanation
+        let (t, x) = av(&vpn("conectada"), &vpn("sin_respuesta"), None).unwrap();
+        assert_eq!(t, "VPN sin respuesta");
+        assert_eq!(x, es.t("vpn_estricto_no_conecta"));
+        let sin_estricto = Vpn {
+            estricto: false,
+            ..vpn("sin_respuesta")
+        };
         assert_eq!(
-            av("conectada", "sin_respuesta", false).as_deref(),
-            Some("La VPN no responde")
+            av(&vpn("conectada"), &sin_estricto, None).unwrap().1,
+            es.t("vpn_sin_respuesta_explica")
         );
         assert_eq!(
-            av("conectada", "reconectando", true).as_deref(),
-            Some("La VPN no responde")
+            titulo(
+                &vpn("conectada"),
+                &vpn("reconectando"),
+                Some(Orden::Conectar)
+            )
+            .as_deref(),
+            Some("VPN: no conecta")
         );
+        let vuelve = aviso(&vpn("sin_respuesta"), &vpn("conectada"), None, &es).unwrap();
+        assert_eq!(vuelve.titulo, "VPN conectada");
+        assert_eq!(vuelve.lugar, "Finlandia · Helsinki");
+        assert_eq!(vuelve.texto, es.t("aviso_vpn_vuelve"));
+        assert!(aviso(
+            &vpn("reconectando"),
+            &vpn("conectada"),
+            Some(Orden::Conectar),
+            &es
+        )
+        .is_some());
+        // connecting and disconnecting: said, unless the person just pressed that very order here
         assert_eq!(
-            av("sin_respuesta", "conectada", false).as_deref(),
-            Some("La VPN ha vuelto")
-        );
-        // connecting and disconnecting: said, unless the person just pressed it here
-        assert_eq!(
-            av("conectando", "conectada", false).as_deref(),
+            titulo(&vpn("conectando"), &vpn("conectada"), None).as_deref(),
             Some("VPN conectada")
         );
-        assert_eq!(av("conectando", "conectada", true), None);
         assert_eq!(
-            av("conectada", "apagada", false).as_deref(),
+            titulo(&vpn("conectando"), &vpn("conectada"), Some(Orden::Conectar)),
+            None
+        );
+        assert!(titulo(
+            &vpn("conectando"),
+            &vpn("conectada"),
+            Some(Orden::Desconectar)
+        )
+        .is_some());
+        assert_eq!(
+            titulo(&vpn("conectada"), &sin_salida("apagada"), None).as_deref(),
             Some("VPN desconectada")
         );
-        assert_eq!(av("conectada", "apagada", true), None);
         assert_eq!(
-            av("conectando", "error", false).as_deref(),
-            Some("La VPN no pudo conectar")
+            titulo(
+                &vpn("conectada"),
+                &sin_salida("apagada"),
+                Some(Orden::Desconectar)
+            ),
+            None
         );
-        // nothing new, the first reading and a service that stops answering: nothing
-        assert_eq!(av("conectada", "conectada", false), None);
-        assert_eq!(av("sin_respuesta", "reconectando", false), None);
-        assert_eq!(aviso(&Vpn::default(), &vpn("conectada"), false, &es), None);
-        assert_eq!(aviso(&vpn("conectada"), &Vpn::default(), false, &es), None);
-        assert_eq!(av("apagada", "conectando", false), None);
-        // the text says where, and the notice opens the VPN
-        let a = aviso(&vpn("conectando"), &vpn("conectada"), false, &es).unwrap();
-        assert!(a.texto.contains("Finlandia · Helsinki"), "{}", a.texto);
+        // the block taken away from elsewhere: the connection is the normal one again
+        assert_eq!(
+            av(&bloqueada(), &sin_salida("apagada"), None).map(|x| x.1),
+            Some(es.t("aviso_vpn_apagada"))
+        );
+        // it could not connect, or it stopped with its block in Windows: always said
+        assert_eq!(
+            titulo(&vpn("conectando"), &vpn("error"), Some(Orden::Conectar)).as_deref(),
+            Some("VPN: no se pudo conectar")
+        );
+        let (t, x) = av(&vpn("reconectando"), &bloqueada(), None).unwrap();
+        assert_eq!(t, "VPN parada, con su bloqueo puesto");
+        assert_eq!(x, es.t("vpn_bloqueo_puesto_explica"));
+        // nothing new, the first reading, a service that stops answering, and an error that ends in nothing: nothing
+        assert_eq!(av(&vpn("conectada"), &vpn("conectada"), None), None);
+        assert_eq!(av(&vpn("sin_respuesta"), &vpn("reconectando"), None), None);
+        assert_eq!(av(&Vpn::default(), &vpn("conectada"), None), None);
+        assert_eq!(av(&vpn("conectada"), &Vpn::default(), None), None);
+        assert_eq!(av(&sin_salida("apagada"), &vpn("conectando"), None), None);
+        assert_eq!(av(&vpn("error"), &sin_salida("apagada"), None), None);
+        // the notice opens the VPN
+        let a = aviso(&vpn("conectando"), &vpn("conectada"), None, &es).unwrap();
         let x = notificacion(&a, &es);
         assert!(x.starts_with("<toast launch=\"guardiana://vpn\" activationType=\"protocol\""));
         assert!(x.contains("arguments=\"guardiana://vpn\"") && x.contains("Abrir la VPN"));
+        assert!(x.contains("<text>Finlandia · Helsinki</text>"));
         for idioma in [Idioma::Es, Idioma::En, Idioma::Pt] {
             let t = Textos::de(idioma);
             for (a, b) in [
-                ("conectada", "sin_respuesta"),
-                ("sin_respuesta", "conectada"),
-                ("conectando", "conectada"),
-                ("conectada", "apagada"),
-                ("conectando", "error"),
+                (vpn("conectada"), vpn("sin_respuesta")),
+                (vpn("conectada"), sin_estricto.clone()),
+                (vpn("sin_respuesta"), vpn("conectada")),
+                (vpn("conectando"), vpn("conectada")),
+                (vpn("conectada"), sin_salida("apagada")),
+                (vpn("conectando"), vpn("error")),
+                (vpn("reconectando"), bloqueada()),
             ] {
-                let x = aviso(&vpn(a), &vpn(b), false, &t).unwrap();
-                assert!(
-                    !x.titulo.contains("aviso_")
-                        && !x.texto.contains("aviso_")
-                        && !x.texto.contains('{'),
-                    "{x:?}"
-                );
+                let x = aviso(&a, &b, None, &t).unwrap();
+                for parte in [&x.titulo, &x.lugar, &x.texto] {
+                    assert!(
+                        !parte.contains("aviso_")
+                            && !parte.contains("vpn_")
+                            && !parte.contains("bandeja_")
+                            && !parte.contains('{'),
+                        "{x:?}"
+                    );
+                }
             }
         }
+    }
+
+    /// The owner's words for every text the icon brings (crates/zero/i18n): «encriptado», never «cifrado»; nothing that
+    /// promises what no one can; the strict mode covers «tus programas de Windows», never the whole computer.
+    #[test]
+    fn los_textos_nuevos_no_prometen_de_mas() {
+        let claves = [
+            "bandeja_sin_servicio",
+            "bandeja_no_disponible",
+            "bandeja_desconectada",
+            "bandeja_error",
+            "bandeja_abrir_vpn",
+            "bandeja_conectar",
+            "bandeja_abrir_guardiana",
+            "aviso_vpn_conectada",
+            "aviso_vpn_vuelve",
+            "aviso_vpn_apagada",
+            "aviso_vpn_error",
+        ];
+        for idioma in [Idioma::Es, Idioma::En, Idioma::Pt] {
+            let t = Textos::de(idioma);
+            for k in claves {
+                let x = t.t(k);
+                assert_ne!(x, k, "{idioma:?}: falta {k}");
+                let bajo = x.to_lowercase();
+                for prohibida in [
+                    "cifra",
+                    "100 %",
+                    "100%",
+                    "imposible",
+                    "impossible",
+                    "nadie puede",
+                    "no one can",
+                    "ninguém pode",
+                    "anónim",
+                    "anonym",
+                    "anônim",
+                    "auditad",
+                    "audited",
+                    "certificad",
+                    "certified",
+                ] {
+                    assert!(!bajo.contains(prohibida), "{idioma:?} {k}: {x}");
+                }
+            }
+        }
+        let es = Textos::de(Idioma::Es);
+        assert!(es
+            .t("aviso_vpn_conectada")
+            .contains("tus programas de Windows"));
+        assert!(es.t("aviso_vpn_conectada").contains("encriptado"));
+    }
+
+    /// An order of the menu the service did not take is said, as the chip says it; one it took is not.
+    #[test]
+    fn una_orden_que_no_se_pudo_hacer() {
+        let es = Textos::de(Idioma::Es);
+        assert_eq!(
+            aviso_de_orden(Orden::Desconectar, true, &vpn("conectada"), &es),
+            None
+        );
+        let a = aviso_de_orden(Orden::Desconectar, false, &vpn("conectada"), &es).unwrap();
+        assert_eq!(
+            (a.titulo.as_str(), a.texto),
+            ("VPN conectada", es.t("vpn_no_desconecta"))
+        );
+        let a = aviso_de_orden(Orden::Desconectar, false, &vpn("conectando"), &es).unwrap();
+        assert_eq!(a.texto, es.t("vpn_espera_conectar"));
+        // GUARDIANA does not answer: the Start menu's way out
+        let a = aviso_de_orden(Orden::Desconectar, false, &Vpn::default(), &es).unwrap();
+        assert_eq!(a.texto, es.t("vpn_sin_panel"));
+        let a = aviso_de_orden(Orden::Conectar, false, &sin_salida("apagada"), &es).unwrap();
+        assert_eq!(
+            (a.titulo.as_str(), a.texto),
+            ("VPN: no se pudo conectar", es.t("aviso_vpn_error"))
+        );
+        assert_eq!(
+            aviso_de_orden(Orden::AbrirVpn, false, &Vpn::default(), &es),
+            None
+        );
+    }
+
+    #[test]
+    fn la_memoria_no_anuncia_lo_que_uno_acaba_de_pulsar() {
+        let es = Textos::de(Idioma::Es);
+        let t0 = std::time::Instant::now();
+        let mut m = Memoria::default();
+        // the first reading: nothing
+        assert_eq!(m.lectura(sin_salida("apagada"), t0, &es), None);
+        m.ordenada(Orden::Conectar, t0);
+        m.ordenada(Orden::AbrirVpn, t0);
+        assert_eq!(m.propio(t0), Some(Orden::Conectar));
+        assert_eq!(m.lectura(vpn("conectando"), t0, &es), None);
+        assert_eq!(m.lectura(vpn("conectada"), t0 + CADA, &es), None);
+        // a minute later the same change is news again
+        assert_eq!(m.propio(t0 + PROPIO), None);
+        assert!(m
+            .lectura(vpn("sin_respuesta"), t0 + CADA * 2, &es)
+            .is_some());
+        assert_eq!(m.vpn.fase, Fase::SinRespuesta);
+    }
+
+    #[test]
+    fn el_idioma_que_eligio_la_persona_en_zero() {
+        let d = std::env::temp_dir().join(format!("guardiana-zero-bandeja-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&d);
+        let _ = std::fs::remove_file(d.join("preferencias.json"));
+        assert_eq!(idioma(&d, "pt-BR"), Idioma::Pt);
+        let _ = std::fs::write(d.join("preferencias.json"), r#"{"idioma":"en"}"#);
+        assert_eq!(idioma(&d, "pt-BR"), Idioma::En);
+        let _ = std::fs::write(d.join("preferencias.json"), r#"{"idioma":""}"#);
+        assert_eq!(idioma(&d, "es-CO"), Idioma::Es);
+        let _ = std::fs::write(d.join("preferencias.json"), "no es json");
+        assert_eq!(idioma(&d, "es-CO"), Idioma::Es);
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]
@@ -630,6 +1219,79 @@ mod tests {
         );
         // without a key, nothing is asked
         assert_eq!(lee(None), Vpn::default());
+    }
+
+    /// The key goes only to the service's own process (the CLI's rule): both known and the same.
+    #[test]
+    fn la_llave_solo_va_al_servicio() {
+        // what Windows' service manager answers: nine words, the state (4, running) second and the process eighth
+        let estado = |st: u32, pid: u32| {
+            let mut b = Vec::new();
+            for w in [16, st, 1, 0, 0, 0, 0, pid, 0] {
+                b.extend_from_slice(&u32::to_ne_bytes(w));
+            }
+            b
+        };
+        assert_eq!(pid_del_servicio(&estado(4, 812)), Some(812));
+        assert_eq!(pid_del_servicio(&estado(1, 812)), None);
+        assert_eq!(pid_del_servicio(&estado(4, 0)), None);
+        assert_eq!(pid_del_servicio(&estado(4, 812)[..20]), None);
+        assert!(es_el_servicio(Some(812), Some(812)));
+        assert!(!es_el_servicio(Some(812), Some(4040)));
+        assert!(!es_el_servicio(None, Some(812)));
+        assert!(!es_el_servicio(Some(812), None));
+        assert!(!es_el_servicio(Some(0), Some(0)));
+        // Windows' table: count, then (state, local address, local port, remote address, remote port, pid) per row,
+        // the addresses and ports as the bytes of the network say them
+        let ip = |a: [u8; 4]| u32::from_ne_bytes(a);
+        let puerto = |p: u16| {
+            let b = p.to_be_bytes();
+            u32::from_ne_bytes([b[0], b[1], 0, 0])
+        };
+        let fila = |a: [u8; 4], p: u16, pid: u32| [2, ip(a), puerto(p), 0, 0, pid];
+        let tabla = |filas: &[[u32; 6]]| {
+            let mut t = vec![u32::try_from(filas.len()).unwrap()];
+            for f in filas {
+                t.extend_from_slice(f);
+            }
+            t
+        };
+        let lo = [127, 0, 0, 1];
+        let t = tabla(&[fila([0; 4], 80, 4), fila(lo, 7443, 812)]);
+        assert_eq!(pid_que_escucha(&t, lo, 7443), Some(812));
+        // another process on every address of the same port: no certainty
+        let t = tabla(&[fila(lo, 7443, 812), fila([0; 4], 7443, 999)]);
+        assert_eq!(pid_que_escucha(&t, lo, 7443), None);
+        // only on every address: not on exactly 127.0.0.1
+        let t = tabla(&[fila([0; 4], 7443, 812)]);
+        assert_eq!(pid_que_escucha(&t, lo, 7443), None);
+        assert_eq!(pid_que_escucha(&[], lo, 7443), None);
+        assert_eq!(pid_que_escucha(&[3, 1, 2], lo, 7443), None);
+    }
+
+    /// The four icons are GUARDIANA's own (build/wix/iconos_vpn.py), with an image for every size the notification
+    /// area asks for at 100 to 200 %.
+    #[test]
+    fn los_iconos_tienen_cada_tamano() {
+        for ico in [
+            &include_bytes!("../../../build/wix/vpn-verde.ico")[..],
+            &include_bytes!("../../../build/wix/vpn-ambar.ico")[..],
+            &include_bytes!("../../../build/wix/vpn-rojo.ico")[..],
+            &include_bytes!("../../../build/wix/vpn-gris.ico")[..],
+        ] {
+            for lado in [16, 20, 24, 32, 40] {
+                let png = imagen_ico(ico, lado).unwrap();
+                assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+                // the PNG's own width, bytes 16 to 19 of its header
+                let ancho = u32::from_be_bytes([png[16], png[17], png[18], png[19]]);
+                assert_eq!(ancho, lado);
+            }
+            // bigger than any: the biggest
+            let png = imagen_ico(ico, 300).unwrap();
+            assert_eq!(u32::from_be_bytes([png[16], png[17], png[18], png[19]]), 64);
+        }
+        assert_eq!(imagen_ico(b"no es un icono", 16), None);
+        assert_eq!(imagen_ico(&[0, 0, 1, 0, 1, 0], 16), None);
     }
 
     /// The menu's orders reach a service on this computer as the CLI sends them: the method, the address, the key and
