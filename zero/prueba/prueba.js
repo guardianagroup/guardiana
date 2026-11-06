@@ -120,6 +120,57 @@ for ($i = 0; $i -lt 6; $i++) { [Rueda]::mouse_event(0x0800, 0, 0, -120, [UIntPtr
 `);
   try { execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${ps}"`, { stdio: 'ignore' }); } catch (_) {}
 }
+// 5 Nov 2026: what Windows says of the VPN's icon next to the clock (`--avisos`'s hidden window, icon number 1): whether
+// it has it and where (Shell_NotifyIconGetRect), and, when it is on the screen, the colour of its dot (the bottom right
+// of the icon) and a picture of it, enlarged, in `recorte`.
+function iconoEnWindows(recorte) {
+  const ps = path.join(os.tmpdir(), 'zero-icono-vpn.ps1');
+  const destino = recorte ? path.join(salida, recorte).replace(/'/g, "''") : '';
+  fs.writeFileSync(ps, `
+Add-Type -AssemblyName System.Drawing
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class IconoVpn {
+  [StructLayout(LayoutKind.Sequential)] public struct ID { public uint cbSize; public IntPtr hWnd; public uint uID; public Guid guidItem; }
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+  [DllImport("shell32.dll")] public static extern int Shell_NotifyIconGetRect(ref ID id, out RECT r);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindowW(string c, string t);
+}
+"@
+$h = [IconoVpn]::FindWindowW('GuardianaAvisos', $null)
+if ($h -eq [IntPtr]::Zero) { 'sin-ventana'; exit }
+$id = New-Object IconoVpn+ID
+$id.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf([type][IconoVpn+ID])
+$id.hWnd = $h
+$id.uID = 1
+$r = New-Object IconoVpn+RECT
+$hr = [IconoVpn]::Shell_NotifyIconGetRect([ref]$id, [ref]$r)
+$w = $r.R - $r.L; $a = $r.B - $r.T
+$color = ''
+if ($hr -eq 0 -and $w -gt 4 -and $a -gt 4 -and $w -lt 200 -and $a -lt 200) {
+  $b = New-Object System.Drawing.Bitmap $w, $a
+  $g = [System.Drawing.Graphics]::FromImage($b)
+  $g.CopyFromScreen($r.L, $r.T, 0, 0, $b.Size)
+  # the most saturated pixel: the dot when it is green, amber or red; the padlock's pale blue when it is grey
+  $mejor = -1
+  for ($x = 0; $x -lt $w; $x++) { for ($y = 0; $y -lt $a; $y++) {
+    $p = $b.GetPixel($x, $y)
+    $s = [Math]::Max($p.R, [Math]::Max($p.G, $p.B)) - [Math]::Min($p.R, [Math]::Min($p.G, $p.B))
+    if ($s -gt $mejor) { $mejor = $s; $color = "$($p.R),$($p.G),$($p.B)" }
+  } }
+  if ('${destino}') {
+    $z = New-Object System.Drawing.Bitmap ($w * 8), ($a * 8)
+    $gz = [System.Drawing.Graphics]::FromImage($z)
+    $gz.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+    $gz.DrawImage($b, 0, 0, $w * 8, $a * 8)
+    $z.Save('${destino}')
+  }
+}
+"$hr $($r.L) $($r.T) $w $a $color"
+`);
+  try { return execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${ps}"`, { encoding: 'utf8' }).trim(); } catch (e) { return `error ${(e && e.message) || ''}`.slice(0, 300); }
+}
 function pantalla(nombre) {
   const ruta = path.join(salida, nombre).replace(/'/g, "''");
   try {
@@ -603,6 +654,81 @@ function pantalla(nombre) {
   comprueba((await barra2.textContent('#b-licencia')) === 'GUARDIANA Gratis', 'sin clave válida sigue en GUARDIANA Gratis, protegiendo');
   try { execSync('taskkill /IM guardiana-zero.exe', { stdio: 'ignore' }); } catch (_) {}
   comprueba(await hasta(async () => salio !== null, 20000), 'cierra otra vez sin forzar');
+
+  // 5 Nov 2026 (the owner, 3 Nov: «Hazlo claro»): the VPN's icon next to Windows' clock, drawn by `--avisos`, the
+  // program's process without a window that starts with the session (the installer's Run entry), so it is there with
+  // ZERO closed. A panel of the test's own on the panel's port answers `GET /api/vpn` as the service does
+  // (crates/panel/src/vpn.rs), with the panel's key where the service keeps it; the process writes what it shows to
+  // `bandeja.txt` (only in the tests: «<colour> <1 if Windows took it>», then its lines), and Windows itself is asked
+  // whether it has the icon and of what colour it is on the screen.
+  {
+    const LLAVE = crypto.randomBytes(32).toString('hex');
+    const carpetaLlave = path.join(process.env.ProgramData || 'C:\\ProgramData', 'Guardiana');
+    const rutaLlave = path.join(carpetaLlave, 'panel.token');
+    let llaveAntes = null;
+    try { llaveAntes = fs.readFileSync(rutaLlave); } catch (_) {}
+    const habiaCarpeta = fs.existsSync(carpetaLlave);
+    fs.mkdirSync(carpetaLlave, { recursive: true });
+    fs.writeFileSync(rutaLlave, LLAVE);
+    let fase = 'apagada';
+    const lecturas = [];
+    const panelVpn = http.createServer((req, res) => {
+      const conLlave = req.headers['x-guardiana-token'] === LLAVE;
+      lecturas.push({ metodo: req.method, ruta: req.url, conLlave });
+      if (!conLlave) { res.writeHead(401); return res.end(); }
+      if (req.method === 'GET' && req.url === '/api/vpn') {
+        const on = fase !== 'apagada';
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ disponible: true, fase, estricto: true, desconectar: on, salida: on ? { id: 'hel', pais: 'FI', ciudad: 'Helsinki' } : null }));
+      }
+      res.writeHead(404);
+      return res.end();
+    });
+    const conPanel = await new Promise((r) => { panelVpn.once('error', () => r(false)); panelVpn.listen(7443, '127.0.0.1', () => r(true)); });
+    comprueba(conPanel, 'el icono de la VPN: un panel de prueba en el puerto del panel (7443)');
+    let explorador = false;
+    try { explorador = /explorer\.exe/i.test(execSync('tasklist /FI "IMAGENAME eq explorer.exe" /NH', { encoding: 'utf8' })); } catch (_) {}
+    const bandeja = path.join(base, 'datos', 'bandeja.txt');
+    try { fs.unlinkSync(bandeja); } catch (_) {}
+    const icono = () => { try { return fs.readFileSync(bandeja, 'utf8'); } catch (_) { return ''; } };
+    const avisos = spawn(exe, ['--avisos'], { env: { ...process.env, GUARDIANA_ZERO_DATOS: base }, stdio: 'ignore' });
+    let avisosSalio = null;
+    avisos.on('exit', (c) => { avisosSalio = c; });
+    // Windows takes the icon only with a taskbar (Explorer): without one on this runner, only what it decided is checked
+    const puesto = explorador ? ' 1' : ' ';
+    if (!explorador) console.log('::warning title=icono de la VPN::este Windows no tiene el Explorador en marcha: no hay barra de tareas donde poner el icono, y solo se comprueba lo que decide');
+    const en = (color, que) => hasta(async () => icono().startsWith(color + puesto) && icono().includes(que), 20000);
+    const enPantalla = (color, recorte) => {
+      const w = iconoEnWindows(recorte);
+      const [hr, , , , , rgb] = w.split(' ');
+      const [r, g, b] = (rgb || '').split(',').map(Number);
+      const visto = !rgb ? '' : Math.max(r, g, b) - Math.min(r, g, b) < 100 ? 'gris' : g > r && g > b ? 'verde' : r > 200 && g > 140 ? 'ambar' : r > g && r > b ? 'rojo' : '?';
+      console.log(`::notice title=icono de la VPN (${color})::Shell_NotifyIconGetRect y el color en la pantalla: ${w}${visto ? ` (se ve ${visto})` : ''}`);
+      return { tiene: hr === '0', visto };
+    };
+    comprueba(await en('gris', 'VPN desconectada'), `el icono de la VPN aparece junto al reloj, gris, con «GUARDIANA · VPN desconectada» (${JSON.stringify(icono())})`);
+    // where Windows put it (on the taskbar, or among the hidden icons) and how it looks: said, never a failure
+    enPantalla('gris', 'vpn-icono-gris.png');
+    fase = 'conectando';
+    comprueba(await en('ambar', 'VPN: conectando'), `mientras conecta, ámbar con «VPN: conectando…» (${JSON.stringify(icono())})`);
+    fase = 'conectada';
+    comprueba(await en('verde', 'VPN conectada\nFinlandia · Helsinki'), `al conectar se pone verde y dice dónde sale (${JSON.stringify(icono())})`);
+    await espera(1500);
+    pantalla('vpn-icono-verde.png');
+    const visto = enPantalla('verde', 'vpn-icono-verde-recorte.png').visto;
+    if (visto && visto !== 'verde') console.log(`::warning title=icono de la VPN::conectada, en la pantalla se ve ${visto}`);
+    fase = 'sin_respuesta';
+    comprueba(await en('rojo', 'VPN sin respuesta'), `si su servidor no contesta, rojo con «VPN sin respuesta» (${JSON.stringify(icono())})`);
+    fase = 'apagada';
+    comprueba(await en('gris', 'VPN desconectada'), `al desconectar vuelve a gris (${JSON.stringify(icono())})`);
+    comprueba(lecturas.length >= 4 && lecturas.every((l) => l.conLlave && l.metodo === 'GET' && l.ruta === '/api/vpn'), `pregunta solo «GET /api/vpn» y con la llave del panel (${lecturas.length} lecturas)`);
+    // the installer closes it as it closes ZERO (its hidden window takes WM_CLOSE), and the icon goes with it
+    try { execSync(`taskkill /PID ${avisos.pid}`, { stdio: 'ignore' }); } catch (_) {}
+    comprueba(await hasta(async () => avisosSalio !== null, 15000), 'y se cierra sin forzar, como lo cierra el instalador');
+    panelVpn.close();
+    try { if (llaveAntes) fs.writeFileSync(rutaLlave, llaveAntes); else fs.unlinkSync(rutaLlave); } catch (_) {}
+    if (!habiaCarpeta) try { fs.rmdirSync(carpetaLlave); } catch (_) {}
+  }
 })().catch((e) => { comprueba(false, `la prueba se interrumpió: ${e && e.message}`); }).finally(() => {
   try { execSync('taskkill /F /IM guardiana-zero.exe', { stdio: 'ignore' }); } catch (_) {}
   fs.writeFileSync(path.join(salida, 'servidor.json'), JSON.stringify(registro, null, 1));
