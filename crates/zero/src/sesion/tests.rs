@@ -3481,6 +3481,35 @@ fn a_notice_of_the_shield_opens_orbita_on_the_scanner() {
     assert_eq!(s.producto(), "orbita");
 }
 
+#[test]
+fn the_vpn_icon_opens_orbita_on_the_vpn() {
+    // 5 Nov 2026: a click on the VPN's icon next to Windows' clock, on its «Abrir la VPN» or on one of its notices.
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "e".repeat(64));
+    let _ = s.abre_programa(&url);
+    let orbita = s.activa();
+    let n = s.pestanas.len();
+    // Órbita open: its own tab goes to the VPN, no second tab; after the Antivirus too.
+    let _ = s.abre_escaner();
+    let o = s.abre_vpn();
+    assert_eq!(s.activa(), orbita);
+    assert_eq!(s.pestanas.len(), n);
+    assert!(o.iter().any(
+        |x| matches!(x, Orden::Navega { id, url: u } if *id == orbita && u == &format!("{ORBITA}#vpn"))
+    ));
+    // Órbita closed: a tab of its own, in front.
+    let (mut s, _, _) = abre();
+    let o = s.abre_vpn();
+    let nueva = s.activa();
+    assert!(s
+        .pestana(nueva)
+        .is_some_and(|p| p.fija && p.url == format!("{ORBITA}#vpn")));
+    assert!(o
+        .iter()
+        .any(|x| matches!(x, Orden::CreaPestana { id, .. } if *id == nueva)));
+    assert_eq!(s.producto(), "orbita");
+}
+
 /// 5 Nov 2026: «conectar» names its exit and strict mode's switch its side, in a body the program checks and passes
 /// rewritten; any other body is refused (400) and the panel is not asked.
 #[test]

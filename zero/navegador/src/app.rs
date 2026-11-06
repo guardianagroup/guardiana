@@ -457,13 +457,15 @@ fn recoge_panel() {
 }
 
 /// Hand this start's request to the copy that is already running (its own window does it):
-/// `dwData` 1 is an address for GUARDIANA's tab, 2 the panel, with a licence key or empty.
+/// `dwData` 1 is an address for GUARDIANA's tab, 2 the panel, with a licence key or empty, 3 Órbita on the Antivirus,
+/// 4 Órbita on the VPN (the icon next to the clock).
 fn pasa_pedido(otra: HWND, pedido: &Pedido) {
     let (tipo, texto) = match pedido {
         Pedido::AbreGuardiana(url) => (1, url.as_str()),
         Pedido::Panel => (2, ""),
         Pedido::Activar(clave) => (2, clave.as_str()),
         Pedido::Escaner => (3, ""),
+        Pedido::Vpn => (4, ""),
     };
     let ancho = Ancho::de(texto);
     let copia = COPYDATASTRUCT {
@@ -2292,6 +2294,9 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             } else if copia.dwData == 3 {
                 // A click on Windows' notice of a grave warning of el escudo: Órbita on the Antivirus.
                 encola(con_sesion(Sesion::abre_escaner).unwrap_or_default());
+            } else if copia.dwData == 4 {
+                // The VPN's icon next to the clock, its menu or one of its notices: Órbita on the VPN.
+                encola(con_sesion(Sesion::abre_vpn).unwrap_or_default());
             } else {
                 encola(con_sesion(|s| s.abre_programa(&texto)).unwrap_or_default());
             }
@@ -2721,6 +2726,11 @@ pub fn arranca() {
         Some(Pedido::Escaner) => {
             let mut o = abre_panel(&mut s, None, true);
             o.extend(s.abre_escaner());
+            o
+        }
+        Some(Pedido::Vpn) => {
+            let mut o = abre_panel(&mut s, None, true);
+            o.extend(s.abre_vpn());
             o
         }
         Some(p) => abre_panel(&mut s, p.clave().map(str::to_owned), true),

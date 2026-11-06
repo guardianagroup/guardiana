@@ -1092,7 +1092,20 @@ impl Sesion {
     /// (`guardiana://escaner`) opens Órbita on its Antivirus: in Órbita's tab when it is open (only the address's
     /// fragment changes, and the page opens the scanner), else in a new one.
     pub fn abre_escaner(&mut self) -> Vec<Orden> {
-        let url = format!("{ORBITA}#escaner");
+        self.abre_seccion_de_orbita("escaner")
+    }
+
+    /// 5 Nov 2026 (the VPN next to Windows' clock, [`crate::bandeja`]): a click on its icon, on its «Abrir la VPN» or on
+    /// one of its notices (`guardiana://vpn`) opens Órbita on its VPN, as [`Sesion::abre_escaner`] opens the Antivirus:
+    /// in Órbita's tab when it is open (only the address's fragment changes, and the program's script in the page opens
+    /// the section, `paginas.rs`), else in a new one.
+    pub fn abre_vpn(&mut self) -> Vec<Orden> {
+        self.abre_seccion_de_orbita("vpn")
+    }
+
+    /// Órbita on its section `seccion` (the address's fragment), in its own tab, in front.
+    fn abre_seccion_de_orbita(&mut self, seccion: &str) -> Vec<Orden> {
+        let url = format!("{ORBITA}#{seccion}");
         let mut o = match self
             .pestanas
             .iter()

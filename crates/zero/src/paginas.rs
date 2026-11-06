@@ -438,6 +438,18 @@ const GUION: &str = r#"(() => {
   /*<programa>*/
   if (!marco && programa && location.origin === 'https://guardianagroup.com') {
     marca('enPrograma');
+    // 5 Nov 2026 (the VPN next to Windows' clock): with Órbita already open, its icon, its menu or one of its notices
+    // (guardiana://vpn) only changes the address's fragment to #vpn, and the VPN's page opens on an arrival only; it
+    // opens here as it would on arriving, the way the Antivirus opens on #escaner.
+    addEventListener('hashchange', () => {
+      if (location.hash !== '#vpn' || !location.pathname.startsWith('/orbita/')) return;
+      const vpn = window.OrbitaVpn;
+      if (!vpn || typeof vpn.abre !== 'function' || vpn.abierto) return;
+      try { history.replaceState({ vpn: 1, llegada: 1 }, '', location.pathname + location.search + '#vpn'); } catch (_) {}
+      const nucleo = window.GuardianaNucleo;
+      if (nucleo && typeof nucleo.cierra === 'function') try { nucleo.cierra(); } catch (_) {}
+      try { vpn.abre({ apila: false }); } catch (_) {}
+    });
     // 1.0.50 (independent review, M1): a reading that sets this computer to work (a review, a slow look of the watch)
     // only right after the person's own click or key, which the page cannot fake.
     let gesto = 0;
@@ -1571,6 +1583,8 @@ mod tests {
             "guardiana-panel-pide",
             "enPrograma",
             "enZero",
+            // 5 Nov 2026: Órbita on the VPN from the icon next to the clock
+            "window.OrbitaVpn",
         ] {
             assert!(!web.contains(parte), "{parte}");
             assert!(programa.contains(parte), "{parte}");

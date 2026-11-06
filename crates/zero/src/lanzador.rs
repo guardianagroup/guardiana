@@ -60,6 +60,9 @@ pub enum Pedido {
     /// `--url guardiana://escaner`: Órbita on the Antivirus (a click on Windows' notice of a grave warning of el
     /// escudo, 1.0.52; see [`crate::avisos`]).
     Escaner,
+    /// `--url guardiana://vpn`: Órbita on the VPN (5 Nov 2026: a click on the VPN's icon next to Windows' clock, on its
+    /// «Abrir la VPN» or on one of its notices; see [`crate::bandeja`]).
+    Vpn,
 }
 
 impl Pedido {
@@ -83,7 +86,8 @@ pub fn pedido_de_argumentos(args: &[String]) -> Option<Pedido> {
         [a] if a == "--panel" => Some(Pedido::Panel),
         [a, url] if a == "--url" => clave_de_enlace(url)
             .map(Pedido::Activar)
-            .or_else(|| es_enlace_escaner(url).then_some(Pedido::Escaner)),
+            .or_else(|| es_enlace_escaner(url).then_some(Pedido::Escaner))
+            .or_else(|| es_enlace_vpn(url).then_some(Pedido::Vpn)),
         _ => None,
     }
 }
@@ -92,9 +96,21 @@ pub fn pedido_de_argumentos(args: &[String]) -> Option<Pedido> {
 /// allowed, nothing else: no query, no fragment, no user, no port, no path).
 #[must_use]
 pub fn es_enlace_escaner(url: &str) -> bool {
+    es_enlace(url, crate::avisos::ENLACE)
+}
+
+/// Whether a link is exactly `guardiana://vpn`, with the same strictness as [`es_enlace_escaner`].
+#[must_use]
+pub fn es_enlace_vpn(url: &str) -> bool {
+    es_enlace(url, crate::bandeja::ENLACE)
+}
+
+/// Whether `url` is exactly `enlace` (a `guardiana://<host>` link), compared without case, with one slash after it
+/// allowed and nothing else.
+fn es_enlace(url: &str, enlace: &str) -> bool {
     let url = url.trim();
     let url = url.strip_suffix('/').unwrap_or(url);
-    url.eq_ignore_ascii_case(crate::avisos::ENLACE)
+    url.eq_ignore_ascii_case(enlace)
 }
 
 /// Whether a licence key has only what a key can have: ASCII letters, digits, `-` and `_`,
@@ -321,12 +337,27 @@ mod tests {
             pedido_de_argumentos(&args(&["--url", "GUARDIANA://Escaner/"])),
             Some(Pedido::Escaner)
         );
+        // 5 Nov 2026: el icono de la VPN junto al reloj, su menú y sus avisos
+        assert_eq!(
+            pedido_de_argumentos(&args(&["--url", "guardiana://vpn"])),
+            Some(Pedido::Vpn)
+        );
+        assert_eq!(
+            pedido_de_argumentos(&args(&["--url", " GUARDIANA://VPN/ "])),
+            Some(Pedido::Vpn)
+        );
         for malo in [
             "guardiana://escaner?x=1",
             "guardiana://escaner#a",
             "guardiana://escaner.evil.com",
             "guardiana://escaner/otra",
             "guardiana://user@escaner",
+            "guardiana://vpn?conecta=1",
+            "guardiana://vpn#x",
+            "guardiana://vpn.evil.com",
+            "guardiana://vpn/desconecta",
+            "guardiana://user@vpn",
+            "guardiana://vpnx",
         ] {
             assert_eq!(
                 pedido_de_argumentos(&args(&["--url", malo])),
