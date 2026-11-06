@@ -18,7 +18,7 @@ use std::sync::{Mutex, PoisonError};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use guardiana_zero::avisos::{self, AUMID};
-use guardiana_zero::bandeja::{self, Color, Memoria, Orden, Respuesta, Vpn};
+use guardiana_zero::bandeja::{self, Color, Falta, Memoria, Orden, Respuesta, Vpn};
 use guardiana_zero::lanzador;
 use guardiana_zero::textos::Textos;
 use windows::core::{w, HRESULT, HSTRING, PCWSTR};
@@ -294,12 +294,25 @@ fn al_servicio() -> bool {
     bandeja::llave_al_puerto(en_prueba(), sin_servicio, pid, pid_del_puerto())
 }
 
-/// The VPN as the service says it now; unknown when the one listening is not the service or the key cannot be read.
+/// The VPN as the service says it now; when it cannot be asked, why, as far as Windows tells it without the key
+/// (`bandeja::Falta`): the service not installed or not running, its port not listening yet or someone else's, the key
+/// not readable from this account, or no answer.
 fn lectura() -> Vpn {
-    if !al_servicio() {
-        return Vpn::default();
+    let (sin_servicio, pid) = servicio();
+    let escucha = pid_del_puerto();
+    if !bandeja::llave_al_puerto(en_prueba(), sin_servicio, pid, escucha) {
+        return Vpn::sin(bandeja::falta_del_puerto(sin_servicio, pid, escucha));
     }
-    bandeja::lee(lanzador::lee_llave(&lanzador::ruta_llave()).as_deref())
+    let ruta = lanzador::ruta_llave();
+    match lanzador::lee_llave(&ruta) {
+        Some(llave) => bandeja::lee(Some(&llave)),
+        None if std::fs::File::open(&ruta)
+            .is_err_and(|e| e.kind() == std::io::ErrorKind::PermissionDenied) =>
+        {
+            Vpn::sin(Falta::SinLlave)
+        }
+        None => Vpn::default(),
+    }
 }
 
 /// A message to this process's own hidden window from another thread (its handle travels as a number).
@@ -368,6 +381,29 @@ fn con_bandeja<R>(f: impl FnOnce(&mut Bandeja) -> R) -> Option<R> {
     BANDEJA.with(|b| b.try_borrow_mut().ok()?.as_mut().map(f))
 }
 
+/// `guardiana.exe`, when it is there: ZERO lives in GUARDIANA's own folder (`Program Files\Guardiana\ZERO`,
+/// build/wix/guardiana.wxs).
+fn guardiana_exe() -> Option<PathBuf> {
+    let yo = std::env::current_exe().ok()?;
+    let g = yo.parent()?.parent()?.join("guardiana.exe");
+    g.is_file().then_some(g)
+}
+
+/// What the Start menu's «Apagar la VPN de GUARDIANA» runs (build/wix/guardiana.wxs, `ApagarVpn`): `guardiana.exe vpn
+/// apaga --menu`, in a console window of its own, from GUARDIANA's folder. Without an administrator's rights it asks
+/// Windows for them itself, and its window says what happened (crates/cli/src/vpn_cmd.rs).
+fn apaga_vpn() {
+    let Some(g) = guardiana_exe() else {
+        return;
+    };
+    let mut c = Command::new(&g);
+    c.args(["vpn", "apaga", "--menu"]);
+    if let Some(carpeta) = g.parent() {
+        c.current_dir(carpeta);
+    }
+    let _ = c.spawn();
+}
+
 /// ZERO itself with `args`: Órbita on the VPN (`--url guardiana://vpn`) or GUARDIANA (`--panel`). A copy already open
 /// takes the request.
 fn abre_zero(args: &[&str]) {
@@ -406,6 +442,20 @@ fn identidad(h: HWND) -> NOTIFYICONDATAW {
 /// changed (`forzar`: again in any case, after Explorer started again).
 fn pon_icono(h: HWND, b: &mut Bandeja, t: &Textos, forzar: bool) {
     if CERRANDO.load(Ordering::SeqCst) {
+        return;
+    }
+    // ZERO alone, without GUARDIANA's service: no VPN, no icon (and it comes when GUARDIANA does)
+    if !bandeja::se_ve(&b.memoria.vpn) {
+        if b.puesto {
+            let d = identidad(h);
+            // SAFETY: takes away the icon of this process's own window.
+            unsafe {
+                let _ = Shell_NotifyIconW(NIM_DELETE, &d);
+            }
+            b.puesto = false;
+        }
+        b.color = None;
+        b.linea.clear();
         return;
     }
     let color = bandeja::color(&b.memoria.vpn);
@@ -525,7 +575,7 @@ fn menu(h: HWND) {
         return;
     };
     let desconectando = ORDENANDO.load(Ordering::SeqCst) == Orden::Desconectar.id();
-    let entradas = bandeja::menu(&vpn, desconectando, &t);
+    let entradas = bandeja::menu(&vpn, desconectando, guardiana_exe().is_some(), &t);
     let anchos: Vec<Vec<u16>> = entradas.iter().map(|e| ancho(&e.texto)).collect();
     let mut punto = POINT::default();
     // SAFETY: a menu of this thread, its texts alive until it is destroyed; shown at the pointer for this process's own
@@ -569,6 +619,7 @@ fn menu(h: HWND) {
     match elegida {
         Some(Orden::AbrirVpn) => abre_zero(&["--url", bandeja::ENLACE]),
         Some(Orden::AbrirGuardiana) => abre_zero(&["--panel"]),
+        Some(Orden::ApagarVpn) => apaga_vpn(),
         Some(o @ (Orden::Conectar | Orden::Desconectar)) => ordena(h, o, t.idioma().codigo()),
         _ => {}
     }
