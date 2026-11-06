@@ -44,11 +44,12 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateIconFromResourceEx, CreatePopupMenu, CreateWindowExW, DefWindowProcW,
     DestroyIcon, DestroyMenu, DispatchMessageW, GetCursorPos, GetMessageW, GetSystemMetrics,
-    PostMessageW, PostQuitMessage, RegisterClassExW, RegisterWindowMessageW, SetForegroundWindow,
-    SetMenuDefaultItem, SetTimer, TrackPopupMenu, TranslateMessage, HICON, LR_DEFAULTCOLOR,
-    MF_GRAYED, MF_SEPARATOR, MF_STRING, MSG, SM_CXSMICON, TPM_NONOTIFY, TPM_RETURNCMD,
-    TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_CONTEXTMENU, WM_ENDSESSION,
-    WM_LBUTTONUP, WM_NULL, WM_QUERYENDSESSION, WM_RBUTTONUP, WM_TIMER, WNDCLASSEXW, WS_OVERLAPPED,
+    KillTimer, PostMessageW, PostQuitMessage, RegisterClassExW, RegisterWindowMessageW,
+    SetForegroundWindow, SetMenuDefaultItem, SetTimer, TrackPopupMenu, TranslateMessage, HICON,
+    LR_DEFAULTCOLOR, MF_GRAYED, MF_SEPARATOR, MF_STRING, MSG, SM_CXSMICON, TPM_NONOTIFY,
+    TPM_RETURNCMD, TPM_RIGHTBUTTON, WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_CONTEXTMENU,
+    WM_ENDSESSION, WM_LBUTTONUP, WM_NULL, WM_QUERYENDSESSION, WM_RBUTTONUP, WM_TIMER, WNDCLASSEXW,
+    WS_OVERLAPPED,
 };
 use windows::UI::Notifications::{ToastNotification, ToastNotificationManager};
 
@@ -199,6 +200,8 @@ static ORDENANDO: AtomicU32 = AtomicU32::new(0);
 static HECHA: Mutex<Option<(Orden, Respuesta)>> = Mutex::new(None);
 /// The message Windows sends every window when the taskbar is created again (Explorer restarted): `TaskbarCreated`.
 static BARRA_NUEVA: AtomicU32 = AtomicU32::new(0);
+/// The process is closing (the installer, or the end of the session): nothing puts the icon back any more.
+static CERRANDO: AtomicBool = AtomicBool::new(false);
 
 /// The icon's texts: the language the person chose in ZERO, else the one ZERO starts in.
 fn textos(datos: &Path) -> Textos {
@@ -326,6 +329,9 @@ fn lee_vpn(h: HWND) {
 /// «Conectar» or «Desconectar» from the menu, on its own thread (closing the tunnel can take seconds), one at a time,
 /// with the icon's language (`idioma`) for the words of the service's answer.
 fn ordena(h: HWND, o: Orden, idioma: &'static str) {
+    if CERRANDO.load(Ordering::SeqCst) {
+        return;
+    }
     if ORDENANDO
         .compare_exchange(0, o.id(), Ordering::SeqCst, Ordering::SeqCst)
         .is_err()
@@ -391,6 +397,9 @@ fn identidad(h: HWND) -> NOTIFYICONDATAW {
 /// The icon as the last reading says it: put when Windows does not have it yet, changed when its colour or its lines
 /// changed (`forzar`: again in any case, after Explorer started again).
 fn pon_icono(h: HWND, b: &mut Bandeja, t: &Textos, forzar: bool) {
+    if CERRANDO.load(Ordering::SeqCst) {
+        return;
+    }
     let color = bandeja::color(&b.memoria.vpn);
     let linea = bandeja::linea(&b.memoria.vpn, t);
     if b.puesto && !forzar && b.color == Some(color) && b.linea == linea {
@@ -447,31 +456,40 @@ fn pon_icono(h: HWND, b: &mut Bandeja, t: &Textos, forzar: bool) {
     b.linea = linea;
 }
 
-/// The icon out of the notification area, before the process ends.
-fn quita_icono(h: HWND) {
-    con_bandeja(|b| {
-        if b.puesto {
-            let d = identidad(h);
-            // SAFETY: takes away the icon of this process's own window.
-            unsafe {
-                let _ = Shell_NotifyIconW(NIM_DELETE, &d);
-            }
-            b.puesto = false;
+/// Before the process ends: its timers stopped, the icon out of the notification area whatever this process believes
+/// of it (Windows only needs the window and the icon's number), and the icon's state emptied. A reading, an order or a
+/// `TaskbarCreated` that arrives after this (the quit message comes only once the queue is empty) finds nothing to draw
+/// and does not put the icon back (review of bandeja-vpn-2, finding 2).
+fn cierra(h: HWND) {
+    CERRANDO.store(true, Ordering::SeqCst);
+    // SAFETY: stops the two timers of this thread's own window.
+    unsafe {
+        let _ = KillTimer(Some(h), RELOJ_AVISOS);
+        let _ = KillTimer(Some(h), RELOJ_VPN);
+    }
+    let d = identidad(h);
+    // SAFETY: takes away the icon of this process's own window; when Windows does not have it, nothing happens.
+    unsafe {
+        let _ = Shell_NotifyIconW(NIM_DELETE, &d);
+    }
+    let fuera = BANDEJA.with(|b| b.try_borrow_mut().ok().and_then(|mut b| b.take()));
+    if let Some(icono) = fuera.and_then(|b| b.icono) {
+        // SAFETY: an icon this process made, no longer shown.
+        unsafe {
+            let _ = DestroyIcon(icono);
         }
-        if let Some(icono) = b.icono.take() {
-            // SAFETY: an icon this process made, no longer shown.
-            unsafe {
-                let _ = DestroyIcon(icono);
-            }
-        }
-    });
+    }
 }
 
 /// A reading or an order finished: the notice it deserves, and the icon as it is now.
 fn al_leer(h: HWND) {
-    let nueva = LEIDA.lock().unwrap_or_else(PoisonError::into_inner).take();
-    let hecha = HECHA.lock().unwrap_or_else(PoisonError::into_inner).take();
-    con_bandeja(|b| {
+    if CERRANDO.load(Ordering::SeqCst) {
+        return;
+    }
+    // taken out only once the icon's state is at hand, so neither is lost
+    let ordenada = con_bandeja(|b| {
+        let nueva = LEIDA.lock().unwrap_or_else(PoisonError::into_inner).take();
+        let hecha = HECHA.lock().unwrap_or_else(PoisonError::into_inner).take();
         let t = textos(&b.datos);
         if let Some((o, r)) = &hecha {
             if let Some(a) = bandeja::aviso_de_orden(*o, r, &b.memoria.vpn, &t) {
@@ -484,9 +502,10 @@ fn al_leer(h: HWND) {
             }
         }
         pon_icono(h, b, &t, false);
+        hecha.is_some()
     });
     // what the order did, at once
-    if hecha.is_some() {
+    if ordenada == Some(true) {
         lee_vpn(h);
     }
 }
@@ -535,6 +554,10 @@ fn menu(h: HWND) {
         let _ = DestroyMenu(m);
         Orden::de_id(u32::try_from(r.0).unwrap_or(0))
     };
+    // closed while the menu was open (its own loop handed the closing on): nothing chosen is done
+    if CERRANDO.load(Ordering::SeqCst) {
+        return;
+    }
     match elegida {
         Some(Orden::AbrirVpn) => abre_zero(&["--url", bandeja::ENLACE]),
         Some(Orden::AbrirGuardiana) => abre_zero(&["--panel"]),
@@ -585,13 +608,13 @@ extern "system" fn proc_avisos(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRE
         }
         WM_QUERYENDSESSION => LRESULT(1),
         WM_CLOSE | WM_ENDSESSION => {
-            quita_icono(h);
+            cierra(h);
             // SAFETY: posts the quit message to this thread's own queue.
             unsafe { PostQuitMessage(0) };
             LRESULT(0)
         }
         m if m != 0 && m == BARRA_NUEVA.load(Ordering::SeqCst) => {
-            // Explorer started again (it stopped, or was restarted): the icon is put back.
+            // Explorer started again (it stopped, or was restarted): the icon is put back, unless the process is closing.
             con_bandeja(|b| {
                 b.puesto = false;
                 let t = textos(&b.datos);
