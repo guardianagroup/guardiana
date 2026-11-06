@@ -135,10 +135,11 @@ public static class IconoVpn {
   [StructLayout(LayoutKind.Sequential)] public struct ID { public uint cbSize; public IntPtr hWnd; public uint uID; public Guid guidItem; }
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
   [DllImport("shell32.dll")] public static extern int Shell_NotifyIconGetRect(ref ID id, out RECT r);
-  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindowW(string c, string t);
+  // the title as a pointer: PowerShell turns $null into "" for a string, and no window has an empty title
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindowW(string c, IntPtr t);
 }
 "@
-$h = [IconoVpn]::FindWindowW('GuardianaAvisos', $null)
+$h = [IconoVpn]::FindWindowW('GuardianaAvisos', [IntPtr]::Zero)
 if ($h -eq [IntPtr]::Zero) { 'sin-ventana'; exit }
 $id = New-Object IconoVpn+ID
 $id.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf([type][IconoVpn+ID])
