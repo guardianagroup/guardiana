@@ -81,9 +81,10 @@ pub enum Falta {
     /// Windows' service manager answered that GUARDIANA's service is not installed (ZERO alone): there is no VPN on
     /// this computer, and no icon ([`se_ve`]).
     SinGuardiana,
-    /// The service is installed but not running.
+    /// Windows' service manager says the service is stopped (`SERVICE_STOPPED`).
     Parada,
-    /// The service runs, but no one listens yet on the panel's port (it is starting), or it cannot be told who does.
+    /// Windows is starting or stopping the service, or it runs but no one listens yet on the panel's port, or it cannot
+    /// be told who does.
     Arrancando,
     /// The service runs, and another program listens on the panel's port.
     OtroEnPuerto,
@@ -134,8 +135,17 @@ pub fn guardiana_del_servicio(imagen: &str) -> Option<String> {
     let ruta = if let Some(resto) = imagen.strip_prefix('"') {
         &resto[..resto.find('"')?]
     } else {
-        // without quotes, up to the first «.exe» (Windows reads it the same way)
+        // without quotes, up to the first «.exe», which must end the path (a space or nothing after it): the strictest
+        // reading, stricter than Windows', which with spaces would first try «C:\Program.exe» (second review of the
+        // icon's fixes, finding 1)
         let fin = imagen.to_ascii_lowercase().find(".exe")? + ".exe".len();
+        if imagen
+            .as_bytes()
+            .get(fin)
+            .is_some_and(|b| !b.is_ascii_whitespace())
+        {
+            return None;
+        }
         &imagen[..fin]
     };
     let nombre = ruta.rsplit(['\\', '/']).next()?;
@@ -1419,6 +1429,11 @@ mod tests {
             guardiana_del_servicio(r#""D:\G\GUARDIANA.EXE" service run"#).as_deref(),
             Some(r"D:\G\GUARDIANA.EXE")
         );
+        assert_eq!(
+            guardiana_del_servicio(r#""\\servidor\c$\Guardiana\guardiana.exe" service run"#)
+                .as_deref(),
+            Some(r"\\servidor\c$\Guardiana\guardiana.exe")
+        );
         for imagen in [
             "",
             r#""C:\Program Files\Guardiana\guardiana.exe service run"#,
@@ -1426,6 +1441,10 @@ mod tests {
             r#""guardiana.exe" service run"#,
             r"Guardiana\guardiana.exe service run",
             r#""C:\Program Files\Guardiana\..\Temp\guardiana.exe" service run"#,
+            // without quotes, «.exe» must end the path
+            r"C:\G\guardiana.exe.bak service run",
+            r"C:\G\guardiana.exe2\guardiana.exe service run",
+            r"C:\G\guardiana.exeX",
         ] {
             assert_eq!(guardiana_del_servicio(imagen), None, "{imagen}");
         }
