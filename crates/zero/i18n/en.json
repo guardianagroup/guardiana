@@ -1374,6 +1374,8 @@
   "aviso_vpn_vuelve": "The server is answering again: what leaves your Windows programs for the internet goes through the tunnel again, encrypted up to the server.",
   "aviso_vpn_apagada": "What leaves your Windows programs goes through your normal connection again, without the tunnel.",
   "aviso_vpn_error": "The computer was left as it was: no tunnel and no cut-off.",
+  "aviso_vpn_bloqueo_sigue": "The block is still in Windows: nothing from your Windows programs goes out outside the tunnel. “Disconnect” removes it and takes you back to your normal connection.",
+  "aviso_vpn_plus": "Connecting the VPN is part of GUARDIANA Plus.",
   "z1_franja_titulo": "Open this site's shield",
   "z1_escudo_web": "This site's shield",
   "z1_plegar": "Collapse",

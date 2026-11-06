@@ -1374,6 +1374,8 @@
   "aviso_vpn_vuelve": "O servidor voltou a responder: o que sai dos seus programas do Windows para a internet passa de novo pelo túnel, criptografado até o servidor.",
   "aviso_vpn_apagada": "O que sai dos seus programas do Windows volta a passar pela sua conexão normal, sem o túnel.",
   "aviso_vpn_error": "O computador ficou como estava: sem túnel e sem corte.",
+  "aviso_vpn_bloqueo_sigue": "O bloqueio continua no Windows: nada dos seus programas do Windows sai fora do túnel. «Desconectar» o remove e volta à sua conexão normal.",
+  "aviso_vpn_plus": "Conectar a VPN faz parte da GUARDIANA Plus.",
   "z1_franja_titulo": "Abrir o escudo deste site",
   "z1_escudo_web": "Escudo deste site",
   "z1_plegar": "Recolher",

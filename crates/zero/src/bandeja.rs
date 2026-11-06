@@ -453,33 +453,96 @@ pub fn aviso(antes: &Vpn, ahora: &Vpn, propio: Option<Orden>, t: &Textos) -> Opt
     })
 }
 
-/// The notice for an order of the menu the service did not take (`hecha` false), with the VPN as it was last read:
-/// «Desconectar» as the chip says it (`vpn_sin_panel` when GUARDIANA does not answer, with the Start menu's way out;
-/// `vpn_espera_conectar` while it is still connecting; else `vpn_no_desconecta`), «Conectar» as a connection that
-/// could not start, which left the computer as it was. `None` when the order was taken: what it does comes with the
-/// next readings.
+/// What the service answered to an order of the menu ([`ordena`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Respuesta {
+    /// It took it (`{"ok": true}`): what it does comes with the next readings.
+    Hecha,
+    /// The VPN is already connecting, or connected to that exit (`"motivo"` says «conectando»): nothing to say, the next
+    /// reading tells it.
+    EnCurso,
+    /// It is GUARDIANA Plus's (`402`, `crates/panel/src/plan.rs`), with the service's own line in the language asked for
+    /// (empty if it gave none).
+    Plus(String),
+    /// It did not take it, or did not answer.
+    No,
+}
+
+/// The [`Respuesta`] of the service's answer to an order (its status code and its body), or of no answer at all.
 #[must_use]
-pub fn aviso_de_orden(o: Orden, hecha: bool, v: &Vpn, t: &Textos) -> Option<Aviso> {
-    if hecha {
-        return None;
+pub fn respuesta_de_orden(r: Option<(u16, String)>) -> Respuesta {
+    let Some((codigo, cuerpo)) = r else {
+        return Respuesta::No;
+    };
+    let v = serde_json::from_str::<Value>(&cuerpo).unwrap_or(Value::Null);
+    match codigo {
+        200 if v["ok"].as_bool() == Some(true) => Respuesta::Hecha,
+        200 if v["motivo"]
+            .as_str()
+            .is_some_and(|m| m.contains("conectando")) =>
+        {
+            Respuesta::EnCurso
+        }
+        402 => Respuesta::Plus(
+            v["texto"]
+                .as_str()
+                .unwrap_or_default()
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(200)
+                .collect(),
+        ),
+        _ => Respuesta::No,
     }
-    let (titulo, clave) = match o {
-        Orden::Desconectar => (
+}
+
+/// The notice for an order of the menu, with what the service answered (`r`) and the VPN as it was last read; `None`
+/// when there is nothing to say (the order was taken, or a «Conectar» found it already connecting: the next readings
+/// tell it).
+///
+/// - «Conectar» that is GUARDIANA Plus's: the state, and the line the service gives (as Órbita's VPN page shows it).
+/// - «Conectar» not taken with the VPN stopped and its block still in Windows: the state, and the sentence the VPN page
+///   says in that state («El bloqueo sigue puesto en Windows…»), never «sin corte».
+/// - «Conectar» not taken while GUARDIANA does not answer: «VPN: no se pudo conectar», and why.
+/// - Any other «Conectar» not taken: «VPN: no se pudo conectar», and that the computer was left as it was.
+/// - «Desconectar» as the chip says it: `vpn_sin_panel` when GUARDIANA does not answer (with the Start menu's way out),
+///   `vpn_espera_conectar` while it is still connecting, else `vpn_no_desconecta`.
+#[must_use]
+pub fn aviso_de_orden(o: Orden, r: &Respuesta, v: &Vpn, t: &Textos) -> Option<Aviso> {
+    let aviso = |titulo: String, texto: String| {
+        Some(Aviso {
+            titulo,
+            lugar: String::new(),
+            texto,
+        })
+    };
+    match (o, r) {
+        (_, Respuesta::Hecha) | (Orden::Conectar, Respuesta::EnCurso) => None,
+        (Orden::Conectar, Respuesta::Plus(linea)) => aviso(
             estado(v, t),
-            match v.fase {
-                Fase::Desconocida => "vpn_sin_panel",
-                Fase::Conectando => "vpn_espera_conectar",
-                _ => "vpn_no_desconecta",
+            if linea.trim().is_empty() {
+                t.t("aviso_vpn_plus")
+            } else {
+                linea.clone()
             },
         ),
-        Orden::Conectar => (t.t("bandeja_error"), "aviso_vpn_error"),
-        _ => return None,
-    };
-    Some(Aviso {
-        titulo,
-        lugar: String::new(),
-        texto: t.t(clave),
-    })
+        (Orden::Conectar, _) if v.bloqueada() => {
+            aviso(estado(v, t), t.t("aviso_vpn_bloqueo_sigue"))
+        }
+        (Orden::Conectar, _) if v.fase == Fase::Desconocida => {
+            aviso(t.t("bandeja_error"), estado(v, t))
+        }
+        (Orden::Conectar, _) => aviso(t.t("bandeja_error"), t.t("aviso_vpn_error")),
+        (Orden::Desconectar, _) => {
+            let clave = match (r, v.fase) {
+                (_, Fase::Desconocida) => "vpn_sin_panel",
+                (Respuesta::EnCurso, _) | (_, Fase::Conectando) => "vpn_espera_conectar",
+                _ => "vpn_no_desconecta",
+            };
+            aviso(estado(v, t), t.t(clave))
+        }
+        _ => None,
+    }
 }
 
 /// The notice in Windows' toast schema: a click on it, or on its button, opens Órbita on the VPN ([`ENLACE`]).
@@ -542,15 +605,18 @@ impl Memoria {
 /// The body of «Conectar» from the menu: the fastest exit the service measured.
 pub const CUERPO_CONECTAR: &str = "{\"salida\":\"rapida\"}";
 
-/// One request to GUARDIANA's service on this computer, with the panel's key, as the CLI makes it: its status code and
-/// its body, or `None` when it does not answer within `espera`. Only once [`es_el_servicio`] said the one listening is
-/// the service.
+/// One request to GUARDIANA's service on this computer, with the panel's key, as the CLI makes it, and the language its
+/// answer's words should be in (`idioma`, a code like `es` or `pt-pt`, sent as the pages send it in
+/// `X-Guardiana-Lang`; empty or anything else, not sent, and the panel answers in Spanish): its status code and its
+/// body, or `None` when it does not answer within `espera`. Only once [`es_el_servicio`] said the one listening is the
+/// service.
 #[must_use]
 pub fn pide(
     metodo: &str,
     ruta: &str,
     cuerpo: &str,
     llave: &str,
+    idioma: &str,
     espera: Duration,
 ) -> Option<(u16, String)> {
     let puerto = crate::lanzador::PUERTO_PANEL;
@@ -558,8 +624,15 @@ pub fn pide(
     let mut s = TcpStream::connect_timeout(&dir, Duration::from_millis(800)).ok()?;
     s.set_read_timeout(Some(espera)).ok()?;
     s.set_write_timeout(Some(Duration::from_secs(2))).ok()?;
+    let lengua = if (2..=8).contains(&idioma.len())
+        && idioma.bytes().all(|b| b.is_ascii_alphabetic() || b == b'-')
+    {
+        format!("X-Guardiana-Lang: {idioma}\r\n")
+    } else {
+        String::new()
+    };
     let peticion = format!(
-        "{metodo} {ruta} HTTP/1.1\r\nHost: 127.0.0.1:{puerto}\r\nX-Guardiana-Token: {llave}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{cuerpo}",
+        "{metodo} {ruta} HTTP/1.1\r\nHost: 127.0.0.1:{puerto}\r\nX-Guardiana-Token: {llave}\r\n{lengua}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{cuerpo}",
         cuerpo.len()
     );
     s.write_all(peticion.as_bytes()).ok()?;
@@ -617,7 +690,7 @@ pub fn lee(llave: Option<&str>) -> Vpn {
     let Some(llave) = llave else {
         return Vpn::default();
     };
-    match pide("GET", "/api/vpn", "", llave, ESPERA_LECTURA) {
+    match pide("GET", "/api/vpn", "", llave, "", ESPERA_LECTURA) {
         Some((200, cuerpo)) => serde_json::from_str::<Value>(&cuerpo)
             .map(|v| Vpn::de_json(&v))
             .unwrap_or_default(),
@@ -625,18 +698,16 @@ pub fn lee(llave: Option<&str>) -> Vpn {
     }
 }
 
-/// «Conectar» or «Desconectar» from the menu: whether the service took the order (`{"ok": true}`).
+/// «Conectar» or «Desconectar» from the menu, with the icon's language (`idioma`) for the words of the answer: what
+/// the service answered ([`Respuesta`]).
 #[must_use]
-pub fn ordena(orden: Orden, llave: &str) -> bool {
+pub fn ordena(orden: Orden, llave: &str, idioma: &str) -> Respuesta {
     let (ruta, cuerpo) = match orden {
         Orden::Conectar => ("/api/vpn/conecta", CUERPO_CONECTAR),
         Orden::Desconectar => ("/api/vpn/desconecta", ""),
-        _ => return false,
+        _ => return Respuesta::No,
     };
-    pide("POST", ruta, cuerpo, llave, ESPERA_ORDEN).is_some_and(|(codigo, cuerpo)| {
-        codigo == 200
-            && serde_json::from_str::<Value>(&cuerpo).is_ok_and(|v| v["ok"].as_bool() == Some(true))
-    })
+    respuesta_de_orden(pide("POST", ruta, cuerpo, llave, idioma, ESPERA_ORDEN))
 }
 
 /// Whether the one listening on the panel's port is GUARDIANA's service, as the CLI decides it before it sends the
@@ -1103,6 +1174,8 @@ mod tests {
             "aviso_vpn_vuelve",
             "aviso_vpn_apagada",
             "aviso_vpn_error",
+            "aviso_vpn_bloqueo_sigue",
+            "aviso_vpn_plus",
         ];
         for idioma in [Idioma::Es, Idioma::En, Idioma::Pt] {
             let t = Textos::de(idioma);
@@ -1131,40 +1204,161 @@ mod tests {
                 }
             }
         }
-        let es = Textos::de(Idioma::Es);
-        assert!(es
-            .t("aviso_vpn_conectada")
-            .contains("tus programas de Windows"));
-        assert!(es.t("aviso_vpn_conectada").contains("encriptado"));
+        // the computer's programs, never more: «tus programas de Windows», and «encriptado» (never «cifrado»)
+        for (idioma, programas, encriptado) in [
+            (Idioma::Es, "tus programas de Windows", "encriptado"),
+            (Idioma::En, "your Windows programs", "encrypted"),
+            (Idioma::Pt, "seus programas do Windows", "criptografado"),
+        ] {
+            let t = Textos::de(idioma);
+            for k in ["aviso_vpn_conectada", "aviso_vpn_vuelve"] {
+                assert!(
+                    t.t(k).contains(programas) && t.t(k).contains(encriptado),
+                    "{idioma:?} {k}"
+                );
+            }
+            for k in ["aviso_vpn_apagada", "aviso_vpn_bloqueo_sigue"] {
+                assert!(t.t(k).contains(programas), "{idioma:?} {k}");
+            }
+        }
     }
 
-    /// An order of the menu the service did not take is said, as the chip says it; one it took is not.
     #[test]
     fn una_orden_que_no_se_pudo_hacer() {
         let es = Textos::de(Idioma::Es);
-        assert_eq!(
-            aviso_de_orden(Orden::Desconectar, true, &vpn("conectada"), &es),
-            None
-        );
-        let a = aviso_de_orden(Orden::Desconectar, false, &vpn("conectada"), &es).unwrap();
+        let no = Respuesta::No;
+        // taken: nothing to say, the next readings tell it
+        for o in [Orden::Conectar, Orden::Desconectar] {
+            assert_eq!(
+                aviso_de_orden(o, &Respuesta::Hecha, &vpn("conectada"), &es),
+                None
+            );
+        }
+        let a = aviso_de_orden(Orden::Desconectar, &no, &vpn("conectada"), &es).unwrap();
         assert_eq!(
             (a.titulo.as_str(), a.texto),
             ("VPN conectada", es.t("vpn_no_desconecta"))
         );
-        let a = aviso_de_orden(Orden::Desconectar, false, &vpn("conectando"), &es).unwrap();
+        let a = aviso_de_orden(Orden::Desconectar, &no, &vpn("conectando"), &es).unwrap();
+        assert_eq!(a.texto, es.t("vpn_espera_conectar"));
+        // the service says it is still connecting (the chip's own reading of its «motivo»)
+        let a = aviso_de_orden(
+            Orden::Desconectar,
+            &Respuesta::EnCurso,
+            &vpn("conectada"),
+            &es,
+        )
+        .unwrap();
         assert_eq!(a.texto, es.t("vpn_espera_conectar"));
         // GUARDIANA does not answer: the Start menu's way out
-        let a = aviso_de_orden(Orden::Desconectar, false, &Vpn::default(), &es).unwrap();
+        let a = aviso_de_orden(Orden::Desconectar, &no, &Vpn::default(), &es).unwrap();
         assert_eq!(a.texto, es.t("vpn_sin_panel"));
-        let a = aviso_de_orden(Orden::Conectar, false, &sin_salida("apagada"), &es).unwrap();
+        // «Conectar» not taken, the computer as it was: no tunnel and no cut-off
+        let a = aviso_de_orden(Orden::Conectar, &no, &sin_salida("apagada"), &es).unwrap();
         assert_eq!(
             (a.titulo.as_str(), a.texto),
             ("VPN: no se pudo conectar", es.t("aviso_vpn_error"))
         );
+        // ... but with its block still in Windows, never «sin corte»: what the VPN page says in that state
+        let a = aviso_de_orden(Orden::Conectar, &no, &bloqueada(), &es).unwrap();
+        assert_eq!(a.titulo, "VPN parada, con su bloqueo puesto");
         assert_eq!(
-            aviso_de_orden(Orden::AbrirVpn, false, &Vpn::default(), &es),
+            a.texto,
+            "El bloqueo sigue puesto en Windows: no sale nada de tus programas de Windows fuera del túnel. «Desconectar» lo quita y vuelve a tu conexión normal."
+        );
+        assert!(!a.texto.contains("sin corte"));
+        // ... and with GUARDIANA not answering, why, without guessing about the block
+        let a = aviso_de_orden(Orden::Conectar, &no, &Vpn::default(), &es).unwrap();
+        assert_eq!(a.titulo, "VPN: no se pudo conectar");
+        assert_eq!(a.texto, estado(&Vpn::default(), &es));
+        // GUARDIANA Plus's: the service's own line, or ours when it gave none
+        let plus = Respuesta::Plus("Esto forma parte de Plus.".into());
+        let a = aviso_de_orden(Orden::Conectar, &plus, &sin_salida("apagada"), &es).unwrap();
+        assert_eq!(
+            (a.titulo.as_str(), a.texto.as_str()),
+            ("VPN desconectada", "Esto forma parte de Plus.")
+        );
+        let a = aviso_de_orden(
+            Orden::Conectar,
+            &Respuesta::Plus(String::new()),
+            &sin_salida("apagada"),
+            &es,
+        )
+        .unwrap();
+        assert_eq!(a.texto, es.t("aviso_vpn_plus"));
+        // already connecting (from Órbita or the bar a moment before): nothing, the next reading tells it
+        assert_eq!(
+            aviso_de_orden(
+                Orden::Conectar,
+                &Respuesta::EnCurso,
+                &sin_salida("apagada"),
+                &es
+            ),
             None
         );
+        assert_eq!(
+            aviso_de_orden(Orden::AbrirVpn, &no, &Vpn::default(), &es),
+            None
+        );
+        for idioma in [Idioma::Es, Idioma::En, Idioma::Pt] {
+            let t = Textos::de(idioma);
+            for (o, v) in [
+                (Orden::Conectar, bloqueada()),
+                (Orden::Conectar, sin_salida("apagada")),
+                (Orden::Conectar, Vpn::default()),
+                (Orden::Desconectar, vpn("conectada")),
+                (Orden::Desconectar, Vpn::default()),
+            ] {
+                let a = aviso_de_orden(o, &no, &v, &t).unwrap();
+                assert!(
+                    !a.titulo.contains("aviso_")
+                        && !a.texto.contains("aviso_")
+                        && !a.texto.contains("vpn_")
+                        && !a.texto.contains("bandeja_"),
+                    "{a:?}"
+                );
+            }
+        }
+    }
+
+    /// What the service answers to an order, read as the VPN page and the chip read it.
+    #[test]
+    fn lo_que_contesta_el_servicio_a_una_orden() {
+        let r = |codigo: u16, cuerpo: &str| respuesta_de_orden(Some((codigo, cuerpo.to_owned())));
+        assert_eq!(r(200, r#"{"ok":true}"#), Respuesta::Hecha);
+        assert_eq!(
+            r(
+                200,
+                r#"{"ok":false,"motivo":"ya está conectada, o conectando"}"#
+            ),
+            Respuesta::EnCurso
+        );
+        assert_eq!(
+            r(
+                200,
+                r#"{"ok":false,"motivo":"no se sabe la dirección de esa salida"}"#
+            ),
+            Respuesta::No
+        );
+        // the panel's own 402 (crates/panel/src/plan.rs, `respuesta_plus`)
+        assert_eq!(
+            r(
+                402,
+                r#"{"plan":"plus","texto":"Isto faz parte do Plus.","boton":"Passar para o Plus","enlace":"https://x"}"#
+            ),
+            Respuesta::Plus("Isto faz parte do Plus.".into())
+        );
+        assert_eq!(r(402, "no es json"), Respuesta::Plus(String::new()));
+        assert_eq!(
+            r(
+                402,
+                &format!(r#"{{"texto":"a\u0007b{}"}}"#, "x".repeat(400))
+            ),
+            Respuesta::Plus(format!("ab{}", "x".repeat(198)))
+        );
+        assert_eq!(r(401, "session token required"), Respuesta::No);
+        assert_eq!(r(200, "no es json"), Respuesta::No);
+        assert_eq!(respuesta_de_orden(None), Respuesta::No);
     }
 
     #[test]
@@ -1339,14 +1533,18 @@ mod tests {
             }
             vistas
         });
-        assert!(ordena(Orden::Conectar, "k1"));
-        assert!(ordena(Orden::Desconectar, "k1"));
-        assert!(!ordena(Orden::AbrirVpn, "k1"));
+        assert_eq!(ordena(Orden::Conectar, "k1", "pt"), Respuesta::Hecha);
+        assert_eq!(ordena(Orden::Desconectar, "k1", "x\r\ny"), Respuesta::Hecha);
+        assert_eq!(ordena(Orden::AbrirVpn, "k1", "es"), Respuesta::No);
         let vistas = hilo.join().unwrap();
         assert!(vistas[0].starts_with("POST /api/vpn/conecta HTTP/1.1\r\n"));
         assert!(vistas[0].contains("X-Guardiana-Token: k1\r\n"));
+        // the words of the answer in the icon's language, as the pages ask for them
+        assert!(vistas[0].contains("X-Guardiana-Lang: pt\r\n"));
         assert!(vistas[0].ends_with(CUERPO_CONECTAR));
         assert!(vistas[1].starts_with("POST /api/vpn/desconecta HTTP/1.1\r\n"));
         assert!(vistas[1].contains("Content-Length: 0\r\n"));
+        // a language that is not a code is not sent at all
+        assert!(!vistas[1].contains("X-Guardiana-Lang"));
     }
 }

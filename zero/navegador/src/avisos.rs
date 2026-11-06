@@ -18,7 +18,7 @@ use std::sync::{Mutex, PoisonError};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use guardiana_zero::avisos::{self, AUMID};
-use guardiana_zero::bandeja::{self, Color, Memoria, Orden, Vpn};
+use guardiana_zero::bandeja::{self, Color, Memoria, Orden, Respuesta, Vpn};
 use guardiana_zero::lanzador;
 use guardiana_zero::textos::Textos;
 use windows::core::{w, HSTRING, PCWSTR};
@@ -195,8 +195,8 @@ static LEIDA: Mutex<Option<Vpn>> = Mutex::new(None);
 static LEYENDO: AtomicBool = AtomicBool::new(false);
 /// The order of the menu under way (its number; 0, none).
 static ORDENANDO: AtomicU32 = AtomicU32::new(0);
-/// The last order of the menu that finished, and whether the service took it.
-static HECHA: Mutex<Option<(Orden, bool)>> = Mutex::new(None);
+/// The last order of the menu that finished, and what the service answered.
+static HECHA: Mutex<Option<(Orden, Respuesta)>> = Mutex::new(None);
 /// The message Windows sends every window when the taskbar is created again (Explorer restarted): `TaskbarCreated`.
 static BARRA_NUEVA: AtomicU32 = AtomicU32::new(0);
 
@@ -323,8 +323,9 @@ fn lee_vpn(h: HWND) {
     }
 }
 
-/// «Conectar» or «Desconectar» from the menu, on its own thread (closing the tunnel can take seconds), one at a time.
-fn ordena(h: HWND, o: Orden) {
+/// «Conectar» or «Desconectar» from the menu, on its own thread (closing the tunnel can take seconds), one at a time,
+/// with the icon's language (`idioma`) for the words of the service's answer.
+fn ordena(h: HWND, o: Orden, idioma: &'static str) {
     if ORDENANDO
         .compare_exchange(0, o.id(), Ordering::SeqCst, Ordering::SeqCst)
         .is_err()
@@ -336,10 +337,11 @@ fn ordena(h: HWND, o: Orden) {
     let lanzado = std::thread::Builder::new()
         .name("vpn-orden".into())
         .spawn(move || {
-            let hecha = al_servicio()
-                && lanzador::lee_llave(&lanzador::ruta_llave())
-                    .is_some_and(|llave| bandeja::ordena(o, &llave));
-            *HECHA.lock().unwrap_or_else(PoisonError::into_inner) = Some((o, hecha));
+            let llave = al_servicio()
+                .then(|| lanzador::lee_llave(&lanzador::ruta_llave()))
+                .flatten();
+            let r = llave.map_or(Respuesta::No, |llave| bandeja::ordena(o, &llave, idioma));
+            *HECHA.lock().unwrap_or_else(PoisonError::into_inner) = Some((o, r));
             ORDENANDO.store(0, Ordering::SeqCst);
             avisa_ventana(ventana);
         });
@@ -471,8 +473,8 @@ fn al_leer(h: HWND) {
     let hecha = HECHA.lock().unwrap_or_else(PoisonError::into_inner).take();
     con_bandeja(|b| {
         let t = textos(&b.datos);
-        if let Some((o, si)) = hecha {
-            if let Some(a) = bandeja::aviso_de_orden(o, si, &b.memoria.vpn, &t) {
+        if let Some((o, r)) = &hecha {
+            if let Some(a) = bandeja::aviso_de_orden(*o, r, &b.memoria.vpn, &t) {
                 let _ = muestra(&bandeja::notificacion(&a, &t));
             }
         }
@@ -536,7 +538,7 @@ fn menu(h: HWND) {
     match elegida {
         Some(Orden::AbrirVpn) => abre_zero(&["--url", bandeja::ENLACE]),
         Some(Orden::AbrirGuardiana) => abre_zero(&["--panel"]),
-        Some(o @ (Orden::Conectar | Orden::Desconectar)) => ordena(h, o),
+        Some(o @ (Orden::Conectar | Orden::Desconectar)) => ordena(h, o, t.idioma().codigo()),
         _ => {}
     }
 }
