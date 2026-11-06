@@ -428,6 +428,33 @@ Pendiente, en este orden:
 
 Decisiones tomadas en la ronda 88 (1 nov 2026): incluida en la licencia de GUARDIANA, sin cuenta aparte; servidores de la fase 1, los de Hetzner (Helsinki, Núremberg); contra el abuso sin guardar nada (puerto 25 cerrado, topes de altas y de conexiones nuevas, pares sin uso se quitan).
 
+## El icono junto al reloj (1.0.57)
+
+> El dueño, 3 nov 2026, sobre el icono y los avisos de la VPN: «Hazlo claro».
+
+- **Dónde vive.** En `GUARDIANA ZERO.exe --avisos` (`zero/navegador/src/avisos.rs`), el proceso sin ventana que ya enseña
+  los avisos graves del escudo: arranca en cada inicio de sesión (la entrada Run «GUARDIANA avisos» del instalador, para
+  todas las cuentas) y con cada arranque de ZERO, uno por sesión, así que el icono está también con ZERO cerrado. No hace
+  falta ningún proceso nuevo, y el servicio, que corre como SYSTEM, no puede poner iconos. El instalador lo cierra como
+  cierra ZERO (su ventana oculta atiende `WM_CLOSE`) y el icono se va con él; al desinstalar se va la entrada Run. Con
+  `ZERO=0` no hay ZERO ni icono.
+- **Qué dice.** Lo mismo que el chip de la VPN de la barra de ZERO y que la pantalla de la VPN de Órbita, con las palabras
+  del chip (`crates/zero/src/bandeja.rs`, probado en los tres sistemas): verde, «VPN conectada» y el lugar («Finlandia ·
+  Helsinki»); ámbar, «VPN: conectando…»; rojo, «VPN sin respuesta», «VPN: no conecta» (el modo estricto, reintentando) y
+  «VPN parada, con su bloqueo puesto», cuando nada de tus programas de Windows sale a internet; gris, «VPN desconectada»,
+  «VPN: no se pudo conectar», «VPN no disponible en este equipo» y «GUARDIANA no contesta en este equipo».
+- **El menú.** Un clic abre Órbita en la VPN (`guardiana://vpn`); el botón derecho enseña el estado y el lugar, «Abrir la
+  VPN», «Conectar a la salida más rápida» y «Desconectar» cuando la pantalla de la VPN los ofrece, y «Abrir GUARDIANA».
+- **Los avisos de Windows.** Uno por cambio: conectada, el servidor deja de contestar o vuelve, la VPN parada con su
+  bloqueo puesto, no se pudo conectar, desconectada. Lo que la persona acaba de pedir desde el menú no se anuncia; una
+  orden que el servicio no tomó, sí, con las palabras del chip.
+- **La llave del panel.** Pregunta `GET /api/vpn` cada 3 s, y solo al proceso del servicio «guardiana», con la regla de
+  `guardiana vpn apaga`: el gestor de servicios de Windows y la tabla de los que escuchan en 127.0.0.1:7443 tienen que
+  decir el mismo proceso. Las lecturas y las órdenes van en hilos aparte, así que el icono siempre responde. Lo que
+  añade es una petición local cada 3 s, en un proceso que ya estaba en marcha.
+- **La prueba.** El flujo `zero` de la CI arranca `--avisos` con un panel de prueba en el 7443 y comprueba que el icono
+  aparece y pasa de gris a ámbar, verde, rojo y otra vez gris, con sus palabras (`zero/prueba/prueba.js`).
+
 ## Los servidores (propuesta para la fase 1)
 
 - WireGuard del núcleo de Linux (`wg0`, UDP 51820) en los servidores actuales, cada uno con su red privada

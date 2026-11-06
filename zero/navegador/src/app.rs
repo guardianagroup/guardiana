@@ -2515,8 +2515,8 @@ fn carpeta_descargas() -> PathBuf {
 /// owner: «English is the first language on screen»). The Spanish and Portuguese installers were
 /// an explicit choice, and they leave it in the registry (`idioma`); anything else is English.
 /// Windows's own language is not asked any more: it says where the computer was bought, not what
-/// the person chose.
-fn idioma_sistema() -> String {
+/// the person chose. The VPN's icon next to the clock (`avisos.rs`) starts in it too.
+pub(crate) fn idioma_sistema() -> String {
     // 1.0.49: also the language of the installer chosen on the website, which GUARDIANA's MSI now
     // writes for every account in HKLM (until 1.0.48 it was only written with ZERO=0, so ZERO
     // opened in English after a Spanish or Portuguese install: review of 30 Oct 2026).

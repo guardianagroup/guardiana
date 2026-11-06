@@ -407,7 +407,8 @@
          antivirus: «Me parece bien la propuesta, sí, buena idea»): ZERO with its notices option («avisos») starts at every sign-in, for
          every account, with no visible window, reads el escudo's warnings and shows Windows' notice of each new grave
          one; a click opens Órbita on the Antivirus (guardiana://escaner). Its hidden window takes the «close GUARDIANA
-         ZERO» above, so an update or an uninstall closes it too. -->
+         ZERO» above, so an update or an uninstall closes it too. 5 Nov 2026 (1.0.57): the same process carries the VPN's
+         icon next to the clock, so it is there with ZERO closed too (docs/VPN.md, «El icono junto al reloj»). -->
     <Component Id="ZeroAvisos" Directory="ZERODIR" Guid="82e59daa-fdc2-4868-a561-dd5d3dc53066">
       <RegistryValue Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run" Name="GUARDIANA avisos" Type="string" Value="&quot;[ZERODIR]GUARDIANA ZERO.exe&quot; --avisos" KeyPath="yes" />
     </Component>
