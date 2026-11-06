@@ -36,8 +36,9 @@ use windows::Win32::NetworkManagement::IpHelper::{
 use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Services::{
-    CloseServiceHandle, OpenSCManagerW, OpenServiceW, QueryServiceStatusEx, SC_MANAGER_CONNECT,
-    SC_STATUS_PROCESS_INFO, SERVICE_QUERY_STATUS,
+    CloseServiceHandle, OpenSCManagerW, OpenServiceW, QueryServiceConfigW, QueryServiceStatusEx,
+    QUERY_SERVICE_CONFIGW, SC_MANAGER_CONNECT, SC_STATUS_PROCESS_INFO, SERVICE_QUERY_CONFIG,
+    SERVICE_QUERY_STATUS,
 };
 use windows::Win32::System::Threading::CreateMutexW;
 use windows::Win32::UI::Shell::{
@@ -218,14 +219,15 @@ fn ancho(s: &str) -> Vec<u16> {
 }
 
 /// GUARDIANA's service as Windows' service manager says it: whether Windows answered that it is not installed (only
-/// that answer: a failure to ask is not taken for it), and the process it runs in, while it runs.
-fn servicio() -> (bool, Option<u32>) {
+/// that answer: a failure to ask is not taken for it), its state ([`bandeja::estado_del_servicio`]; `None` when it could
+/// not be asked), and the process it runs in, while it runs.
+fn servicio() -> (bool, Option<u32>, Option<u32>) {
     let nombre = ancho(bandeja::SERVICIO);
     // SAFETY: opens Windows' service manager and GUARDIANA's service only to read its state into a buffer of ours that
     // lives through the call, and closes both handles.
     unsafe {
         let Ok(gestor) = OpenSCManagerW(PCWSTR::null(), PCWSTR::null(), SC_MANAGER_CONNECT) else {
-            return (false, None);
+            return (false, None, None);
         };
         let r = match OpenServiceW(gestor, PCWSTR(nombre.as_ptr()), SERVICE_QUERY_STATUS) {
             Ok(s) => {
@@ -238,15 +240,19 @@ fn servicio() -> (bool, Option<u32>) {
                     &mut hace_falta,
                 );
                 let _ = CloseServiceHandle(s);
-                let pid = if leido.is_ok() {
-                    bandeja::pid_del_servicio(&estado)
+                if leido.is_ok() {
+                    (
+                        false,
+                        bandeja::estado_del_servicio(&estado),
+                        bandeja::pid_del_servicio(&estado),
+                    )
                 } else {
-                    None
-                };
-                (false, pid)
+                    (false, None, None)
+                }
             }
             Err(e) => (
                 e.code() == HRESULT::from_win32(ERROR_SERVICE_DOES_NOT_EXIST.0),
+                None,
                 None,
             ),
         };
@@ -293,7 +299,7 @@ fn pid_del_puerto() -> Option<u32> {
 /// Whether the panel's key may go to the one listening on the panel's port: only GUARDIANA's service (the CLI's rule);
 /// the automatic tests' own panel only on a computer where the service does not exist (`bandeja::llave_al_puerto`).
 fn al_servicio() -> bool {
-    let (sin_servicio, pid) = servicio();
+    let (sin_servicio, _, pid) = servicio();
     bandeja::llave_al_puerto(en_prueba(), sin_servicio, pid, pid_del_puerto())
 }
 
@@ -301,10 +307,15 @@ fn al_servicio() -> bool {
 /// (`bandeja::Falta`): the service not installed or not running, its port not listening yet or someone else's, the key
 /// not readable from this account, or no answer.
 fn lectura() -> Vpn {
-    let (sin_servicio, pid) = servicio();
+    let (sin_servicio, estado, pid) = servicio();
     let escucha = pid_del_puerto();
     if !bandeja::llave_al_puerto(en_prueba(), sin_servicio, pid, escucha) {
-        return Vpn::sin(bandeja::falta_del_puerto(sin_servicio, pid, escucha));
+        return Vpn::sin(bandeja::falta_del_puerto(
+            sin_servicio,
+            estado,
+            pid,
+            escucha,
+        ));
     }
     let ruta = lanzador::ruta_llave();
     match lanzador::lee_llave(&ruta) {
@@ -384,11 +395,36 @@ fn con_bandeja<R>(f: impl FnOnce(&mut Bandeja) -> R) -> Option<R> {
     BANDEJA.with(|b| b.try_borrow_mut().ok()?.as_mut().map(f))
 }
 
-/// `guardiana.exe`, when it is there: ZERO lives in GUARDIANA's own folder (`Program Files\Guardiana\ZERO`,
-/// build/wix/guardiana.wxs).
+/// `guardiana.exe`, as Windows' service manager names the program it runs as GUARDIANA's service
+/// ([`bandeja::guardiana_del_servicio`]), when the file is there. Never deduced from where ZERO runs, which can be a
+/// folder of the account (second review of bandeja-vpn-2, point 5).
 fn guardiana_exe() -> Option<PathBuf> {
-    let yo = std::env::current_exe().ok()?;
-    let g = yo.parent()?.parent()?.join("guardiana.exe");
+    let nombre = ancho(bandeja::SERVICIO);
+    let mut imagen = None;
+    // SAFETY: opens Windows' service manager and GUARDIANA's service only to read its configuration into a buffer of
+    // ours, aligned for it (8 bytes) and alive while its text is copied, and closes both handles.
+    unsafe {
+        let gestor = OpenSCManagerW(PCWSTR::null(), PCWSTR::null(), SC_MANAGER_CONNECT).ok()?;
+        if let Ok(s) = OpenServiceW(gestor, PCWSTR(nombre.as_ptr()), SERVICE_QUERY_CONFIG) {
+            let mut hace_falta = 0u32;
+            let _ = QueryServiceConfigW(s, None, 0, &mut hace_falta);
+            let palabras = usize::try_from(hace_falta)
+                .unwrap_or(0)
+                .div_ceil(8)
+                .max(128);
+            let mut buf = vec![0u64; palabras];
+            let config = buf.as_mut_ptr().cast::<QUERY_SERVICE_CONFIGW>();
+            let tam = u32::try_from(palabras * 8).unwrap_or(u32::MAX);
+            if QueryServiceConfigW(s, Some(config), tam, &mut hace_falta).is_ok()
+                && !(*config).lpBinaryPathName.is_null()
+            {
+                imagen = (*config).lpBinaryPathName.to_string().ok();
+            }
+            let _ = CloseServiceHandle(s);
+        }
+        let _ = CloseServiceHandle(gestor);
+    }
+    let g = PathBuf::from(bandeja::guardiana_del_servicio(&imagen?)?);
     g.is_file().then_some(g)
 }
 

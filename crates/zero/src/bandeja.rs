@@ -93,19 +93,57 @@ pub enum Falta {
 }
 
 /// Why the panel's key may not go to the one listening on the panel's port ([`llave_al_puerto`] said no), from what
-/// Windows says: whether the service is not installed (`sin_servicio`), the process it runs in (`servicio`), and the
-/// one listening on the port without doubt (`escucha`).
+/// Windows says: whether the service is not installed (`sin_servicio`), its state ([`estado_del_servicio`]; `None` when
+/// the service manager could not be asked), the process it runs in (`servicio`), and the one listening on the port
+/// without doubt (`escucha`). «Stopped» only when Windows says so; while it starts or stops, «not answering yet»; when it
+/// cannot be told, the general words (second review of bandeja-vpn-2, point 5).
 #[must_use]
-pub fn falta_del_puerto(sin_servicio: bool, servicio: Option<u32>, escucha: Option<u32>) -> Falta {
+pub fn falta_del_puerto(
+    sin_servicio: bool,
+    estado: Option<u32>,
+    servicio: Option<u32>,
+    escucha: Option<u32>,
+) -> Falta {
     if sin_servicio {
         Falta::SinGuardiana
-    } else if servicio.is_none() {
-        Falta::Parada
-    } else if escucha.is_none() {
-        Falta::Arrancando
+    } else if servicio.is_some() {
+        if escucha.is_none() {
+            Falta::Arrancando
+        } else {
+            Falta::OtroEnPuerto
+        }
     } else {
-        Falta::OtroEnPuerto
+        match estado {
+            // SERVICE_STOPPED
+            Some(1) => Falta::Parada,
+            // SERVICE_START_PENDING, SERVICE_STOP_PENDING, SERVICE_CONTINUE_PENDING, SERVICE_PAUSE_PENDING
+            Some(2 | 3 | 5 | 6) => Falta::Arrancando,
+            // running without a process to name, paused, or no answer from the service manager
+            _ => Falta::Respuesta,
+        }
     }
+}
+
+/// `guardiana.exe` from the program Windows' service manager runs as GUARDIANA's service (its `lpBinaryPathName`, as
+/// `QueryServiceConfigW` gives it: `"…\Guardiana\guardiana.exe" service run`, build/wix/guardiana.wxs), which only an
+/// administrator can change; never from where ZERO runs, which can be a folder of the account (second review of
+/// bandeja-vpn-2, point 5). `None` unless it is an absolute path to a file called `guardiana.exe`.
+#[must_use]
+pub fn guardiana_del_servicio(imagen: &str) -> Option<String> {
+    let imagen = imagen.trim();
+    let ruta = if let Some(resto) = imagen.strip_prefix('"') {
+        &resto[..resto.find('"')?]
+    } else {
+        // without quotes, up to the first «.exe» (Windows reads it the same way)
+        let fin = imagen.to_ascii_lowercase().find(".exe")? + ".exe".len();
+        &imagen[..fin]
+    };
+    let nombre = ruta.rsplit(['\\', '/']).next()?;
+    let unidad = ruta.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
+        && ruta.as_bytes().get(1..3) == Some(b":\\".as_slice());
+    let absoluta = unidad || ruta.starts_with(r"\\");
+    (absoluta && nombre.eq_ignore_ascii_case("guardiana.exe") && !ruta.contains(".."))
+        .then(|| ruta.to_owned())
 }
 
 /// The VPN as the service says it (`GET /api/vpn`).
@@ -814,8 +852,17 @@ pub fn llave_al_puerto(
     (prueba && sin_servicio) || es_el_servicio(servicio, escucha)
 }
 
-/// The process GUARDIANA's service runs in, from what Windows' service manager answers (`SERVICE_STATUS_PROCESS`, as
-/// `QueryServiceStatusEx` writes it: nine 32-bit words, the state second and the process eighth): only while it runs.
+/// The state of GUARDIANA's service in what Windows' service manager answers (`SERVICE_STATUS_PROCESS`, as
+/// `QueryServiceStatusEx` writes it: nine 32-bit words, the state second): 1 stopped, 2 starting, 3 stopping, 4 running,
+/// 5 continuing, 6 pausing, 7 paused.
+#[must_use]
+pub fn estado_del_servicio(estado: &[u8]) -> Option<u32> {
+    let b = estado.get(4..8)?;
+    Some(u32::from_ne_bytes([b[0], b[1], b[2], b[3]]))
+}
+
+/// The process GUARDIANA's service runs in, from what Windows' service manager answers (the same nine words as
+/// [`estado_del_servicio`], the process eighth): only while it runs.
 #[must_use]
 pub fn pid_del_servicio(estado: &[u8]) -> Option<u32> {
     let palabra = |i: usize| -> Option<u32> {
@@ -1326,15 +1373,62 @@ mod tests {
     #[test]
     fn por_que_no_contesta_y_su_salida() {
         assert_eq!(
-            falta_del_puerto(true, None, Some(4040)),
+            falta_del_puerto(true, None, None, Some(4040)),
             Falta::SinGuardiana
         );
-        assert_eq!(falta_del_puerto(false, None, Some(812)), Falta::Parada);
-        assert_eq!(falta_del_puerto(false, Some(812), None), Falta::Arrancando);
         assert_eq!(
-            falta_del_puerto(false, Some(812), Some(4040)),
+            falta_del_puerto(false, Some(1), None, Some(812)),
+            Falta::Parada
+        );
+        assert_eq!(
+            falta_del_puerto(false, Some(4), Some(812), None),
+            Falta::Arrancando
+        );
+        assert_eq!(
+            falta_del_puerto(false, Some(4), Some(812), Some(4040)),
             Falta::OtroEnPuerto
         );
+        // while Windows starts or stops it, «not answering yet», never «stopped»; when it cannot be told, the general
+        // words (second review of bandeja-vpn-2, point 5)
+        for pendiente in [2, 3, 5, 6] {
+            assert_eq!(
+                falta_del_puerto(false, Some(pendiente), None, None),
+                Falta::Arrancando,
+                "{pendiente}"
+            );
+        }
+        assert_eq!(falta_del_puerto(false, None, None, None), Falta::Respuesta);
+        assert_eq!(
+            falta_del_puerto(false, Some(7), None, None),
+            Falta::Respuesta
+        );
+        // the way out runs GUARDIANA's own guardiana.exe, as the service manager names it, and nothing else
+        let instalado = r"C:\Program Files\Guardiana\guardiana.exe";
+        for imagen in [
+            r#""C:\Program Files\Guardiana\guardiana.exe" service run"#,
+            r"C:\Program Files\Guardiana\guardiana.exe service run",
+            r#"  "C:\Program Files\Guardiana\guardiana.exe"  "#,
+        ] {
+            assert_eq!(
+                guardiana_del_servicio(imagen).as_deref(),
+                Some(instalado),
+                "{imagen}"
+            );
+        }
+        assert_eq!(
+            guardiana_del_servicio(r#""D:\G\GUARDIANA.EXE" service run"#).as_deref(),
+            Some(r"D:\G\GUARDIANA.EXE")
+        );
+        for imagen in [
+            "",
+            r#""C:\Program Files\Guardiana\guardiana.exe service run"#,
+            r#""C:\Program Files\Guardiana\otro.exe" service run"#,
+            r#""guardiana.exe" service run"#,
+            r"Guardiana\guardiana.exe service run",
+            r#""C:\Program Files\Guardiana\..\Temp\guardiana.exe" service run"#,
+        ] {
+            assert_eq!(guardiana_del_servicio(imagen), None, "{imagen}");
+        }
         let causas = [
             Falta::Respuesta,
             Falta::SinGuardiana,
@@ -1620,6 +1714,9 @@ mod tests {
         assert_eq!(pid_del_servicio(&estado(1, 812)), None);
         assert_eq!(pid_del_servicio(&estado(4, 0)), None);
         assert_eq!(pid_del_servicio(&estado(4, 812)[..20]), None);
+        assert_eq!(estado_del_servicio(&estado(2, 0)), Some(2));
+        assert_eq!(estado_del_servicio(&estado(1, 0)), Some(1));
+        assert_eq!(estado_del_servicio(&estado(4, 812)[..6]), None);
         assert!(es_el_servicio(Some(812), Some(812)));
         assert!(!es_el_servicio(Some(812), Some(4040)));
         // the tests' own panel only where GUARDIANA's service does not exist; with it, the rule holds for them too

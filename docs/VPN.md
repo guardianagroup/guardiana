@@ -448,15 +448,18 @@ Decisiones tomadas en la ronda 88 (1 nov 2026): incluida en la licencia de GUARD
   conecta» (el modo estricto, reintentando) y «VPN parada, con su bloqueo puesto», cuando nada de tus programas de Windows
   sale a internet; gris, «VPN desconectada», «VPN: no se pudo conectar» y «VPN no disponible en este equipo». Cuando no
   se puede preguntar al servicio, dice por qué si Windows lo dice sin la llave del panel: «El servicio de GUARDIANA está
-  parado en este equipo», «El servicio de GUARDIANA aún no contesta en este equipo», «Otro programa ocupa el puerto del
-  panel de GUARDIANA en este equipo», «Esta cuenta de Windows no puede leer la llave del panel de GUARDIANA» o, si no,
-  «GUARDIANA no contesta en este equipo».
+  parado en este equipo» (solo si Windows lo da por parado), «El servicio de GUARDIANA aún no contesta en este equipo»
+  (también mientras Windows lo arranca o lo para), «Otro programa ocupa el puerto del panel de GUARDIANA en este
+  equipo», «Esta cuenta de Windows no puede leer la llave del panel de GUARDIANA» o, si no, «GUARDIANA no contesta en
+  este equipo».
 - **El menú.** Un clic abre Órbita en la VPN (`guardiana://vpn`). El botón derecho enseña el estado y el lugar, «Abrir la
   VPN», «Conectar a la salida más rápida» cuando se puede conectar (apagada o tras un error), «Desconectar» mientras está
   encendida o con su bloqueo puesto (como el chip, también mientras conecta), y «Abrir GUARDIANA». Mientras GUARDIANA no
   contesta ofrece además «Apagar la VPN de GUARDIANA», que lanza lo mismo que esa entrada del menú Inicio
   (`guardiana.exe vpn apaga --menu`, que pide a Windows los permisos de administrador): el bloqueo del modo estricto
-  sigue en Windows sin el servicio, y desde el icono no se puede saber si está.
+  sigue en Windows sin el servicio, y desde el icono no se puede saber si está. Ese `guardiana.exe` es el que Windows
+  tiene apuntado para el servicio «guardiana» (`QueryServiceConfigW`), que solo cambia un administrador, y nunca uno
+  deducido de la carpeta desde la que corre ZERO.
 - **Los avisos de Windows.** Uno por cambio: conectada, el servidor deja de contestar o vuelve, la VPN parada con su
   bloqueo puesto, no se pudo conectar, desconectada. Lo que la persona acaba de pedir desde el menú no se anuncia. Una
   orden del menú que el servicio no tomó, sí: «Desconectar» con las palabras del chip; «Conectar» con las de la pantalla
