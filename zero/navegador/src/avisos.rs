@@ -21,11 +21,11 @@ use guardiana_zero::avisos::{self, AUMID};
 use guardiana_zero::bandeja::{self, Color, Memoria, Orden, Respuesta, Vpn};
 use guardiana_zero::lanzador;
 use guardiana_zero::textos::Textos;
-use windows::core::{w, HSTRING, PCWSTR};
+use windows::core::{w, HRESULT, HSTRING, PCWSTR};
 use windows::Data::Xml::Dom::XmlDocument;
 use windows::Win32::Foundation::{
-    GetLastError, ERROR_ALREADY_EXISTS, ERROR_INSUFFICIENT_BUFFER, HINSTANCE, HWND, LPARAM,
-    LRESULT, POINT, WPARAM,
+    GetLastError, ERROR_ALREADY_EXISTS, ERROR_INSUFFICIENT_BUFFER, ERROR_SERVICE_DOES_NOT_EXIST,
+    HINSTANCE, HWND, LPARAM, LRESULT, POINT, WPARAM,
 };
 use windows::Win32::NetworkManagement::IpHelper::{
     GetExtendedTcpTable, TCP_TABLE_OWNER_PID_LISTENER,
@@ -84,8 +84,9 @@ fn ahora_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// The automatic tests (zero/prueba/prueba.js) run with their own data folder: they have no GUARDIANA service, so
-/// their own panel on the port is taken as it, and the icon writes what it shows to `bandeja.txt` for them to read.
+/// The automatic tests (zero/prueba/prueba.js) run with their own data folder: on a computer without GUARDIANA's service
+/// their own panel on the port is taken as it (`bandeja::llave_al_puerto`; never where the service exists), and the
+/// icon writes what it shows to `bandeja.txt` for them to read.
 fn en_prueba() -> bool {
     std::env::var_os("GUARDIANA_ZERO_DATOS").is_some()
 }
@@ -213,18 +214,20 @@ fn ancho(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// The process GUARDIANA's service runs in, while it runs, as Windows' service manager says it.
-fn pid_del_servicio() -> Option<u32> {
+/// GUARDIANA's service as Windows' service manager says it: whether Windows answered that it is not installed (only
+/// that answer: a failure to ask is not taken for it), and the process it runs in, while it runs.
+fn servicio() -> (bool, Option<u32>) {
     let nombre = ancho(bandeja::SERVICIO);
     // SAFETY: opens Windows' service manager and GUARDIANA's service only to read its state into a buffer of ours that
     // lives through the call, and closes both handles.
     unsafe {
-        let gestor = OpenSCManagerW(PCWSTR::null(), PCWSTR::null(), SC_MANAGER_CONNECT).ok()?;
-        let servicio = OpenServiceW(gestor, PCWSTR(nombre.as_ptr()), SERVICE_QUERY_STATUS);
-        let mut estado = [0u8; 64];
-        let mut hace_falta = 0u32;
-        let pid = match servicio {
+        let Ok(gestor) = OpenSCManagerW(PCWSTR::null(), PCWSTR::null(), SC_MANAGER_CONNECT) else {
+            return (false, None);
+        };
+        let r = match OpenServiceW(gestor, PCWSTR(nombre.as_ptr()), SERVICE_QUERY_STATUS) {
             Ok(s) => {
+                let mut estado = [0u8; 64];
+                let mut hace_falta = 0u32;
                 let leido = QueryServiceStatusEx(
                     s,
                     SC_STATUS_PROCESS_INFO,
@@ -232,16 +235,20 @@ fn pid_del_servicio() -> Option<u32> {
                     &mut hace_falta,
                 );
                 let _ = CloseServiceHandle(s);
-                if leido.is_ok() {
+                let pid = if leido.is_ok() {
                     bandeja::pid_del_servicio(&estado)
                 } else {
                     None
-                }
+                };
+                (false, pid)
             }
-            Err(_) => None,
+            Err(e) => (
+                e.code() == HRESULT::from_win32(ERROR_SERVICE_DOES_NOT_EXIST.0),
+                None,
+            ),
         };
         let _ = CloseServiceHandle(gestor);
-        pid
+        r
     }
 }
 
@@ -280,10 +287,11 @@ fn pid_del_puerto() -> Option<u32> {
     None
 }
 
-/// Whether the panel's key may go to the one listening on the panel's port: only GUARDIANA's service (the CLI's rule,
-/// `bandeja::es_el_servicio`); in the automatic tests, their own panel.
+/// Whether the panel's key may go to the one listening on the panel's port: only GUARDIANA's service (the CLI's rule);
+/// the automatic tests' own panel only on a computer where the service does not exist (`bandeja::llave_al_puerto`).
 fn al_servicio() -> bool {
-    en_prueba() || bandeja::es_el_servicio(pid_del_servicio(), pid_del_puerto())
+    let (sin_servicio, pid) = servicio();
+    bandeja::llave_al_puerto(en_prueba(), sin_servicio, pid, pid_del_puerto())
 }
 
 /// The VPN as the service says it now; unknown when the one listening is not the service or the key cannot be read.

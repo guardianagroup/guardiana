@@ -720,6 +720,21 @@ pub fn es_el_servicio(servicio: Option<u32>, escucha: Option<u32>) -> bool {
     matches!((servicio, escucha), (Some(s), Some(e)) if s == e && s != 0)
 }
 
+/// Whether the panel's key may go to the one listening on the panel's port: only to GUARDIANA's service
+/// ([`es_el_servicio`]). The automatic tests (`prueba`: `GUARDIANA_ZERO_DATOS`, zero/prueba/prueba.js) bring a panel of
+/// their own to a computer without GUARDIANA, and may use it only when Windows answered that the service does not exist
+/// there (`sin_servicio`): on a computer with GUARDIANA the rule always holds, whatever the environment says (review of
+/// bandeja-vpn-2, finding 4).
+#[must_use]
+pub fn llave_al_puerto(
+    prueba: bool,
+    sin_servicio: bool,
+    servicio: Option<u32>,
+    escucha: Option<u32>,
+) -> bool {
+    (prueba && sin_servicio) || es_el_servicio(servicio, escucha)
+}
+
 /// The process GUARDIANA's service runs in, from what Windows' service manager answers (`SERVICE_STATUS_PROCESS`, as
 /// `QueryServiceStatusEx` writes it: nine 32-bit words, the state second and the process eighth): only while it runs.
 #[must_use]
@@ -1432,6 +1447,13 @@ mod tests {
         assert_eq!(pid_del_servicio(&estado(4, 812)[..20]), None);
         assert!(es_el_servicio(Some(812), Some(812)));
         assert!(!es_el_servicio(Some(812), Some(4040)));
+        // the tests' own panel only where GUARDIANA's service does not exist; with it, the rule holds for them too
+        assert!(llave_al_puerto(true, true, None, Some(4040)));
+        assert!(!llave_al_puerto(true, false, None, Some(4040)));
+        assert!(!llave_al_puerto(true, false, Some(812), Some(4040)));
+        assert!(llave_al_puerto(true, false, Some(812), Some(812)));
+        assert!(!llave_al_puerto(false, true, None, Some(4040)));
+        assert!(llave_al_puerto(false, false, Some(812), Some(812)));
         assert!(!es_el_servicio(None, Some(812)));
         assert!(!es_el_servicio(Some(812), None));
         assert!(!es_el_servicio(Some(0), Some(0)));
