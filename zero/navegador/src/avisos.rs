@@ -607,6 +607,10 @@ extern "system" fn proc_avisos(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRE
             LRESULT(0)
         }
         WM_QUERYENDSESSION => LRESULT(1),
+        // A wParam of 0: the end of the session was called off (another program said no) and the session goes on, so
+        // do the notices and the icon. The installers close this process with WM_CLOSE (taskkill without /F), and
+        // Windows' Restart Manager with a WM_ENDSESSION of wParam 1.
+        WM_ENDSESSION if wp.0 == 0 => LRESULT(0),
         WM_CLOSE | WM_ENDSESSION => {
             cierra(h);
             // SAFETY: posts the quit message to this thread's own queue.
