@@ -436,24 +436,42 @@ Decisiones tomadas en la ronda 88 (1 nov 2026): incluida en la licencia de GUARD
   los avisos graves del escudo: arranca en cada inicio de sesión (la entrada Run «GUARDIANA avisos» del instalador, para
   todas las cuentas) y con cada arranque de ZERO, uno por sesión, así que el icono está también con ZERO cerrado. No hace
   falta ningún proceso nuevo, y el servicio, que corre como SYSTEM, no puede poner iconos. El instalador lo cierra como
-  cierra ZERO (su ventana oculta atiende `WM_CLOSE`) y el icono se va con él; al desinstalar se va la entrada Run. Con
-  `ZERO=0` no hay ZERO ni icono.
-- **Qué dice.** Lo mismo que el chip de la VPN de la barra de ZERO y que la pantalla de la VPN de Órbita, con las palabras
-  del chip (`crates/zero/src/bandeja.rs`, probado en los tres sistemas): verde, «VPN conectada» y el lugar («Finlandia ·
-  Helsinki»); ámbar, «VPN: conectando…»; rojo, «VPN sin respuesta», «VPN: no conecta» (el modo estricto, reintentando) y
-  «VPN parada, con su bloqueo puesto», cuando nada de tus programas de Windows sale a internet; gris, «VPN desconectada»,
-  «VPN: no se pudo conectar», «VPN no disponible en este equipo» y «GUARDIANA no contesta en este equipo».
-- **El menú.** Un clic abre Órbita en la VPN (`guardiana://vpn`); el botón derecho enseña el estado y el lugar, «Abrir la
-  VPN», «Conectar a la salida más rápida» y «Desconectar» cuando la pantalla de la VPN los ofrece, y «Abrir GUARDIANA».
+  cierra ZERO (su ventana oculta atiende `WM_CLOSE`), y al cerrarse quita el icono; un apagado que otro programa cancela
+  no lo cierra. Al desinstalar se va la entrada Run. Con `ZERO=0` no hay ZERO ni icono, y sin el servicio de GUARDIANA
+  (ZERO solo) no hay VPN y no se pone.
+- **Cuándo falta.** Tras una reparación, o una actualización sin la interfaz completa del instalador (`/qn`, `/passive`):
+  el instalador cierra los avisos (`CierraZeroAntes`) y solo vuelve a abrir ZERO con la interfaz completa
+  (`LaunchPanel`), así que el icono vuelve en el próximo inicio de sesión o la próxima vez que se abra ZERO.
+- **Qué dice.** Lo que dice el chip de la VPN de la barra de ZERO, con sus palabras donde el chip lo dice, y lo que dice
+  la pantalla de la VPN de Órbita donde el chip calla (`crates/zero/src/bandeja.rs`, probado en los tres sistemas): verde,
+  «VPN conectada» y el lugar («Finlandia · Helsinki»); ámbar, «VPN: conectando…»; rojo, «VPN sin respuesta», «VPN: no
+  conecta» (el modo estricto, reintentando) y «VPN parada, con su bloqueo puesto», cuando nada de tus programas de Windows
+  sale a internet; gris, «VPN desconectada», «VPN: no se pudo conectar» y «VPN no disponible en este equipo». Cuando no
+  se puede preguntar al servicio, dice por qué si Windows lo dice sin la llave del panel: «El servicio de GUARDIANA está
+  parado en este equipo», «El servicio de GUARDIANA aún no contesta en este equipo», «Otro programa ocupa el puerto del
+  panel de GUARDIANA en este equipo», «Esta cuenta de Windows no puede leer la llave del panel de GUARDIANA» o, si no,
+  «GUARDIANA no contesta en este equipo».
+- **El menú.** Un clic abre Órbita en la VPN (`guardiana://vpn`). El botón derecho enseña el estado y el lugar, «Abrir la
+  VPN», «Conectar a la salida más rápida» cuando se puede conectar (apagada o tras un error), «Desconectar» mientras está
+  encendida o con su bloqueo puesto (como el chip, también mientras conecta), y «Abrir GUARDIANA». Mientras GUARDIANA no
+  contesta ofrece además «Apagar la VPN de GUARDIANA», que lanza lo mismo que esa entrada del menú Inicio
+  (`guardiana.exe vpn apaga --menu`, que pide a Windows los permisos de administrador): el bloqueo del modo estricto
+  sigue en Windows sin el servicio, y desde el icono no se puede saber si está.
 - **Los avisos de Windows.** Uno por cambio: conectada, el servidor deja de contestar o vuelve, la VPN parada con su
-  bloqueo puesto, no se pudo conectar, desconectada. Lo que la persona acaba de pedir desde el menú no se anuncia; una
-  orden que el servicio no tomó, sí, con las palabras del chip.
+  bloqueo puesto, no se pudo conectar, desconectada. Lo que la persona acaba de pedir desde el menú no se anuncia. Una
+  orden del menú que el servicio no tomó, sí: «Desconectar» con las palabras del chip; «Conectar» con las de la pantalla
+  de la VPN (con el bloqueo puesto, «El bloqueo sigue puesto en Windows…»; si es de Plus, la línea que da el servicio,
+  en el idioma del icono). Un «Conectar» que encuentra la VPN ya conectando no trae aviso: lo cuenta la lectura siguiente.
 - **La llave del panel.** Pregunta `GET /api/vpn` cada 3 s, y solo al proceso del servicio «guardiana», con la regla de
   `guardiana vpn apaga`: el gestor de servicios de Windows y la tabla de los que escuchan en 127.0.0.1:7443 tienen que
-  decir el mismo proceso. Las lecturas y las órdenes van en hilos aparte, así que el icono siempre responde. Lo que
-  añade es una petición local cada 3 s, en un proceso que ya estaba en marcha.
+  decir el mismo proceso. En las pruebas automáticas (`GUARDIANA_ZERO_DATOS`) vale su propio panel de prueba, pero solo
+  si Windows contesta que el servicio «guardiana» no existe en el equipo. Las lecturas y las órdenes van en hilos aparte:
+  el icono nunca espera a la red ni al servicio; al ponerse o cambiar puede esperar unos segundos al Explorador
+  (`Shell_NotifyIconW`). Lo que añade es una petición local cada 3 s, en un proceso que ya estaba en marcha.
 - **La prueba.** El flujo `zero` de la CI arranca `--avisos` con un panel de prueba en el 7443 y comprueba que el icono
-  aparece y pasa de gris a ámbar, verde, rojo y otra vez gris, con sus palabras (`zero/prueba/prueba.js`).
+  aparece y pasa de gris a ámbar, verde, rojo y otra vez gris, con sus palabras (`zero/prueba/prueba.js`). No comprueba
+  el menú, las órdenes, los avisos, que el icono se vaya al cerrarse ni que vuelva tras reiniciar el Explorador: eso se
+  prueba a mano.
 
 ## Los servidores (propuesta para la fase 1)
 

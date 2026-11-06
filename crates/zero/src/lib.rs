@@ -1,8 +1,12 @@
 //! GUARDIANA ZERO, the browser: everything that decides, tested on every system.
 //!
 //! The window, the tabs and the hooks into the engine live in `zero/` (Windows, WebView2) and
-//! ask this crate what each request is, whether it may leave, and what to write down. Nothing
-//! here opens a connection: the browser's only traffic is the pages the person asks for.
+//! ask this crate what each request is, whether it may leave, and what to write down. The
+//! connections made from here are named in their own modules: GUARDIANA's service on this
+//! computer (127.0.0.1:7443: `lanzador` waits for it, and `bandeja`, the VPN's icon, asks it with
+//! the panel's key), and those of the features that need them (the relays and the phone of
+//! Comunicaciones, SECURE, the subscription). None of them is a page's: the pages' traffic is only
+//! what the person's own browsing asks for.
 // SECURE's state for the page is one big `json!` (16 Oct 2026: past the default limit).
 #![recursion_limit = "256"]
 

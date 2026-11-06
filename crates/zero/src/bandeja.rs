@@ -4,24 +4,27 @@
 //!
 //! Decided here, and tested on every system; `GUARDIANA ZERO.exe --avisos` (zero/navegador/src/avisos.rs) draws it: the
 //! process without a window that already shows el escudo's notices, started at every sign-in by the installer's Run
-//! entry and by every start of ZERO, one per session, so the icon stays with ZERO closed too. It asks GUARDIANA's
-//! service on this computer as the CLI does (`crates/cli/src/vpn_cmd.rs`): `GET /api/vpn` on 127.0.0.1:7443 with the
-//! panel's key in `X-Guardiana-Token`, every [`CADA`], and only when the one listening there is the service's own
-//! process ([`es_el_servicio`]); «Conectar» and «Desconectar» are the panel's own orders.
+//! entry and by every start of ZERO, one per session, so the icon stays with ZERO closed too (but for a repair, or an
+//! update without the installer's whole interface, which close it and do not open ZERO again: then it is back at the
+//! next sign-in or the next start of ZERO; docs/VPN.md). Without GUARDIANA's service there is no icon ([`se_ve`]). It
+//! asks the service on this computer as the CLI does (`crates/cli/src/vpn_cmd.rs`): `GET /api/vpn` on 127.0.0.1:7443
+//! with the panel's key in `X-Guardiana-Token`, every [`CADA`], and only when the one listening there is the service's
+//! own process ([`llave_al_puerto`]); «Conectar» and «Desconectar» are the panel's own orders.
 //!
-//! The icon says what the VPN chip of ZERO's bar (zero/navegador/interfaz/barra.js) and Órbita's VPN page say, with the
-//! chip's own words (its texts, `vpn_*`) wherever the chip says it ([`Cara`]):
+//! The icon says what the VPN chip of ZERO's bar (zero/navegador/interfaz/barra.js) says, with the chip's own words (its
+//! texts, `vpn_*`) wherever the chip says it, and what Órbita's VPN page says where the chip says nothing ([`Cara`]):
 //!
 //! - The colour ([`color`]): green connected; amber connecting; red while nothing of the computer's programs reaches the
 //!   internet (its server does not answer, strict mode trying again, or the VPN stopped with its block still in
-//!   Windows); grey off, not on this computer, or GUARDIANA not answering.
+//!   Windows); grey off, not on this computer, or GUARDIANA not answering, with why when Windows tells it ([`Falta`]).
 //! - The lines under the pointer ([`linea`]): «GUARDIANA», the state, and where it goes out («Finlandia · Helsinki»,
 //!   written as the VPN page writes it).
 //! - The menu ([`menu`]): the state and the place (not clickable), «Abrir la VPN», «Conectar a la salida más rápida»
-//!   and «Desconectar» when the VPN page offers them, and «Abrir GUARDIANA».
+//!   when it can connect, «Desconectar» as the chip offers it, the Start menu's «Apagar la VPN de GUARDIANA» while
+//!   GUARDIANA does not answer, and «Abrir GUARDIANA».
 //! - The notices ([`aviso`]): one per change of what the icon says; none for the first reading or a service that stops
 //!   answering, and none for the connection or the disconnection the person has just ordered from this menu
-//!   ([`PROPIO`]).
+//!   ([`PROPIO`]); and one for an order of the menu the service did not take ([`aviso_de_orden`]).
 
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
@@ -976,7 +979,7 @@ mod tests {
             estado(&bloqueada(), &es),
             "VPN parada, con su bloqueo puesto"
         );
-        // every state has its words in the three languages, and none promises more than «tus programas de Windows»
+        // every state has its words in the three languages (what they promise: los_textos_nuevos_no_prometen_de_mas)
         for idioma in [Idioma::Es, Idioma::En, Idioma::Pt] {
             let t = Textos::de(idioma);
             for v in [

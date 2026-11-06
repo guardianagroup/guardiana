@@ -6,7 +6,10 @@
 //! 5 Nov 2026 (the owner, 3 Nov, on the icon and the notices of the VPN: «Hazlo claro»): the same process carries the
 //! VPN's icon next to Windows' clock, so it is there from the sign-in and with ZERO closed too. What it says, its menu
 //! and its notices are decided by `guardiana_zero::bandeja`; this asks GUARDIANA's service on its own threads (never on
-//! the window's, so the icon always answers), draws the icon with `Shell_NotifyIconW`, shows its menu and opens ZERO.
+//! the window's, so the icon never waits for the network or the service; putting or changing the icon may wait a few
+//! seconds for Explorer, inside `Shell_NotifyIconW`), draws the icon, shows its menu and opens ZERO. A repair, or an
+//! update without the installer's whole interface, closes this process and does not open ZERO again: the icon is back
+//! at the next sign-in or the next start of ZERO.
 
 use std::cell::RefCell;
 use std::ffi::c_void;
