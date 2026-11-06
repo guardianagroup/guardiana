@@ -582,9 +582,6 @@ extern "system" fn proc_avisos(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRE
             LRESULT(0)
         }
         WM_QUERYENDSESSION => LRESULT(1),
-        // Any WM_ENDSESSION ends it, whatever its wParam says: an installer closing the program may send it that way
-        // (5 Nov 2026, measured: when this process stayed for a wParam of 0, the update in the installer's test of the CI
-        // never finished).
         WM_CLOSE | WM_ENDSESSION => {
             quita_icono(h);
             // SAFETY: posts the quit message to this thread's own queue.

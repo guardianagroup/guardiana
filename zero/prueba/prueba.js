@@ -120,58 +120,6 @@ for ($i = 0; $i -lt 6; $i++) { [Rueda]::mouse_event(0x0800, 0, 0, -120, [UIntPtr
 `);
   try { execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${ps}"`, { stdio: 'ignore' }); } catch (_) {}
 }
-// 5 Nov 2026: what Windows says of the VPN's icon next to the clock (`--avisos`'s hidden window, icon number 1): whether
-// it has it and where (Shell_NotifyIconGetRect), and, when it is on the screen, the colour of its dot (the bottom right
-// of the icon) and a picture of it, enlarged, in `recorte`.
-function iconoEnWindows(recorte) {
-  const ps = path.join(os.tmpdir(), 'zero-icono-vpn.ps1');
-  const destino = recorte ? path.join(salida, recorte).replace(/'/g, "''") : '';
-  fs.writeFileSync(ps, `
-Add-Type -AssemblyName System.Drawing
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-public static class IconoVpn {
-  [StructLayout(LayoutKind.Sequential)] public struct ID { public uint cbSize; public IntPtr hWnd; public uint uID; public Guid guidItem; }
-  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
-  [DllImport("shell32.dll")] public static extern int Shell_NotifyIconGetRect(ref ID id, out RECT r);
-  // the title as a pointer: PowerShell turns $null into "" for a string, and no window has an empty title
-  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindowW(string c, IntPtr t);
-}
-"@
-$h = [IconoVpn]::FindWindowW('GuardianaAvisos', [IntPtr]::Zero)
-if ($h -eq [IntPtr]::Zero) { 'sin-ventana'; exit }
-$id = New-Object IconoVpn+ID
-$id.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf([type][IconoVpn+ID])
-$id.hWnd = $h
-$id.uID = 1
-$r = New-Object IconoVpn+RECT
-$hr = [IconoVpn]::Shell_NotifyIconGetRect([ref]$id, [ref]$r)
-$w = $r.R - $r.L; $a = $r.B - $r.T
-$color = ''
-if ($hr -eq 0 -and $w -gt 4 -and $a -gt 4 -and $w -lt 200 -and $a -lt 200) {
-  $b = New-Object System.Drawing.Bitmap $w, $a
-  $g = [System.Drawing.Graphics]::FromImage($b)
-  $g.CopyFromScreen($r.L, $r.T, 0, 0, $b.Size)
-  # the most saturated pixel: the dot when it is green, amber or red; the padlock's pale blue when it is grey
-  $mejor = -1
-  for ($x = 0; $x -lt $w; $x++) { for ($y = 0; $y -lt $a; $y++) {
-    $p = $b.GetPixel($x, $y)
-    $s = [Math]::Max($p.R, [Math]::Max($p.G, $p.B)) - [Math]::Min($p.R, [Math]::Min($p.G, $p.B))
-    if ($s -gt $mejor) { $mejor = $s; $color = "$($p.R),$($p.G),$($p.B)" }
-  } }
-  if ('${destino}') {
-    $z = New-Object System.Drawing.Bitmap ($w * 8), ($a * 8)
-    $gz = [System.Drawing.Graphics]::FromImage($z)
-    $gz.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
-    $gz.DrawImage($b, 0, 0, $w * 8, $a * 8)
-    $z.Save('${destino}')
-  }
-}
-"$hr $($r.L) $($r.T) $w $a $color"
-`);
-  try { return execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${ps}"`, { encoding: 'utf8' }).trim(); } catch (e) { return `error ${(e && e.message) || ''}`.slice(0, 300); }
-}
 function pantalla(nombre) {
   const ruta = path.join(salida, nombre).replace(/'/g, "''");
   try {
@@ -660,8 +608,9 @@ function pantalla(nombre) {
   // program's process without a window that starts with the session (the installer's Run entry), so it is there with
   // ZERO closed. A panel of the test's own on the panel's port answers `GET /api/vpn` as the service does
   // (crates/panel/src/vpn.rs), with the panel's key where the service keeps it; the process writes what it shows to
-  // `bandeja.txt` (only in the tests: «<colour> <1 if Windows took it>», then its lines), and Windows itself is asked
-  // whether it has the icon and of what colour it is on the screen.
+  // `bandeja.txt` (only in the tests: «<colour> <1 if Windows took it>», then its lines). Windows is not asked from
+  // outside where it has the icon (Shell_NotifyIconGetRect from another process): with that question the next step, the
+  // installer's test, never ended in the CI (three times out of three, 5 Nov 2026), and without it, it ends in a minute.
   {
     const LLAVE = crypto.randomBytes(32).toString('hex');
     const carpetaLlave = path.join(process.env.ProgramData || 'C:\\ProgramData', 'Guardiana');
@@ -699,25 +648,13 @@ function pantalla(nombre) {
     const puesto = explorador ? ' 1' : ' ';
     if (!explorador) console.log('::warning title=icono de la VPN::este Windows no tiene el Explorador en marcha: no hay barra de tareas donde poner el icono, y solo se comprueba lo que decide');
     const en = (color, que) => hasta(async () => icono().startsWith(color + puesto) && icono().includes(que), 20000);
-    const enPantalla = (color, recorte) => {
-      const w = iconoEnWindows(recorte);
-      const [hr, , , , , rgb] = w.split(' ');
-      const [r, g, b] = (rgb || '').split(',').map(Number);
-      const visto = !rgb ? '' : Math.max(r, g, b) - Math.min(r, g, b) < 100 ? 'gris' : g > r && g > b ? 'verde' : r > 200 && g > 140 ? 'ambar' : r > g && r > b ? 'rojo' : '?';
-      console.log(`::notice title=icono de la VPN (${color})::Shell_NotifyIconGetRect y el color en la pantalla: ${w}${visto ? ` (se ve ${visto})` : ''}`);
-      return { tiene: hr === '0', visto };
-    };
     comprueba(await en('gris', 'VPN desconectada'), `el icono de la VPN aparece junto al reloj, gris, con «GUARDIANA · VPN desconectada» (${JSON.stringify(icono())})`);
-    // where Windows put it (on the taskbar, or among the hidden icons) and how it looks: said, never a failure
-    enPantalla('gris', 'vpn-icono-gris.png');
     fase = 'conectando';
     comprueba(await en('ambar', 'VPN: conectando'), `mientras conecta, ámbar con «VPN: conectando…» (${JSON.stringify(icono())})`);
     fase = 'conectada';
     comprueba(await en('verde', 'VPN conectada\nFinlandia · Helsinki'), `al conectar se pone verde y dice dónde sale (${JSON.stringify(icono())})`);
     await espera(1500);
     pantalla('vpn-icono-verde.png');
-    const visto = enPantalla('verde', 'vpn-icono-verde-recorte.png').visto;
-    if (visto && visto !== 'verde') console.log(`::warning title=icono de la VPN::conectada, en la pantalla se ve ${visto}`);
     fase = 'sin_respuesta';
     comprueba(await en('rojo', 'VPN sin respuesta'), `si su servidor no contesta, rojo con «VPN sin respuesta» (${JSON.stringify(icono())})`);
     fase = 'apagada';
