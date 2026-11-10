@@ -106,6 +106,10 @@ body:has(main.lente) > footer { max-width: calc(var(--s-pagina) + 2 * var(--s-ma
 .lente-ancha .lente-principal { grid-column: span 12; }
 /* A row the whole width of the page under the 8 + 4 (wide tables: Registro, Foto, Reglas). */
 .lente-completa { grid-column: 1 / -1; min-width: 0; display: flex; flex-direction: column; gap: var(--e5); }
+/* 1.0.58 (10 nov 2026): con un bloque de ancho completo debajo (Reglas, Foto de 60 s, Actividad), la columna lateral no se
+   queda fija: es fija dentro de toda la rejilla, así que al bajar se montaba encima de la tabla y tapaba sus últimas
+   columnas y los botones «deshacer» (visto en el equipo del dueño, a 1280 px). Sin ese bloque sigue fija como antes. */
+.lente-cuerpo:has(> .lente-completa) > .lente-lado { position: static; }
 
 /* ---- cards ----------------------------------------------------------------------------- */
 .lente-tarjeta { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-tarjeta); min-width: 0; }
