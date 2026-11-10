@@ -1473,16 +1473,10 @@ pub(crate) async fn detectar(_s: Session) -> ApiResult<DeteccionView> {
         Err(e) => (Vec::new(), Some(e.to_string())),
     };
     // Say which of the detected products GUARDIANA's list knows (so the page can link to it).
-    let conocido = |n: &str| {
-        antivirus::antivirus().iter().any(|a| {
-            n.to_ascii_lowercase()
-                .contains(&a.nombre.to_ascii_lowercase())
-        })
-    };
     let detectados: Vec<Detectado> = lista
         .into_iter()
         .map(|a| Detectado {
-            conocido: conocido(&a.nombre),
+            conocido: en_la_lista(&a.nombre),
             nombre: a.nombre,
             ruta: a.ruta,
             activo: a.activo,
@@ -1509,11 +1503,31 @@ struct Detectado {
     conocido: bool,
 }
 
+/// Whether GUARDIANA's list knows the antivirus Windows registers as `nombre`: the list's name of a product is in it.
+/// Windows' own registers under its old name, «Windows Defender», and the list has it under the one Microsoft uses
+/// today, «Microsoft Defender»: until the 1.0.57 the page said of it «aún no está en nuestra lista», on every computer
+/// that uses the antivirus Windows brings (seen on the owner's, 10 Nov 2026).
+fn en_la_lista(nombre: &str) -> bool {
+    let n = nombre
+        .to_ascii_lowercase()
+        .replace("windows defender", "microsoft defender");
+    antivirus::antivirus()
+        .iter()
+        .any(|a| n.contains(&a.nombre.to_ascii_lowercase()))
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use guardiana_core::ProgramName;
+
+    #[test]
+    fn el_antivirus_de_windows_esta_en_la_lista_con_sus_dos_nombres() {
+        assert!(en_la_lista("Windows Defender"));
+        assert!(en_la_lista("Microsoft Defender Antivirus"));
+        assert!(!en_la_lista("Un antivirus que no existe"));
+    }
 
     /// The paths of a cut are kept with it in the ledger and come back whole, added to, never
     /// twice; letting the product through forgets them, and only its (review of arreglos-1055):

@@ -118,7 +118,14 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   evento 5: `TargetProcessId`, `DesiredAccess`, `ReturnCode`). Lo de Windows y lo instalado en Program Files
   (antivirus, copias de seguridad) no se juzga; un programa que ejecuta otros (rundll32, PowerShell…) o una herramienta
   que copia la memoria de un proceso, sí, esté donde esté. Grave, también si Windows lo negó (la protección de LSA):
-  el intento ya es la señal.
+  el intento ya es la señal. Desde la 1.0.58 (10 nov 2026) tampoco se juzga un programa con firma válida que no sea
+  una de esas herramientas: muchos programas instalados en la carpeta de la persona recorren la lista de procesos
+  pidiendo a cada uno los derechos de siempre, leer la memoria entre ellos, y LSASS es uno más de la lista. OneDrive lo
+  hace cada hora desde `AppData\Local\Microsoft\OneDrive`: hasta la 1.0.57 era un aviso grave cada hora, con el
+  botón de la cuarentena, en cualquier equipo con OneDrive (en el del dueño, 62 en tres días). Los derechos pedidos no
+  distinguen a uno de otro; quién firma el archivo, sí. El aviso espera hasta un minuto a que Windows compruebe la
+  firma; sin firma válida, o sin poder comprobarla, se avisa como antes. Cuando Windows da por firmado un programa, los
+  avisos de esta regla que una versión anterior dejó sobre ese mismo archivo se quitan de la lista del panel.
 - «Segunda opinión» (`defensor.rs`): en cada aviso grave sobre el archivo de un programa (fuera de la carpeta de
   Windows), se pregunta a Microsoft Defender por ese archivo (`MpCmdRun -Scan -ScanType 3 -File … -DisableRemediation`:
   solo dice, no toca nada; un archivo, una vez al día, en un hilo aparte). Si lo reconoce como amenaza, es otro aviso

@@ -11,7 +11,7 @@ use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use guardiana_apps::{Apertura, Contenido, DesdeMedio, Guardia, Observador, Rafaga};
+use guardiana_apps::{Acceso, Apertura, Contenido, DesdeMedio, Guardia, Observador, Rafaga};
 use guardiana_core::vigilancia::Suceso;
 use guardiana_core::{Ledger, NewEvent};
 use guardiana_escudo::arranque::Archivo;
@@ -237,6 +237,8 @@ pub(crate) struct EscudoVivo {
     secuestros_vistos: HashMap<String, u64>,
     /// Programs started from a disc, a disk image or a removable drive whose signature was not checked yet.
     medios_pend: Vec<DesdeMedio>,
+    /// Openings of LSASS whose program's signature was not checked yet.
+    accesos_pend: Vec<Acceso>,
     /// Connections without a name whose program's signature was not checked yet, and program path → when it was
     /// last judged.
     sin_nombre_pend: Vec<SinNombre>,
@@ -299,6 +301,7 @@ impl EscudoVivo {
             rafagas: Vec::new(),
             secuestros_vistos: HashMap::new(),
             medios_pend: Vec::new(),
+            accesos_pend: Vec::new(),
             hosts,
             ruta_hosts,
             hosts_leido_ms: 0,
@@ -367,7 +370,7 @@ impl EscudoVivo {
         self.mira_hosts(ahora_ms);
         self.ladrones(obs, ahora_ms);
         self.cadenas();
-        self.credenciales();
+        self.credenciales(obs, ahora_ms);
         self.medios(obs, ahora_ms);
         self.arranques_pendientes(obs, ahora_ms);
         if self.pendientes.is_empty() {
@@ -594,23 +597,53 @@ impl EscudoVivo {
         }
     }
 
-    /// The openings of LSASS that asked to read its memory, through the rule (`guardiana_escudo::credenciales`). The
-    /// same program warns once an hour.
-    fn credenciales(&mut self) {
+    /// The openings of LSASS that asked to read its memory, once Windows has checked the program's signature where the
+    /// answer depends on it (or after [`ESPERA_FIRMA_MS`]), through the rule (`guardiana_escudo::credenciales`). The
+    /// same program warns once an hour. A program found validly signed is not a warning (1.0.58), and the warnings an
+    /// earlier version wrote for that same file leave the panel's list.
+    fn credenciales(&mut self, obs: &Observador, ahora_ms: u64) {
         let nuevos = self
             .guardia
             .as_ref()
             .map(Guardia::accesos)
             .unwrap_or_default();
-        for a in nuevos {
+        if nuevos.is_empty() && self.accesos_pend.is_empty() {
+            return;
+        }
+        let mut todos = std::mem::take(&mut self.accesos_pend);
+        todos.extend(nuevos);
+        for a in todos {
             let cuando = u64::try_from(a.ts).unwrap_or(0);
+            let firma = if guardiana_escudo::credenciales::depende_de_la_firma(
+                &a.programa,
+                &a.ruta,
+                a.acceso,
+            ) {
+                match obs.firma(&a.ruta) {
+                    Some(f) if f.is_empty() => Firma::SinFirma,
+                    Some(f) => Firma::Firmado(f),
+                    None if ahora_ms.saturating_sub(cuando) < ESPERA_FIRMA_MS => {
+                        if self.accesos_pend.len() < MAX_PENDIENTES {
+                            self.accesos_pend.push(a);
+                        }
+                        continue;
+                    }
+                    None => Firma::SinComprobar,
+                }
+            } else {
+                Firma::SinComprobar
+            };
             let Some((aviso, grave)) = guardiana_escudo::credenciales::juzga(
                 &a.programa,
                 &a.ruta,
+                &firma,
                 a.acceso,
                 a.concedido,
                 cuando,
             ) else {
+                if matches!(firma, Firma::Firmado(_)) {
+                    self.retira_credenciales(&a.ruta);
+                }
                 continue;
             };
             let clave = (aviso.nombre.clone(), "credenciales".to_owned());
@@ -626,6 +659,21 @@ impl EscudoVivo {
             }
             self.cadenas_vistas.insert(clave, cuando);
             self.anota(&aviso, grave);
+        }
+    }
+
+    /// Takes out of the panel's file the «credenciales» warnings about the program at `ruta`, now that Windows found it
+    /// validly signed: until the 1.0.57 the rule did not look at the signature and warned every hour about programs
+    /// such as OneDrive (`guardiana_escudo::credenciales`). Nothing else in the file changes.
+    fn retira_credenciales(&self, ruta: &str) {
+        let Ok(texto) = std::fs::read_to_string(&self.ruta_avisos) else {
+            return;
+        };
+        let Some(quedan) = sin_credenciales_de(&texto, ruta) else {
+            return;
+        };
+        if let Err(e) = escribe(&self.ruta_avisos, quedan.as_bytes()) {
+            eprintln!("guardiana: escudo: {e}");
         }
     }
 
@@ -1227,6 +1275,28 @@ fn firma_de(obs: &Observador, ruta: &str, firmado_por: &str) -> Firma {
     }
 }
 
+/// The warnings file `texto` without the «credenciales» warnings about the program at `ruta` (the rule writes the
+/// path, in lower case, as the warning's `nombre`); `None` when there is none, so the file is left as it is.
+fn sin_credenciales_de(texto: &str, ruta: &str) -> Option<String> {
+    let nombre = ruta.to_lowercase();
+    let suyo = |linea: &str| {
+        serde_json::from_str::<serde_json::Value>(linea).is_ok_and(|v| {
+            v["regla"].as_str() == Some("credenciales")
+                && v["nombre"].as_str() == Some(nombre.as_str())
+        })
+    };
+    let lineas: Vec<&str> = texto.lines().filter(|l| !l.is_empty()).collect();
+    let quedan: Vec<&str> = lineas.iter().copied().filter(|l| !suyo(l)).collect();
+    if quedan.len() == lineas.len() {
+        return None;
+    }
+    let mut salida = quedan.join("\n");
+    if !salida.is_empty() {
+        salida.push('\n');
+    }
+    Some(salida)
+}
+
 /// Writes a whole file through a temporary name, so that it is either all there or not at all.
 fn escribe(ruta: &Path, datos: &[u8]) -> std::io::Result<()> {
     let tmp = ruta.with_extension("tmp");
@@ -1319,5 +1389,45 @@ fn escribe_senuelo(ruta: &Path) -> Option<std::time::SystemTime> {
     {
         let _ = ruta;
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sin_credenciales_de;
+
+    #[test]
+    fn los_avisos_de_credenciales_de_un_programa_firmado_se_retiran() {
+        let onedrive = r"C:\Users\ana\AppData\Local\Microsoft\OneDrive\OneDrive.exe";
+        let nombre = onedrive.to_lowercase();
+        let linea = |regla: &str, nombre: &str, cuando: u64| {
+            serde_json::json!({
+                "regla": regla, "programa": "OneDrive.exe", "ruta": onedrive, "sitio": "",
+                "nombre": nombre, "cuando_ms": cuando, "texto": "…", "grave": true
+            })
+            .to_string()
+        };
+        // dos de OneDrive por «credenciales», uno de otro programa por la misma regla y uno de OneDrive por otra
+        let otro = r"c:\users\ana\downloads\x.exe";
+        let texto = [
+            linea("credenciales", &nombre, 1),
+            linea("credenciales", otro, 2),
+            linea("secuestro", &nombre, 3),
+            linea("credenciales", &nombre, 4),
+        ]
+        .join("\n")
+            + "\n";
+        let quedan = sin_credenciales_de(&texto, onedrive).unwrap_or_default();
+        let lineas: Vec<&str> = quedan.lines().collect();
+        assert_eq!(lineas.len(), 2, "{quedan}");
+        assert!(lineas[0].contains(r#""cuando_ms":2"#), "{quedan}");
+        assert!(lineas[1].contains(r#""regla":"secuestro""#), "{quedan}");
+        assert!(quedan.ends_with('\n'));
+        // nada suyo: el archivo se deja como está
+        assert_eq!(sin_credenciales_de(&quedan, onedrive), None);
+        assert_eq!(sin_credenciales_de("", onedrive), None);
+        // solo había avisos suyos: el archivo queda vacío
+        let solo = linea("credenciales", &nombre, 1) + "\n";
+        assert_eq!(sin_credenciales_de(&solo, onedrive), Some(String::new()));
     }
 }
