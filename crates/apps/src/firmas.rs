@@ -280,10 +280,15 @@ mod tests {
             assert_eq!(sola, vec![f.clone()], "{r}");
         }
         assert!(
-            juntas.iter().any(|(f, _)| !f.is_empty()),
+            juntas.iter().any(|(f, _, _)| !f.is_empty()),
             "los programas de Windows están firmados: {juntas:?}"
         );
-        assert_eq!(juntas[2], (String::new(), String::new()));
+        // el nombre que declara el archivo (15 nov 2026): el de la consola dice que es cmd.exe
+        assert!(
+            juntas[1].2.to_ascii_lowercase().starts_with("cmd.exe"),
+            "{juntas:?}"
+        );
+        assert_eq!(juntas[2], (String::new(), String::new(), String::new()));
         let ejecutada = std::path::Path::new(&marca).exists();
         let _ = std::fs::remove_file(&marca);
         let _ = std::fs::remove_dir_all(&carpeta);
