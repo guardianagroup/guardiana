@@ -158,7 +158,7 @@ function pantalla(nombre) {
     await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
     if (await panel.evaluate(() => document.body.classList.contains('plegado'))) await panel.click('#carril-emblema');
     await hasta(() => panel.evaluate(() => !document.body.classList.contains('plegado')));
-    await panel.click('#e-ajustes');
+    await panel.evaluate(() => { const b = document.getElementById('e-ajustes'); b.scrollIntoView({ block: 'center' }); b.click(); }); // (el escudo se mueve en directo: un clic de Playwright espera a que se quede quieto)
   };
   const inicio = await paginaQue(nav, (u) => u.endsWith('/inicio.html'));
   comprueba(true, 'barra, panel y pestaña nueva cargados desde zero.guardiana');
@@ -172,7 +172,7 @@ function pantalla(nombre) {
   comprueba(await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa'))), 'y el escudo se queda abierto al lado, en directo');
   // The language can be chosen; the rest of the test reads Spanish.
   comprueba(await barra.evaluate(() => !document.getElementById('b-menu')), 'la barra ya no tiene «Ajustes» arriba a la derecha');
-  await panel.click('#e-ajustes');
+  await panel.evaluate(() => { const b = document.getElementById('e-ajustes'); b.scrollIntoView({ block: 'center' }); b.click(); }); // (el escudo se mueve en directo: un clic de Playwright espera a que se quede quieto)
   await hasta(() => panel.evaluate(() => document.querySelector('#v-ajustes').classList.contains('vista-activa')));
   await panel.selectOption('#a-idioma', 'es');
   comprueba(await hasta(async () => (await barra.textContent('.pestana .titulo')) === 'Nueva pestaña'), 'cambiar el idioma a español cambia la barra al momento');
