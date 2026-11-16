@@ -131,7 +131,7 @@ const fn tipo_de(r: Recurso) -> u16 {
 }
 
 /// One network rule, compiled.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Regla {
     /// The pattern split at `*`, lower case; `^` kept as the separator placeholder.
     partes: Vec<Box<str>>,
@@ -157,6 +157,9 @@ struct Regla {
 pub struct Motor {
     bloqueo: Indice,
     excepcion: Indice,
+    /// The rules of the lists of danger alone (1.0.59): what the open auction lets past the
+    /// other lists is still checked against them, whatever another rule found first.
+    peligro: Indice,
     /// How many rules were read.
     pub leidas: usize,
     /// How many were left out (unknown options, regular expressions, switched off).
@@ -654,6 +657,9 @@ impl Motor {
                     }
                     Some((r, false, None)) => {
                         m.leidas += 1;
+                        if r.lista == Lista::Peligro {
+                            m.peligro.mete(r.clone());
+                        }
                         m.bloqueo.mete(r);
                     }
                     None => m.omitidas += 1,
@@ -694,6 +700,33 @@ impl Motor {
             return None;
         }
         Some(r.lista)
+    }
+}
+
+impl Motor {
+    /// Whether a list of danger (uBlock badware, URLhaus) knows this request, whatever the other
+    /// lists say and with no exception of theirs (1.0.59, second review: an advert rule found
+    /// first must not hide a dangerous address).
+    #[must_use]
+    pub fn peligroso(
+        &self,
+        url: &str,
+        recurso: Recurso,
+        tercero: bool,
+        sitio_pagina: &str,
+    ) -> bool {
+        let bajo = url.to_ascii_lowercase();
+        let host = rango_host(&bajo);
+        let host_destino = &bajo[host.0..host.1];
+        let p = Pedido {
+            url: &bajo,
+            host,
+            tipo: tipo_de(recurso),
+            tercero,
+            sitio_pagina,
+            host_destino,
+        };
+        self.peligro.busca(&p, &tokens(&bajo)).is_some()
     }
 }
 
@@ -870,6 +903,28 @@ mod tests {
 
     fn m(reglas: &str) -> Motor {
         Motor::de(&[(reglas, Lista::Anuncios)])
+    }
+
+    #[test]
+    fn a_dangerous_address_is_found_whatever_rule_comes_first() {
+        // 1.0.59 (second review): the open auction asks the lists of danger on their own
+        let url = "https://bidder.example/openrtb";
+        let ambas = Motor::de(&[
+            ("||bidder.example^", Lista::Anuncios),
+            ("||bidder.example^", Lista::Peligro),
+        ]);
+        assert_eq!(
+            ambas.bloquea(url, Recurso::Datos, true, "eltiempo.com"),
+            Some(Lista::Anuncios)
+        );
+        assert!(ambas.peligroso(url, Recurso::Datos, true, "eltiempo.com"));
+        // an exception of the advert lists does not lift it
+        let con_excepcion = Motor::de(&[
+            ("@@||bidder.example^", Lista::Anuncios),
+            ("||bidder.example^", Lista::Peligro),
+        ]);
+        assert!(con_excepcion.peligroso(url, Recurso::Datos, true, "eltiempo.com"));
+        assert!(!m("||bidder.example^").peligroso(url, Recurso::Datos, true, "eltiempo.com"));
     }
 
     #[test]

@@ -361,12 +361,65 @@ pub fn es_programa_de_subasta(ruta: &str) -> bool {
     archivo.ends_with(".js") && (archivo.contains("prebid") || archivo.starts_with("pbjs"))
 }
 
-/// A name Prebid.js sends its bid requests to (1.0.59, the auction open by default: with the
-/// page's auction program, all the auction needs to run). Not the ad program that picks and
-/// serves the ad, not the crossings of identifiers, not the identifiers.
+/// The parts of a name that say it is not where bids are asked (1.0.59, second review): logs,
+/// analytics, events, beacons and pixels, syncing and cookies, and the static files of a CDN.
+const NO_ES_PUJA: &[&str] = &[
+    "sync",
+    "usync",
+    "usersync",
+    "cookie",
+    "cookies",
+    "cm",
+    "cs",
+    "match",
+    "matching",
+    "pixel",
+    "px",
+    "log",
+    "logs",
+    "logger",
+    "logging",
+    "analytics",
+    "event",
+    "events",
+    "monitoring",
+    "beacon",
+    "track",
+    "tracking",
+    "trk",
+    "stats",
+    "metrics",
+    "collect",
+    "report",
+    "cdn",
+    "static",
+    "js",
+    "scripts",
+    "lib",
+    "assets",
+    "widget",
+    "player",
+];
+
+/// A name Prebid.js sends its bid requests to, exactly as the auction list writes it (1.0.59,
+/// the auction open by default: with the page's auction program, all the auction needs to run).
+/// Never a parent of it, never one whose labels before the site say it is a log, a counter, a
+/// sync or a static file. Not the ad program that picks and serves the ad, not the crossings of
+/// identifiers, not the identifiers.
 #[must_use]
 pub fn es_nombre_de_puja(host: &str) -> bool {
-    papel_de(host).is_some_and(|r| r.papel == Papel::Puja)
+    let h = host.trim().trim_end_matches('.').to_ascii_lowercase();
+    let Some(r) = papel_de(&h) else {
+        return false;
+    };
+    if r.papel != Papel::Puja || r.coincide != h {
+        return false;
+    }
+    let s = sitio(&h);
+    let antes = h.strip_suffix(s.as_str()).unwrap_or("");
+    !antes
+        .split(|c: char| c == '.' || c == '-' || c.is_ascii_digit())
+        .any(|p| NO_ES_PUJA.contains(&p))
 }
 
 /// Whether «No me subastes» cuts this request: the page's auction program by its name, any

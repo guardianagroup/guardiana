@@ -116,12 +116,14 @@ const GPC: &str = r#"(() => {
 /// (`adPlacements`, `playerAds`, `adSlots` and the heartbeat of its breaks) wherever they come:
 /// the page's first data, `JSON.parse` and the answers of `fetch` read with `.json()`; the
 /// notice YouTube puts up against blockers leaves the same way. The spaces of the advertising
-/// in the pages are hidden, and an advert that still starts is taken to its end. YouTube changes
-/// how it serves them: an advert can get through until the next version brings the rules up to
-/// date. Nothing is sent anywhere; the person turns it off in ZERO's settings.
+/// in the pages are hidden, and an advert that still starts plays muted and fast, with «Saltar»
+/// pressed when it appears (never a jump: second review). Not in YouTube Studio. YouTube changes
+/// how it serves them: an advert can get through. Nothing is sent anywhere; the person turns it
+/// off in ZERO's settings.
 const YOUTUBE: &str = r#"(() => {
   'use strict';
-  if (!/(^|\.)(youtube\.com|youtube-nocookie\.com|youtubekids\.com)$/.test(location.hostname)) return;
+  // YouTube's own sites where its videos play; never YouTube Studio, where creators manage their adverts (second review)
+  if (!/^(www\.|m\.|music\.)?(youtube\.com|youtube-nocookie\.com|youtubekids\.com)$/.test(location.hostname)) return;
   const CLAVES = ['adPlacements', 'playerAds', 'adSlots', 'adBreakHeartbeatParams'];
   const quita = (x) => {
     if (!x || typeof x !== 'object') return;
@@ -145,7 +147,7 @@ const YOUTUBE: &str = r#"(() => {
   const CSS = 'ytd-ad-slot-renderer,ytd-in-feed-ad-layout-renderer,ytd-banner-promo-renderer,ytd-statement-banner-renderer,' +
     'ytd-display-ad-renderer,ytd-companion-slot-renderer,ytd-promoted-sparkles-web-renderer,ytd-promoted-video-renderer,' +
     'ytd-search-pyv-renderer,ytd-player-legacy-desktop-watch-ads-renderer,ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"],' +
-    '#player-ads,#masthead-ad,.ytp-ad-module,.ytp-ad-overlay-container,.ytp-ad-image-overlay,ytm-promoted-sparkles-web-renderer,' +
+    '#player-ads,#masthead-ad,.ytp-ad-overlay-container,.ytp-ad-image-overlay,ytm-promoted-sparkles-web-renderer,' +
     'ytm-companion-ad-renderer,ad-slot-renderer,ytd-rich-item-renderer:has(ytd-ad-slot-renderer),' +
     'tp-yt-paper-dialog:has(ytd-enforcement-message-view-model){display:none!important}';
   const pon = () => {
@@ -153,11 +155,19 @@ const YOUTUBE: &str = r#"(() => {
     try { const s = document.createElement('style'); s.textContent = CSS; (document.head || document.documentElement).appendChild(s); } catch (_) {}
   };
   if (document.documentElement) pon(); else document.addEventListener('readystatechange', pon, { once: true });
-  // an advert that still starts: to its end, and «Saltar» if it is there
+  // an advert that still starts: muted and fast while it lasts, never a jump to its end (an advert stitched into the
+  // video would take the video with it), and «Saltar» when it appears; the sound and the speed come back after it
+  let antes = null;
   setInterval(() => {
-    const r = document.querySelector('.html5-video-player.ad-showing'); if (!r) return;
-    const v = r.querySelector('video'); if (v && Number.isFinite(v.duration) && v.duration > 0) { try { v.muted = true; v.currentTime = v.duration; } catch (_) {} }
-    const b = r.querySelector('.ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button'); if (b) { try { b.click(); } catch (_) {} }
+    const r = document.querySelector('.html5-video-player'); const v = r && r.querySelector('video'); if (!v) return;
+    if (r.classList.contains('ad-showing')) {
+      if (!antes) antes = { muted: v.muted, rate: v.playbackRate };
+      try { v.muted = true; if (v.playbackRate < 16) v.playbackRate = 16; } catch (_) {}
+      const b = r.querySelector('.ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button'); if (b) { try { b.click(); } catch (_) {} }
+    } else if (antes) {
+      try { v.muted = antes.muted; v.playbackRate = antes.rate; } catch (_) {}
+      antes = null;
+    }
   }, 400);
 })();"#;
 
@@ -1802,6 +1812,82 @@ console.log('bien');
             .spawn()
         else {
             eprintln!("node is not here: the script's VPN readings were checked on its text only");
+            return;
+        };
+        if let Some(mut entrada) = node.stdin.take() {
+            use std::io::Write as _;
+            let _ = entrada.write_all(programa.as_bytes());
+        }
+        let salida = node.wait_with_output();
+        assert!(
+            salida.as_ref().is_ok_and(|s| s.status.success()
+                && String::from_utf8_lossy(&s.stdout)
+                    .trim_end()
+                    .ends_with("bien")),
+            "{:?}",
+            salida.map(|s| (
+                String::from_utf8_lossy(&s.stdout).into_owned(),
+                String::from_utf8_lossy(&s.stderr).into_owned()
+            ))
+        );
+    }
+
+    /// The YouTube script in a YouTube of make-believe (second review of 1.0.59): the advertising
+    /// fields leave every way they come, nothing else is touched, other sites and YouTube Studio
+    /// are left alone, and an advert that still plays goes muted and fast, never jumped, with the
+    /// sound and the speed back after it.
+    const PRUEBA_YOUTUBE_JS: &str = r#"
+let fallos = 0; const ok = (c, t) => { if (!c) { fallos++; console.log('FALLO ' + t); } };
+function entorno(host) {
+  let tic = null;
+  const g = { location: { hostname: host }, JSON: { parse: JSON.parse, stringify: JSON.stringify },
+    Response: class { constructor(b) { this.b = b; } json() { return Promise.resolve(JSON.parse(this.b)); } },
+    document: { documentElement: {}, adoptedStyleSheets: [], querySelector: () => null, createElement: () => ({}), addEventListener() {} },
+    CSSStyleSheet: class { replaceSync() {} }, setInterval: (f) => { tic = f; return 1; }, Object, Array, Number, Proxy, Reflect, Promise };
+  g.window = g;
+  new Function(...Object.keys(g), YT)(...Object.values(g));
+  g.tic = () => tic && tic();
+  return g;
+}
+(async () => {
+  const yt = entorno('www.youtube.com');
+  const p = yt.JSON.parse(JSON.stringify({ playerResponse: { adPlacements: [1], playerAds: [2], videoDetails: { title: 'v' }, auxiliaryUi: { messageRenderers: { enforcementMessageViewModel: {}, otro: 1 } } }, adSlots: [3] }));
+  ok(!('adPlacements' in p.playerResponse) && !('playerAds' in p.playerResponse) && !('adSlots' in p) && p.playerResponse.videoDetails.title === 'v', 'JSON.parse');
+  ok(!p.playerResponse.auxiliaryUi.messageRenderers.enforcementMessageViewModel && p.playerResponse.auxiliaryUi.messageRenderers.otro === 1, 'aviso');
+  const r = await new yt.Response(JSON.stringify({ adPlacements: [1], streamingData: { a: 1 } })).json();
+  ok(!('adPlacements' in r) && r.streamingData.a === 1, 'fetch json');
+  yt.window.ytInitialPlayerResponse = { adPlacements: [1], videoDetails: {} };
+  ok(!('adPlacements' in yt.window.ytInitialPlayerResponse) && 'videoDetails' in yt.window.ytInitialPlayerResponse, 'primeros datos');
+  ok(yt.JSON.parse('7') === 7 && yt.JSON.parse('null') === null, 'lo que no es un objeto');
+  for (const h of ['m.youtube.com', 'music.youtube.com', 'www.youtube-nocookie.com', 'youtubekids.com']) ok(entorno(h).JSON.parse !== JSON.parse, h);
+  for (const h of ['studio.youtube.com', 'www.ejemplo.com', 'youtube.com.evil.example']) ok(entorno(h).JSON.parse === JSON.parse, h);
+  // an advert that still plays: muted and fast, never jumped; afterwards, as it was
+  const v = { muted: false, playbackRate: 1.25, currentTime: 30, duration: 600 };
+  const clases = new Set(['ad-showing']); let saltar = 0;
+  const jugador = { classList: { contains: (c) => clases.has(c) }, querySelector: (s) => (s === 'video' ? v : /skip/.test(s) ? { click: () => { saltar++; } } : null) };
+  const y2 = entorno('www.youtube.com'); y2.document.querySelector = (s) => (s === '.html5-video-player' ? jugador : null);
+  y2.tic();
+  ok(v.muted === true && v.playbackRate === 16 && v.currentTime === 30 && saltar === 1, 'anuncio: mudo y rápido, sin saltar el vídeo');
+  clases.delete('ad-showing'); y2.tic();
+  ok(v.muted === false && v.playbackRate === 1.25, 'después: el sonido y la velocidad de antes');
+  console.log(fallos ? 'fallos ' + fallos : 'bien');
+})();
+"#;
+
+    #[test]
+    fn the_youtube_script_does_what_it_says_and_no_more() {
+        let programa = format!(
+            "const YT = {};\n{PRUEBA_YOUTUBE_JS}",
+            serde_json::to_string(YOUTUBE).unwrap_or_default()
+        );
+        let Ok(mut node) = std::process::Command::new("node")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+        else {
+            eprintln!("node is not here: the YouTube script was checked on its text only");
+            assert!(YOUTUBE.contains("adPlacements") && !YOUTUBE.contains("currentTime"));
             return;
         };
         if let Some(mut entrada) = node.stdin.take() {

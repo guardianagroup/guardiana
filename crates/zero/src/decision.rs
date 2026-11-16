@@ -144,7 +144,9 @@ pub struct Decision {
     /// What the open lists (and our list of pixels) would cut it for, whatever the person's
     /// switches and rules say now: `Rastreador`, `Publicidad` or `Corredor` with the protection
     /// on, `Telemetria` or `Baliza` only with maximum protection. `None` for the page's own
-    /// site. The shield derives from it what holds for a site when a switch changes.
+    /// site. The shield derives from it what holds for a site when a switch changes. Since 1.0.59,
+    /// `None` too for what the open auction lets through (its program and its bid requests),
+    /// unless a list of danger knows it.
     pub lista: Option<Motivo>,
     /// It is the tab's own page (a top-level navigation), not something the page asked for.
     pub pagina: bool,
@@ -251,14 +253,40 @@ pub fn decide_con(
     // and serves the ad (so no advert is shown), the crossings of identifiers, the identifiers
     // and the trackers. Never a dangerous address; the person's own cuts, the mandate, the decoy
     // and their marked data still hold, below.
-    // Only as what they are: the program as a script, a bid request as the page's own request
-    // (a bidder's ad tag or pixel on the same name stays cut).
-    let de_la_puja = (p.recurso == Recurso::Script
-        && crate::subasta::es_programa_de_subasta(&ruta))
-        || (p.recurso == Recurso::Datos && crate::subasta::es_nombre_de_puja(&destino.host));
-    let lista = lista.filter(|m| {
-        *m == Motivo::Peligro || !de_la_puja || !ajustes.subasta_abierta(p.sitio_pagina)
-    });
+    // Only as what they are, and only what the auction needs (second review of 1.0.59):
+    // - the program as a script, from the page's own site or from a name no list calls tracking,
+    //   advertising, a broker or a part of the auction (a CDN): never a tracker's file that is
+    //   only called prebid.js;
+    // - a bid request as the page's own request (XHR or fetch), to a name the auction list writes
+    //   exactly as a bid name, never a sync, a log or a pixel on it (a bidder's ad tag, pixel or
+    //   beacon on the same name stays cut).
+    let candidata = ajustes.subasta_abierta(p.sitio_pagina)
+        && match p.recurso {
+            Recurso::Script => {
+                crate::subasta::es_programa_de_subasta(&ruta)
+                    && (destino.sitio == p.sitio_pagina
+                        || (!destino.sigue()
+                            && destino.corredor.is_none()
+                            && guardiana_lists::subastas::papel_de(&destino.host).is_none()))
+            }
+            Recurso::Datos => {
+                crate::subasta::es_nombre_de_puja(&destino.host)
+                    && !crate::subasta::es_sincronizacion(&destino.host, &ruta)
+            }
+            _ => false,
+        };
+    // Never a dangerous address: the lists of danger are asked on their own, so that an advert
+    // rule found first cannot hide one.
+    let lista = if candidata {
+        let otro_sitio = !destino.sitio.is_empty() && destino.sitio != p.sitio_pagina;
+        if crate::filtros::motor().peligroso(p.url, p.recurso, otro_sitio, p.sitio_pagina) {
+            Some(Motivo::Peligro)
+        } else {
+            lista.filter(|m| *m == Motivo::Peligro)
+        }
+    } else {
+        lista
+    };
     // «No me subastes» (1.0.46): the auction's own machinery, when the person turned it on and
     // has not let it run on this web. Never the page the person opens.
     let lista = lista.or_else(|| {
@@ -392,6 +420,39 @@ mod tests {
             Recurso::Imagen,
         );
         assert!(decide(&pixel, &a, &[], None, None).cortar);
+        // as a beacon: cut
+        let aviso = pet(
+            "https://grid-bidder.criteo.com/openrtb_2_5/pbjs/auction/request",
+            b"",
+            Recurso::Aviso,
+        );
+        assert!(decide(&aviso, &a, &[], None, None).cortar);
+        // the crossing of identifiers of Prebid Server on a bid name, and a bidder's log: cut
+        let cruce = pet(
+            "https://prebid-server.rubiconproject.com/cookie_sync",
+            b"{}",
+            Recurso::Datos,
+        );
+        assert!(decide(&cruce, &a, &[], None, None).cortar);
+        let registro = pet(
+            "https://hb-analytics.nextmillmedia.com/rp",
+            b"{}",
+            Recurso::Datos,
+        );
+        assert!(decide(&registro, &a, &[], None, None).cortar);
+        // Prebid from an advertising company's own host: cut; from a delivery network: passes
+        let ajeno = pet(
+            "https://acdn.adnxs.com/prebid/not-for-prod/prebid.js",
+            b"",
+            Recurso::Script,
+        );
+        assert!(decide(&ajeno, &a, &[], None, None).cortar);
+        let reparto = pet(
+            "https://cdn.jsdelivr.net/npm/prebid.js@9.12.0/dist/not-for-prod/prebid.js",
+            b"",
+            Recurso::Script,
+        );
+        assert!(!decide(&reparto, &a, &[], None, None).cortar);
         // what the person cut by hand still holds
         a.cortados.insert("criteo.com".into());
         assert_eq!(

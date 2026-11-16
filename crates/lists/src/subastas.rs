@@ -196,6 +196,33 @@ mod tests {
     }
 
     #[test]
+    fn no_bid_name_is_a_sync_a_cookie_or_a_pixel() {
+        // 1.0.59 (second review): with the auction open by default, a bid name passes the lists;
+        // the names that only cross identifiers belong in @sincroniza, never in @puja
+        let malos = [
+            "sync", "usync", "usersync", "user", "cookie", "cookies", "cm", "cs", "match",
+            "matching", "pixel", "px",
+        ];
+        for (n, papel) in nombres() {
+            if papel != Papel::Puja {
+                continue;
+            }
+            let s = crate::dominio::sitio(n);
+            let antes = n.strip_suffix(s.as_str()).unwrap_or("");
+            for parte in antes.split(|c: char| c == '.' || c == '-' || c.is_ascii_digit()) {
+                assert!(!malos.contains(&parte), "{n}");
+            }
+            assert!(!n.contains("shb-sync"), "{n}");
+        }
+        assert_eq!(
+            papel_de("sync.inmobi.com").unwrap().papel,
+            Papel::Sincroniza
+        );
+        assert_eq!(papel_de("cm.adform.net").unwrap().papel, Papel::Sincroniza);
+        assert_eq!(papel_de("ssp.drift-pixel.ai").unwrap().papel, Papel::Puja);
+    }
+
+    #[test]
     fn the_opt_out_pages_are_kept_and_never_made_up() {
         let uid2 = papel_de("uidapi.com").unwrap().sistema.unwrap();
         assert_eq!(uid2.nombre, "UID2");

@@ -95,7 +95,8 @@ fn the_first_run_opens_a_new_tab_and_asks_the_question() {
         PANEL,
         r#"{"tipo":"bienvenida","cortar":true}"#,
     );
-    assert!(o.contains(&Orden::Seguimiento { estricto: true }));
+    // 1.0.59: with the auction open by default the engine stays balanced (strict blocks the bids)
+    assert!(o.contains(&Orden::Seguimiento { estricto: false }));
     // Answered, the panel turns into the shield, live, beside the page.
     assert_eq!(
         del_tipo(&o, Origen::Panel, "vista").unwrap_or_default()["vista"],
@@ -1192,10 +1193,11 @@ fn after_the_trial_the_browser_keeps_protecting_for_free() {
     assert_eq!(l["nivel"], "plus");
     assert!(s.peticion(id, rastreador, "GET", b"", 3).cortar);
 
+    let estricto = s.seguimiento_estricto();
     let o = s.pon_licencia(EstadoLicencia::PruebaTerminada { desde: reloj() });
     // Nothing of the protection moves: no order to the engine, the same shield and figures.
     assert!(!o.iter().any(|x| matches!(x, Orden::Seguimiento { .. })));
-    assert!(s.seguimiento_estricto());
+    assert_eq!(s.seguimiento_estricto(), estricto);
     assert_eq!(s.nivel(), guardiana_license::Nivel::Gratis);
     for a in [Origen::Barra, Origen::Panel] {
         let l = del_tipo(&o, a, "licencia").unwrap_or_default();
@@ -4155,6 +4157,61 @@ fn auctions_can_be_allowed_on_one_site_and_the_settings_reach_the_page_script() 
         r#"{"tipo":"ajuste","clave":"subastas","valor":false}"#,
     );
     assert!(!s.prefs.reglas.corta_subastas("otra.co"));
+}
+
+#[test]
+fn by_default_the_auction_runs_and_the_panel_says_it_is_open() {
+    // 1.0.59 (the owner, 15 Nov 2026, 23:32): the page's program and its bid requests pass, so the
+    // bids can be seen; the crossing of identifiers stays cut
+    let (mut s, _, id) = con_pagina(true);
+    let web = "https://www.eltiempo.com/";
+    assert!(
+        !s.peticion(
+            id,
+            "https://www.eltiempo.com/static/js/prebid11.12.min.js",
+            "GET",
+            b"",
+            6
+        )
+        .cortar
+    );
+    assert!(
+        !s.peticion(
+            id,
+            "https://grid-bidder.criteo.com/openrtb_2_5/pbjs/auction/request",
+            "POST",
+            b"{}",
+            8
+        )
+        .cortar
+    );
+    assert!(
+        s.peticion(
+            id,
+            "https://gum.criteo.com/syncframe?topUrl=www.eltiempo.com",
+            "GET",
+            b"",
+            3
+        )
+        .cortar
+    );
+    let _ = s.mensaje(Origen::Pestana(id), web, &subasta_eltiempo("z1"));
+    let o = s.tic();
+    let e = del_tipo(&o, Origen::Barra, "escudo").unwrap_or_default();
+    assert_eq!(e["subasta"]["activo"], false, "{e}");
+    assert_eq!(e["subasta"]["proteccion"], true, "{e}");
+    // the engine at the balanced level, so that it does not block the bids; strict when the
+    // person cuts the auction
+    assert!(!s.seguimiento_estricto());
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"subastas","valor":true}"#,
+    );
+    assert!(o
+        .iter()
+        .any(|x| matches!(x, Orden::Seguimiento { estricto: true })));
+    assert!(s.seguimiento_estricto());
 }
 
 #[test]

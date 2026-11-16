@@ -242,7 +242,8 @@ pub enum Orden {
     },
     /// Delete cookies, cache and history of the kept session.
     BorraNavegacion,
-    /// The engine's own tracking prevention: strict while cutting, balanced while watching.
+    /// The engine's own tracking prevention: strict while cutting with the auction cut too,
+    /// balanced otherwise (see `Sesion::seguimiento_estricto`).
     Seguimiento {
         /// Strict.
         estricto: bool,
@@ -1265,10 +1266,15 @@ impl Sesion {
         self.servidores = crate::servidor::Servidores::con(r);
     }
 
-    /// Whether the engine's tracking prevention should be strict.
+    /// Whether the engine's tracking prevention should be strict. Since 1.0.59, only while the
+    /// auction is cut too («No me subastes» or maximum protection): the strict level blocks the
+    /// loads of what it knows as advertising, so with the auction open (the owner, 15 Nov 2026,
+    /// 23:32: «que se pueda ver el precio») no company could bid. At the balanced level the engine
+    /// still blocks their storage (their cookies), and the lists still cut everything else.
     #[must_use]
     pub const fn seguimiento_estricto(&self) -> bool {
-        self.prefs.reglas.cortar_seguimiento
+        let r = &self.prefs.reglas;
+        r.cortar_seguimiento && (r.subastas_cortadas || r.maxima)
     }
 
     /// The level the licence gives now. The browser protects the same at both (2 Nov 2026, the
@@ -3400,6 +3406,12 @@ impl Sesion {
                 }
                 self.guarda_prefs();
                 let mut o = vec![envia(Origen::Panel, &self.msg_ajustes())];
+                // «No me subastes» decides the engine's level too (see `seguimiento_estricto`)
+                if clave == "subastas" {
+                    o.push(Orden::Seguimiento {
+                        estricto: self.seguimiento_estricto(),
+                    });
+                }
                 o.extend(self.escudo_activa(false));
                 o
             }
