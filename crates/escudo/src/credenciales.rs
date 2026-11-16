@@ -9,15 +9,18 @@
 //! that copies a process's memory is, wherever it is, because that is how it is done with Windows' own programs.
 //! Grave, also when Windows refused (LSA protection): the attempt is the sign.
 //!
-//! A program with a valid signature is not judged either (1.0.58, 10 Nov 2026). Many ordinary programs installed in the
-//! person's own folder list the processes of the computer asking every one of them for the usual rights, reading
-//! memory among them (`PROCESS_QUERY_INFORMATION | PROCESS_VM_READ`), and LSASS is one more in that list: Microsoft
-//! OneDrive does it every hour from `AppData\Local\Microsoft\OneDrive`. Until the 1.0.57 that was a grave warning
-//! every hour, with the button that puts the program in the quarantine, on any computer with OneDrive (seen on the
-//! owner's: 62 warnings in three days, all of them OneDrive). The rights asked for do not tell the two apart (the
-//! tools that steal credentials ask for the same ones), so what does is who signs the file: the warning stays for a
-//! program with no valid signature, or whose signature Windows has not been able to check, and for the tools above,
-//! signed or not.
+//! Who signs the file decides the rest (1.0.58, 10 and 15 Nov 2026). Many ordinary programs installed in the person's
+//! own folder list the processes of the computer asking every one of them for the usual rights, reading memory among
+//! them (`PROCESS_QUERY_INFORMATION | PROCESS_VM_READ`), and LSASS is one more in that list: Microsoft OneDrive does it
+//! every hour from `AppData\Local\Microsoft\OneDrive`. Until the 1.0.57 that was a grave warning every hour, with the
+//! button that puts the program in the quarantine, on any computer with OneDrive (seen on the owner's: 62 warnings in
+//! three days, all of them OneDrive). The rights asked for do not tell the two apart (the tools that steal credentials
+//! ask for the same ones), so:
+//! - signed by Microsoft (as Windows checks it), and neither its name nor the name its file declares
+//!   (`OriginalFilename`, so a renamed copy of PowerShell or ProcDump is still that) is one of the tools: no warning;
+//! - validly signed by anyone else: a warning, not grave (no quarantine button), so a signed program that has no
+//!   business there is still seen, and a stolen or cheap certificate is not enough to go unseen;
+//! - no valid signature, or one Windows could not check, and the tools, signed or not: grave, as before.
 
 use crate::primera_vez::{Aviso, Firma};
 
@@ -42,6 +45,20 @@ const HERRAMIENTAS: &[&str] = &[
     "sqldumper.exe",
     "createdump.exe",
     "dotnet-dump.exe",
+    // (15 Nov 2026) firmadas por Microsoft y conocidas por copiar la memoria de LSASS (LOLBAS): Visual Studio, las
+    // herramientas de depuración y las de diagnóstico de Windows
+    "dump64.exe",
+    "dumpminitool.exe",
+    "adplus.exe",
+    "rdrleakdiag.exe",
+    "tttracer.exe",
+];
+
+/// The signers taken as Microsoft (the common name of the certificate, as Windows reads it from a valid signature).
+const MICROSOFT: &[&str] = &[
+    "Microsoft Corporation",
+    "Microsoft Windows",
+    "Microsoft Windows Publisher",
 ];
 
 /// Whether `ruta` (a program's full path) is inside Windows' folder or Program Files, where only an administrator
@@ -63,6 +80,22 @@ pub fn es_herramienta(programa: &str) -> bool {
     HERRAMIENTAS.contains(&programa.to_ascii_lowercase().as_str())
 }
 
+/// Whether the name a file declares for itself (`OriginalFilename` in its version information) is one of the tools:
+/// Windows writes it as `PowerShell.EXE.MUI` or `RUNDLL32.EXE.MUI`, other files as `procdump` or `procdump.exe`.
+#[must_use]
+pub fn es_herramienta_original(original: &str) -> bool {
+    let o = original.trim().to_ascii_lowercase();
+    let o = o.strip_suffix(".mui").unwrap_or(&o);
+    if o.is_empty() {
+        return false;
+    }
+    if o.ends_with(".exe") {
+        es_herramienta(o)
+    } else {
+        es_herramienta(&format!("{o}.exe"))
+    }
+}
+
 /// Whether the signature has to be known before judging: a program that is not one of the tools, with a known path
 /// outside Windows' folder and Program Files, asking to read the memory. For the rest the answer does not depend on it.
 #[must_use]
@@ -70,9 +103,7 @@ pub fn depende_de_la_firma(programa: &str, ruta: &str, acceso: u32) -> bool {
     acceso & LEE_MEMORIA != 0 && !es_herramienta(programa) && !ruta.is_empty() && !instalado(ruta)
 }
 
-/// `programa` (its file name) at `ruta`, signed as `firma` says, opened LSASS asking for `acceso` (the rights, as
-/// Windows' `DesiredAccess`); `concedido` says whether Windows allowed it. A warning when the rights include reading
-/// its memory and the program is one to judge (see the module). Always grave.
+/// [`juzga_con_original`] for a file whose declared name is not known.
 #[must_use]
 pub fn juzga(
     programa: &str,
@@ -82,16 +113,42 @@ pub fn juzga(
     concedido: bool,
     cuando_ms: u64,
 ) -> Option<(Aviso, bool)> {
+    juzga_con_original(programa, ruta, firma, "", acceso, concedido, cuando_ms)
+}
+
+/// Whether the file is exempt for its signer: signed by Microsoft and neither its name nor its declared name is one of
+/// the tools. The warnings an earlier version wrote about it can leave the panel's list (see the service).
+#[must_use]
+pub fn exento_por_firma(programa: &str, firma: &Firma, original: &str) -> bool {
+    !es_herramienta(programa)
+        && !es_herramienta_original(original)
+        && matches!(firma, Firma::Firmado(f) if MICROSOFT.contains(&f.as_str()))
+}
+
+/// `programa` (its file name) at `ruta`, signed as `firma` says and declaring `original` as its own name (empty when
+/// not known), opened LSASS asking for `acceso` (the rights, as Windows' `DesiredAccess`); `concedido` says whether
+/// Windows allowed it. A warning when the rights include reading its memory and the program is one to judge (see the
+/// module); grave, except for a program validly signed by someone other than Microsoft.
+#[must_use]
+pub fn juzga_con_original(
+    programa: &str,
+    ruta: &str,
+    firma: &Firma,
+    original: &str,
+    acceso: u32,
+    concedido: bool,
+    cuando_ms: u64,
+) -> Option<(Aviso, bool)> {
     if acceso & LEE_MEMORIA == 0 {
         return None;
     }
-    let herramienta = es_herramienta(programa);
+    let herramienta = es_herramienta(programa) || es_herramienta_original(original);
     // a program with no known path is judged by its name only
     if !herramienta && (ruta.is_empty() || instalado(ruta)) {
         return None;
     }
-    // a program Windows found validly signed, listing the processes as so many do: not a sign (see the module)
-    if !herramienta && matches!(firma, Firma::Firmado(_)) {
+    // signed by Microsoft, listing the processes as OneDrive does: not a sign (see the module)
+    if exento_por_firma(programa, firma, original) {
         return None;
     }
     let resultado = if concedido {
@@ -99,11 +156,26 @@ pub fn juzga(
     } else {
         "Windows no se lo permitió (la protección de LSA lo impide), pero el intento ya es una señal"
     };
-    let texto = format!(
-        "«{programa}» ha abierto la memoria de LSASS, el proceso de Windows que guarda las credenciales de las cuentas \
-         con sesión abierta, para leerla; {resultado}. Así se roban las contraseñas de un equipo. Si no lo conoces, \
-         analízalo y cambia tus contraseñas desde otro dispositivo."
-    );
+    let (texto, grave) = match firma {
+        // validly signed by someone else: seen, not grave
+        Firma::Firmado(f) if !herramienta => (
+            format!(
+                "«{programa}», firmado por «{f}», ha abierto la memoria de LSASS, el proceso de Windows que guarda las \
+                 credenciales de las cuentas con sesión abierta, para leerla; {resultado}. Algunos programas lo hacen al \
+                 revisar todos los procesos del equipo, pero así también se roban las contraseñas. Si no lo conoces, \
+                 analízalo."
+            ),
+            false,
+        ),
+        _ => (
+            format!(
+                "«{programa}» ha abierto la memoria de LSASS, el proceso de Windows que guarda las credenciales de las \
+                 cuentas con sesión abierta, para leerla; {resultado}. Así se roban las contraseñas de un equipo. Si no \
+                 lo conoces, analízalo y cambia tus contraseñas desde otro dispositivo."
+            ),
+            true,
+        ),
+    };
     Some((
         Aviso {
             regla: "credenciales",
@@ -115,7 +187,7 @@ pub fn juzga(
             fuente: None,
             texto,
         },
-        true,
+        grave,
     ))
 }
 
@@ -201,6 +273,75 @@ mod tests {
             r"C:\Program Files\Antivirus\av.exe",
             0x1410
         ));
+    }
+
+    #[test]
+    fn firmado_por_otro_se_ve_sin_ser_grave_y_una_copia_renombrada_sigue_siendo_la_herramienta() {
+        // segunda voz de la 1.0.58 (15 nov 2026): firmar no basta para no ser visto
+        let ruta = r"C:\Users\ana\AppData\Local\Temp\lector.exe";
+        let otro = Firma::Firmado("Herramientas Baratas S.L.".into());
+        let (a, grave) =
+            juzga_con_original("lector.exe", ruta, &otro, "lector.exe", 0x1410, true, 1).unwrap();
+        assert!(!grave, "firmado por otro: aviso, no grave");
+        assert!(
+            a.texto.contains("firmado por «Herramientas Baratas S.L.»"),
+            "{}",
+            a.texto
+        );
+        // una copia de PowerShell (firmada por Microsoft, con su nombre de siempre dentro) con otro nombre: grave
+        let windows = Firma::Firmado("Microsoft Windows".into());
+        let (_, grave) = juzga_con_original(
+            "notas.exe",
+            ruta,
+            &windows,
+            "PowerShell.EXE.MUI",
+            0x1410,
+            true,
+            1,
+        )
+        .unwrap();
+        assert!(grave);
+        // ProcDump renombrado, firmado por Microsoft: grave
+        let microsoft = Firma::Firmado("Microsoft Corporation".into());
+        let (_, grave) = juzga_con_original(
+            "update.exe",
+            ruta,
+            &microsoft,
+            "procdump",
+            0x1F_FFFF,
+            true,
+            1,
+        )
+        .unwrap();
+        assert!(grave);
+        // OneDrive, firmado por Microsoft y con su propio nombre: nada
+        let onedrive = r"C:\Users\ana\AppData\Local\Microsoft\OneDrive\OneDrive.exe";
+        assert_eq!(
+            juzga_con_original(
+                "OneDrive.exe",
+                onedrive,
+                &microsoft,
+                "OneDrive.exe",
+                0x1410,
+                true,
+                1
+            ),
+            None
+        );
+        assert!(exento_por_firma("OneDrive.exe", &microsoft, "OneDrive.exe"));
+        assert!(!exento_por_firma("OneDrive.exe", &otro, "OneDrive.exe"));
+        assert!(!exento_por_firma(
+            "OneDrive.exe",
+            &microsoft,
+            "rundll32.exe.mui"
+        ));
+        assert!(!exento_por_firma("OneDrive.exe", &Firma::SinFirma, ""));
+        // los nombres declarados
+        assert!(es_herramienta_original("RUNDLL32.EXE.MUI"));
+        assert!(es_herramienta_original(" procdump64 "));
+        assert!(es_herramienta_original("DumpMinitool.exe"));
+        assert!(!es_herramienta_original(""));
+        assert!(!es_herramienta_original("OneDrive.exe"));
     }
 
     #[test]

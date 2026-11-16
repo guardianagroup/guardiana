@@ -110,6 +110,12 @@ impl Sesion {
         self.firmas.comprobada(ruta)
     }
 
+    /// The name the file at `ruta` declares for itself (`OriginalFilename`), once checked with its signature: empty
+    /// when it declares none, `None` while not checked yet.
+    pub(crate) fn original(&self, ruta: &str) -> Option<String> {
+        self.firmas.original(ruta)
+    }
+
     pub(crate) fn quien_pidio(&self, qname: &str, ts_ms: i64) -> Option<Proceso> {
         let buscado = qname.trim_end_matches('.').to_ascii_lowercase();
         let Ok(mut d) = self.datos.lock() else {

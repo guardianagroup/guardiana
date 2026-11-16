@@ -599,8 +599,10 @@ impl EscudoVivo {
 
     /// The openings of LSASS that asked to read its memory, once Windows has checked the program's signature where the
     /// answer depends on it (or after [`ESPERA_FIRMA_MS`]), through the rule (`guardiana_escudo::credenciales`). The
-    /// same program warns once an hour. A program found validly signed is not a warning (1.0.58), and the warnings an
-    /// earlier version wrote for that same file leave the panel's list.
+    /// same program warns once an hour. A program signed by Microsoft that is not one of the tools is not a warning
+    /// (1.0.58), and the warnings an earlier version wrote for that same file leave the panel's list; those this
+    /// version writes carry who signs the file (`firma`) and stay. With the queue of openings waiting for a signature
+    /// full, an opening is judged at once as not checked, never dropped.
     fn credenciales(&mut self, obs: &Observador, ahora_ms: u64) {
         let nuevos = self
             .guardia
@@ -622,10 +624,10 @@ impl EscudoVivo {
                 match obs.firma(&a.ruta) {
                     Some(f) if f.is_empty() => Firma::SinFirma,
                     Some(f) => Firma::Firmado(f),
-                    None if ahora_ms.saturating_sub(cuando) < ESPERA_FIRMA_MS => {
-                        if self.accesos_pend.len() < MAX_PENDIENTES {
-                            self.accesos_pend.push(a);
-                        }
+                    None if ahora_ms.saturating_sub(cuando) < ESPERA_FIRMA_MS
+                        && self.accesos_pend.len() < MAX_PENDIENTES =>
+                    {
+                        self.accesos_pend.push(a);
                         continue;
                     }
                     None => Firma::SinComprobar,
@@ -633,15 +635,19 @@ impl EscudoVivo {
             } else {
                 Firma::SinComprobar
             };
-            let Some((aviso, grave)) = guardiana_escudo::credenciales::juzga(
+            // the name the file declares for itself, read with its signature: a renamed tool is still the tool
+            let original = obs.original(&a.ruta).unwrap_or_default();
+            let Some((aviso, grave)) = guardiana_escudo::credenciales::juzga_con_original(
                 &a.programa,
                 &a.ruta,
                 &firma,
+                &original,
                 a.acceso,
                 a.concedido,
                 cuando,
             ) else {
-                if matches!(firma, Firma::Firmado(_)) {
+                if guardiana_escudo::credenciales::exento_por_firma(&a.programa, &firma, &original)
+                {
                     self.retira_credenciales(&a.ruta);
                 }
                 continue;
@@ -658,13 +664,21 @@ impl EscudoVivo {
                 self.cadenas_vistas.clear();
             }
             self.cadenas_vistas.insert(clave, cuando);
-            self.anota(&aviso, grave);
+            let mut extra = serde_json::Map::new();
+            let quien = match &firma {
+                Firma::Firmado(f) => f.clone(),
+                Firma::SinFirma => "sin firma".to_owned(),
+                Firma::SinComprobar => "sin comprobar".to_owned(),
+            };
+            extra.insert("firma".to_owned(), serde_json::Value::String(quien));
+            self.anota_con(&aviso, grave, extra);
         }
     }
 
-    /// Takes out of the panel's file the «credenciales» warnings about the program at `ruta`, now that Windows found it
-    /// validly signed: until the 1.0.57 the rule did not look at the signature and warned every hour about programs
-    /// such as OneDrive (`guardiana_escudo::credenciales`). Nothing else in the file changes.
+    /// Takes out of the panel's file the «credenciales» warnings an earlier version wrote about the program at `ruta`,
+    /// now that Windows found it signed by Microsoft: until the 1.0.57 the rule did not look at the signature and
+    /// warned every hour about programs such as OneDrive (`guardiana_escudo::credenciales`). Those written from the
+    /// 1.0.58 on carry `firma` and stay. Nothing else in the file changes.
     fn retira_credenciales(&self, ruta: &str) {
         let Ok(texto) = std::fs::read_to_string(&self.ruta_avisos) else {
             return;
@@ -1275,14 +1289,16 @@ fn firma_de(obs: &Observador, ruta: &str, firmado_por: &str) -> Firma {
     }
 }
 
-/// The warnings file `texto` without the «credenciales» warnings about the program at `ruta` (the rule writes the
-/// path, in lower case, as the warning's `nombre`); `None` when there is none, so the file is left as it is.
+/// The warnings file `texto` without the «credenciales» warnings an earlier version wrote about the program at `ruta`
+/// (the rule writes the path, in lower case, as the warning's `nombre`; from the 1.0.58 on it also writes `firma`, and
+/// those stay); `None` when there is none, so the file is left as it is.
 fn sin_credenciales_de(texto: &str, ruta: &str) -> Option<String> {
     let nombre = ruta.to_lowercase();
     let suyo = |linea: &str| {
         serde_json::from_str::<serde_json::Value>(linea).is_ok_and(|v| {
             v["regla"].as_str() == Some("credenciales")
                 && v["nombre"].as_str() == Some(nombre.as_str())
+                && v.get("firma").is_none()
         })
     };
     let lineas: Vec<&str> = texto.lines().filter(|l| !l.is_empty()).collect();
@@ -1423,6 +1439,14 @@ mod tests {
         assert!(lineas[0].contains(r#""cuando_ms":2"#), "{quedan}");
         assert!(lineas[1].contains(r#""regla":"secuestro""#), "{quedan}");
         assert!(quedan.ends_with('\n'));
+        // los que escribe la 1.0.58 llevan quién firma: se quedan (segunda voz, 15 nov 2026)
+        let nuevo = serde_json::json!({
+            "regla": "credenciales", "programa": "OneDrive.exe", "ruta": onedrive, "sitio": "",
+            "nombre": nombre, "cuando_ms": 5, "texto": "…", "grave": true, "firma": "sin firma"
+        })
+        .to_string()
+            + "\n";
+        assert_eq!(sin_credenciales_de(&nuevo, onedrive), None);
         // nada suyo: el archivo se deja como está
         assert_eq!(sin_credenciales_de(&quedan, onedrive), None);
         assert_eq!(sin_credenciales_de("", onedrive), None);

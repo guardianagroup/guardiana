@@ -23,6 +23,8 @@ const MAXIMO: usize = 4_096;
 struct Estado {
     /// Program file → (signer, declared version).
     hechas: HashMap<String, (String, String)>,
+    /// Program file → the name it declares for itself (`OriginalFilename`; empty when none), read with the rest.
+    originales: HashMap<String, String>,
     pedidas: HashSet<String>,
     cola: VecDeque<String>,
 }
@@ -52,6 +54,16 @@ impl Firmas {
         let (m, _) = &*self.estado;
         let e = m.lock().ok()?;
         e.hechas.get(ruta).map(|(firma, _)| firma.clone())
+    }
+
+    /// The name the file at `ruta` declares for itself, once checked (empty when none); `None` before.
+    pub(crate) fn original(&self, ruta: &str) -> Option<String> {
+        let (m, _) = &*self.estado;
+        let e = m.lock().ok()?;
+        if !e.hechas.contains_key(ruta) {
+            return None;
+        }
+        Some(e.originales.get(ruta).cloned().unwrap_or_default())
     }
 
     pub(crate) fn de(&self, ruta: &str) -> String {
@@ -96,8 +108,9 @@ fn trabaja(estado: &(Mutex<Estado>, Condvar)) {
         };
         let firmas = firmantes(&tanda);
         if let Ok(mut e) = m.lock() {
-            for (ruta, firma) in tanda.into_iter().zip(firmas) {
-                e.hechas.insert(ruta, firma);
+            for (ruta, (firma, version, original)) in tanda.into_iter().zip(firmas) {
+                e.originales.insert(ruta.clone(), original);
+                e.hechas.insert(ruta, (firma, version));
             }
         }
     }
@@ -116,15 +129,16 @@ const VARIABLE: &str = "GUARDIANA_FIRMAS";
 
 /// The check, for every path in [`VARIABLE`]. The paths are data, never part of the command:
 /// nothing in a file name can become one, not even the typographic quotes (‘ ’) PowerShell also
-/// takes for quotes. Before each path's lines, a line `N:`; then its two tagged lines, `F:` the
-/// signer and `V:` the version, so neither can pass for the other. What fails for one path (it
-/// is not there, it cannot be read) leaves its lines empty and the next path is checked anyway.
+/// takes for quotes. Before each path's lines, a line `N:`; then its tagged lines, `F:` the
+/// signer, `V:` the version and `O:` the name the file declares for itself (15 Nov 2026), so none
+/// can pass for another. What fails for one path (it is not there, it cannot be read) leaves its
+/// lines empty and the next path is checked anyway.
 const GUION: &str = "foreach ($r in $env:GUARDIANA_FIRMAS.Split([char]10)) { 'N:'; \
      try { $s = Get-AuthenticodeSignature -LiteralPath $r -ErrorAction Stop; \
      if ($s.Status -eq 'Valid') { 'F:' + $s.SignerCertificate.GetNameInfo(0, $false) } } catch { }; \
      try { $v = (Get-Item -LiteralPath $r -ErrorAction Stop).VersionInfo; \
      if ($v) { $p = $v.ProductVersion; if (-not $p) { $p = $v.FileVersion }; \
-     if ($p) { 'V:' + $p } } } catch { } }";
+     if ($p) { 'V:' + $p }; if ($v.OriginalFilename) { 'O:' + $v.OriginalFilename } } } catch { } }";
 
 /// Up to [`POR_TANDA`] paths from the front of the queue, while they fit in [`MAXIMO_TANDA`]; at
 /// least one.
@@ -158,13 +172,14 @@ fn de_tanda(texto: &str) -> Vec<String> {
 }
 
 /// For each path, in its order: the signer's common name when the signature is valid (empty
-/// otherwise), and the version the file declares (empty when it declares none). One PowerShell
-/// for all of them; if it stopped half-way, the ones it did not reach are checked one by one.
-fn firmantes(rutas: &[String]) -> Vec<(String, String)> {
+/// otherwise), the version the file declares and the name it declares for itself (empty when it
+/// declares none). One PowerShell for all of them; if it stopped half-way, the ones it did not
+/// reach are checked one by one.
+fn firmantes(rutas: &[String]) -> Vec<(String, String, String)> {
     use std::os::windows::process::CommandExt;
     // CREATE_NO_WINDOW: no console flashing when this runs from the service.
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let vacio = || (String::new(), String::new());
+    let vacio = || (String::new(), String::new(), String::new());
     let Ok(salida) = std::process::Command::new("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-Command", GUION])
         .env(VARIABLE, rutas.join("\n"))
@@ -174,10 +189,13 @@ fn firmantes(rutas: &[String]) -> Vec<(String, String)> {
         return rutas.iter().map(|_| vacio()).collect();
     };
     let partes = de_tanda(&String::from_utf8_lossy(&salida.stdout));
-    let mut out: Vec<(String, String)> = partes
+    let mut out: Vec<(String, String, String)> = partes
         .iter()
         .take(rutas.len())
-        .map(|p| crate::lee_firma_y_version(p))
+        .map(|p| {
+            let (f, v) = crate::lee_firma_y_version(p);
+            (f, v, crate::lee_original(p))
+        })
         .collect();
     if out.len() < rutas.len() {
         if rutas.len() == 1 {

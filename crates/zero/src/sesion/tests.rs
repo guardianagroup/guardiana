@@ -4844,7 +4844,7 @@ fn cuanto_tarda_una_peticion() {
     let t = std::time::Instant::now();
     let _ = s.peticion(id, pedidos[0].0, "GET", b"", 6);
     let primera = t.elapsed();
-    let vueltas = 2_000;
+    let vueltas: usize = 2_000;
     let mut cortadas = 0;
     let t = std::time::Instant::now();
     for i in 0..vueltas {

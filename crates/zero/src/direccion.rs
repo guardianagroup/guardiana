@@ -49,12 +49,30 @@ pub const BUSCADORES: &[Buscador] = &[
 /// The engine for whoever has not chosen one (2 Nov 2026; the owner, 09:10: «hazlo dentro del
 /// programa para que la gente vaya libremente por todo Google»). ZERO runs on the person's own
 /// computer and connection, so Google answers it like any browser: all of Google, no box of 50
-/// sites. Whoever chose another engine keeps it.
+/// sites. Whoever chose one of the three keeps it.
 pub const POR_DEFECTO: &str = "google";
 
-/// The engine with `id`, or the default one.
+/// The engines offered until the 1.0.57 that are no longer (1.0.58: only three, the ones that work
+/// everywhere). All of them were private ones: whoever had chosen one goes on with a private
+/// engine, DuckDuckGo, and not with Google (second voice of the 1.0.58, 15 Nov 2026).
+const RETIRADOS_PRIVADOS: &[&str] = &[
+    "startpage",
+    "ecosia",
+    "qwant",
+    "mojeek",
+    "swisscows",
+    "metager",
+];
+
+/// The engine with `id`; for one of the engines no longer offered, DuckDuckGo; else the default
+/// one.
 #[must_use]
 pub fn buscador(id: &str) -> &'static Buscador {
+    let id = if RETIRADOS_PRIVADOS.contains(&id) {
+        "duckduckgo"
+    } else {
+        id
+    };
     BUSCADORES
         .iter()
         .find(|b| b.id == id)
@@ -128,6 +146,17 @@ mod tests {
         assert_eq!(d.id, "google");
         assert_eq!(buscador("duckduckgo").id, "duckduckgo");
         assert_eq!(buscador("no-existe").id, "google");
+        // los que se quitaron en la 1.0.58 eran privados: quien tenía uno sigue con uno privado
+        for viejo in [
+            "startpage",
+            "ecosia",
+            "qwant",
+            "mojeek",
+            "swisscows",
+            "metager",
+        ] {
+            assert_eq!(buscador(viejo).id, "duckduckgo", "{viejo}");
+        }
         assert_eq!(a_direccion("elpais.com", d), "https://elpais.com/");
         assert_eq!(
             a_direccion("www.realmadrid.com/es", d),

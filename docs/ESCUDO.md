@@ -118,14 +118,18 @@ Partner Center de Microsoft. Programa MVI de Microsoft: producto con protección
   evento 5: `TargetProcessId`, `DesiredAccess`, `ReturnCode`). Lo de Windows y lo instalado en Program Files
   (antivirus, copias de seguridad) no se juzga; un programa que ejecuta otros (rundll32, PowerShell…) o una herramienta
   que copia la memoria de un proceso, sí, esté donde esté. Grave, también si Windows lo negó (la protección de LSA):
-  el intento ya es la señal. Desde la 1.0.58 (10 nov 2026) tampoco se juzga un programa con firma válida que no sea
-  una de esas herramientas: muchos programas instalados en la carpeta de la persona recorren la lista de procesos
-  pidiendo a cada uno los derechos de siempre, leer la memoria entre ellos, y LSASS es uno más de la lista. OneDrive lo
-  hace cada hora desde `AppData\Local\Microsoft\OneDrive`: hasta la 1.0.57 era un aviso grave cada hora, con el
-  botón de la cuarentena, en cualquier equipo con OneDrive (en el del dueño, 62 en tres días). Los derechos pedidos no
-  distinguen a uno de otro; quién firma el archivo, sí. El aviso espera hasta un minuto a que Windows compruebe la
-  firma; sin firma válida, o sin poder comprobarla, se avisa como antes. Cuando Windows da por firmado un programa, los
-  avisos de esta regla que una versión anterior dejó sobre ese mismo archivo se quitan de la lista del panel.
+  el intento ya es la señal. Desde la 1.0.58 (10 y 15 nov 2026) decide quién firma el archivo: muchos programas
+  instalados en la carpeta de la persona recorren la lista de procesos pidiendo a cada uno los derechos de siempre,
+  leer la memoria entre ellos, y LSASS es uno más de la lista. OneDrive lo hace cada hora desde
+  `AppData\Local\Microsoft\OneDrive`: hasta la 1.0.57 era un aviso grave cada hora, con el botón de la cuarentena, en
+  cualquier equipo con OneDrive (en el del dueño, 62 en tres días). Los derechos pedidos no distinguen a uno de otro;
+  la firma, sí. Firmado por Microsoft y sin ser una de las herramientas, ni por su nombre ni por el que su archivo
+  declara (`OriginalFilename`: una copia de PowerShell o de ProcDump con otro nombre sigue siéndolo), no se avisa.
+  Firmado por otro, se avisa sin que sea grave (sin el botón de la cuarentena): un certificado robado o barato no basta
+  para pasar sin ser visto. Sin firma válida, o sin poder comprobarla, grave como antes. El aviso espera hasta un minuto
+  a que Windows compruebe la firma (con la cola llena, se juzga en el acto como sin comprobar). Cuando Windows da un
+  programa por firmado por Microsoft, los avisos de esta regla que una versión anterior dejó sobre ese archivo se
+  quitan de la lista del panel; los de la 1.0.58 llevan quién firma y se quedan.
 - «Segunda opinión» (`defensor.rs`): en cada aviso grave sobre el archivo de un programa (fuera de la carpeta de
   Windows), se pregunta a Microsoft Defender por ese archivo (`MpCmdRun -Scan -ScanType 3 -File … -DisableRemediation`:
   solo dice, no toca nada; un archivo, una vez al día, en un hilo aparte). Si lo reconoce como amenaza, es otro aviso

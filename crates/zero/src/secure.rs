@@ -706,12 +706,24 @@ impl Secure {
         let carpeta = datos.join("secure");
         let _ = std::fs::create_dir_all(&carpeta);
         let clave = lee_o_crea_clave(&carpeta.join("clave.bin"));
-        let identidad = std::fs::read_to_string(carpeta.join("identidad.txt"))
-            .ok()
+        let ruta_identidad = carpeta.join("identidad.txt");
+        let guardada = std::fs::read_to_string(&ruta_identidad).ok();
+        let identidad = guardada
+            .as_deref()
             .and_then(|s| Identity::unlock(s.trim(), &clave).ok())
             .unwrap_or_else(|| {
+                // (15 Nov 2026, second voice of the 1.0.58) an identity file that does not open is set aside, never
+                // written over: if a new version could not read it, a later one still can, and nothing is lost
+                if guardada.is_some() {
+                    let aparte = carpeta.join(format!("identidad.txt.no-abre-{}", ahora_s()));
+                    if let Err(e) = std::fs::rename(&ruta_identidad, &aparte) {
+                        eprintln!(
+                            "guardiana: secure: la identidad no se abre y no se pudo apartar: {e}"
+                        );
+                    }
+                }
                 let i = Identity::new();
-                let _ = std::fs::write(carpeta.join("identidad.txt"), i.lock(&clave));
+                let _ = std::fs::write(&ruta_identidad, i.lock(&clave));
                 i
             });
         let agenda = std::fs::read_to_string(carpeta.join("agenda.json"))

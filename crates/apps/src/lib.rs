@@ -164,6 +164,22 @@ impl Observador {
             None
         }
     }
+
+    /// The name the program's file declares for itself (`OriginalFilename` in its version information), read with its
+    /// signature (15 Nov 2026): a renamed copy of a tool still says what it is. Empty when it declares none, `None`
+    /// while not checked yet (and always outside Windows).
+    #[must_use]
+    pub fn original(&self, ruta: &str) -> Option<String> {
+        #[cfg(windows)]
+        {
+            self.interno.original(ruta)
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = ruta;
+            None
+        }
+    }
 }
 
 /// What one program sent to and received from one address since the last take (1.0.21).
@@ -771,8 +787,34 @@ pub fn lee_firma_y_version(salida: &str) -> (String, String) {
     (firma, version)
 }
 
+/// Reads the line `O:<name>` the signature check prints when the file declares its original name (15 Nov 2026): the
+/// first one, trimmed and cut at 120 characters; empty when there is none. Untagged lines are not trusted.
+#[must_use]
+pub fn lee_original(salida: &str) -> String {
+    salida
+        .lines()
+        .map(str::trim)
+        .find_map(|l| l.strip_prefix("O:"))
+        .map(|o| o.trim().chars().take(120).collect())
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod firma_y_version {
+    #[test]
+    fn the_declared_name_is_read_from_its_own_line() {
+        assert_eq!(
+            super::lee_original("F:Microsoft Windows\r\nV:10.0.1\r\nO:PowerShell.EXE.MUI\r\n"),
+            "PowerShell.EXE.MUI"
+        );
+        assert_eq!(super::lee_original("F:X\nV:1.0\n"), "");
+        assert_eq!(
+            super::lee_original("procdump.exe\n"),
+            "",
+            "untagged lines are not trusted"
+        );
+    }
+
     #[test]
     fn the_signer_and_the_version_are_read_from_their_own_lines() {
         let (f, v) =
