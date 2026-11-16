@@ -1,5 +1,6 @@
 {
   "youtube_ajuste": "移除 YouTube 廣告",
   "youtube_ajuste_explica": "移除 YouTube 影片和頁面中的廣告。如果 YouTube 改變廣告的呈現方式，可能會漏掉個別廣告。適用於從現在起開啟的分頁。",
-  "sub_abierta": "競價已開放：ZERO 放行此頁面的出價請求及其攜帶的資料，好讓你看到各公司為你的造訪出價多少。要切斷它們，請在Settings中開啟“Don’t auction me”。"
+  "sub_abierta": "競價已開放：ZERO 放行此頁面的出價請求及其攜帶的資料，好讓你看到各公司為你的造訪出價多少。要切斷它們，請在Settings中開啟“Don’t auction me”。",
+  "abriendo": "正在開啟 GUARDIANA…"
 }

@@ -1635,5 +1635,6 @@
   "sala_ent_cifras": "{hecho} van {total} · {v}/s · nog {r}",
   "sala_ent_cerrar": "Sluiten",
   "sala_e_mirando": "De eerste controle is nog niet gedaan",
-  "sala_in_alcance": "De handtekening bewijst dat dit rapport niet is gewijzigd nadat het werd verzegeld. Het garandeert niet dat elke gebeurtenis in het systeem is gedetecteerd."
+  "sala_in_alcance": "De handtekening bewijst dat dit rapport niet is gewijzigd nadat het werd verzegeld. Het garandeert niet dat elke gebeurtenis in het systeem is gedetecteerd.",
+  "abriendo": "GUARDIANA wordt geopend…"
 }

@@ -1635,5 +1635,6 @@
   "sala_ent_cifras": "已完成 {hecho}，共 {total} · {v}/s · 剩余 {r}",
   "sala_ent_cerrar": "关闭",
   "sala_e_mirando": "尚未进行首次检查",
-  "sala_in_alcance": "签名证明此报告在加封后未被篡改。它不保证系统中的每个事件都已被检测到。"
+  "sala_in_alcance": "签名证明此报告在加封后未被篡改。它不保证系统中的每个事件都已被检测到。",
+  "abriendo": "正在打开 GUARDIANA…"
 }

@@ -131,18 +131,24 @@
         <Control Id="Paso" Type="Text" X="18" Y="141" Width="334" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Paso}!(loc.PasoPreparar)">
           <Subscribe Event="ActionText" Attribute="Text" />
         </Control>
-        <Control Id="Barra" Type="ProgressBar" X="18" Y="161" Width="334" Height="5" Text="!(loc.ProgressDlgProgressBar)">
+        <Control Id="Barra" Type="ProgressBar" X="18" Y="161" Width="334" Height="6" Text="!(loc.ProgressDlgProgressBar)">
           <Subscribe Event="SetProgress" Attribute="Progress" />
         </Control>
+        <!-- 16 nov 2026 (el dueño, 07:50: «que aparezca el mensaje de GUARDIANA con una barrita, con el tiempo que queda»):
+             el tiempo que queda, como lo calcula Windows Installer mientras avanza la barra (UIText TimeRemaining de WixUI,
+             en el idioma del instalador: «Tiempo restante: …»). Vacío hasta que Windows tiene la cuenta. -->
+        <Control Id="Queda" Type="Text" X="18" Y="170" Width="334" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Linea}">
+          <Subscribe Event="TimeRemaining" Attribute="TimeRemaining" />
+        </Control>
         <!-- Cada línea con su punto (otro control, con la misma condición: una línea que no sale no deja su punto) -->
-        <Control Id="PuntoProteccion" Type="Text" X="18" Y="178" Width="8" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Paso}•" />
-        <Control Id="LineaProteccion" Type="Text" X="28" Y="178" Width="324" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Linea}!(loc.InstalandoProteccion)" />
+        <Control Id="PuntoProteccion" Type="Text" X="18" Y="186" Width="8" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Paso}•" />
+        <Control Id="LineaProteccion" Type="Text" X="28" Y="186" Width="324" Height="13" Transparent="yes" NoPrefix="yes" Text="{\Guardiana_Linea}!(loc.InstalandoProteccion)" />
 <?ifdef ZeroExe ?>
-        <Control Id="PuntoZero" Type="Text" X="18" Y="191" Width="8" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="ZERO &lt;&gt; &quot;0&quot;" Text="{\Guardiana_Paso}•" />
-        <Control Id="LineaZero" Type="Text" X="28" Y="191" Width="324" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="ZERO &lt;&gt; &quot;0&quot;" Text="{\Guardiana_Linea}!(loc.InstalandoZero)" />
+        <Control Id="PuntoZero" Type="Text" X="18" Y="199" Width="8" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="ZERO &lt;&gt; &quot;0&quot;" Text="{\Guardiana_Paso}•" />
+        <Control Id="LineaZero" Type="Text" X="28" Y="199" Width="324" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="ZERO &lt;&gt; &quot;0&quot;" Text="{\Guardiana_Linea}!(loc.InstalandoZero)" />
 <?endif ?>
-        <Control Id="PuntoDns" Type="Text" X="18" Y="204" Width="8" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="VIGILAR = &quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" Text="{\Guardiana_Paso}•" />
-        <Control Id="LineaDns" Type="Text" X="28" Y="204" Width="324" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="VIGILAR = &quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" Text="{\Guardiana_Linea}!(loc.InstalandoDns)" />
+        <Control Id="PuntoDns" Type="Text" X="18" Y="212" Width="8" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="VIGILAR = &quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" Text="{\Guardiana_Paso}•" />
+        <Control Id="LineaDns" Type="Text" X="28" Y="212" Width="324" Height="13" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="VIGILAR = &quot;1&quot; AND NOT Installed AND NOT WIX_UPGRADE_DETECTED AND NOT REMOVE" Text="{\Guardiana_Linea}!(loc.InstalandoDns)" />
       </Dialog>
     </UI>
     <MajorUpgrade AllowSameVersionUpgrades="yes" IgnoreLanguage="yes" DowngradeErrorMessage="!(loc.VersionMasNueva)" />

@@ -1635,5 +1635,6 @@
   "sala_ent_cifras": "{hecho} din {total} · {v}/s · mai rămân {r}",
   "sala_ent_cerrar": "Închide",
   "sala_e_mirando": "Prima verificare nu a fost încă făcută",
-  "sala_in_alcance": "Semnătura dovedește că acest raport nu a fost modificat după sigilare. Nu garantează că a fost detectat fiecare eveniment al sistemului."
+  "sala_in_alcance": "Semnătura dovedește că acest raport nu a fost modificat după sigilare. Nu garantează că a fost detectat fiecare eveniment al sistemului.",
+  "abriendo": "Se deschide GUARDIANA…"
 }

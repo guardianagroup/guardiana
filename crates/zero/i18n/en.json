@@ -1701,5 +1701,6 @@
   "sala_ent_cifras": "{hecho} of {total} · {v}/s · {r} left",
   "sala_ent_cerrar": "Close",
   "sala_e_mirando": "The first check hasn't run yet",
-  "sala_in_alcance": "The signature proves this report hasn't been altered since it was sealed. It doesn't guarantee that every system event was detected."
+  "sala_in_alcance": "The signature proves this report hasn't been altered since it was sealed. It doesn't guarantee that every system event was detected.",
+  "abriendo": "Opening GUARDIANA…"
 }

@@ -1635,5 +1635,6 @@
   "sala_ent_cifras": "{hecho}/{total} · {v}/s · {r} jäljellä",
   "sala_ent_cerrar": "Sulje",
   "sala_e_mirando": "Ensimmäistä tarkistusta ei ole vielä tehty",
-  "sala_in_alcance": "Allekirjoitus osoittaa, ettei tätä raporttia ole muutettu sinetöinnin jälkeen. Se ei takaa, että jokainen järjestelmän tapahtuma on havaittu."
+  "sala_in_alcance": "Allekirjoitus osoittaa, ettei tätä raporttia ole muutettu sinetöinnin jälkeen. Se ei takaa, että jokainen järjestelmän tapahtuma on havaittu.",
+  "abriendo": "Avataan GUARDIANA…"
 }

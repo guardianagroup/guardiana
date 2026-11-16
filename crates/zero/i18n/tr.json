@@ -1635,5 +1635,6 @@
   "sala_ent_cifras": "{hecho}/{total} · {v}/sn · {r} kaldı",
   "sala_ent_cerrar": "Kapat",
   "sala_e_mirando": "İlk kontrol henüz yapılmadı",
-  "sala_in_alcance": "İmza, bu raporun mühürlendikten sonra değiştirilmediğini kanıtlar. Sistemdeki her olayın algılandığını garanti etmez."
+  "sala_in_alcance": "İmza, bu raporun mühürlendikten sonra değiştirilmediğini kanıtlar. Sistemdeki her olayın algılandığını garanti etmez.",
+  "abriendo": "GUARDIANA açılıyor…"
 }

@@ -1660,5 +1660,6 @@
   "sala_ent_cifras": "{hecho} sur {total} · {v}/s · il reste {r}",
   "sala_ent_cerrar": "Fermer",
   "sala_e_mirando": "La première vérification n’a pas encore eu lieu",
-  "sala_in_alcance": "La signature démontre que ce rapport n’a pas été modifié depuis qu’il a été scellé. Elle ne garantit pas que chaque événement du système a été détecté."
+  "sala_in_alcance": "La signature démontre que ce rapport n’a pas été modifié depuis qu’il a été scellé. Elle ne garantit pas que chaque événement du système a été détecté.",
+  "abriendo": "Ouverture de GUARDIANA…"
 }

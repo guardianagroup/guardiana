@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::ffi::c_void;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU32, Ordering};
 
 use guardiana_zero::lanzador::{self, Pedido};
 use guardiana_zero::licencia::{Estado as EstadoLicencia, Fallo, Lugar as LugarLicencia};
@@ -42,7 +42,10 @@ use windows::Win32::Graphics::Dwm::{
     DwmSetWindowAttribute, DWMWA_CAPTION_COLOR, DWMWA_TEXT_COLOR, DWMWA_USE_IMMERSIVE_DARK_MODE,
 };
 use windows::Win32::Graphics::Gdi::{
-    CreateSolidBrush, GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    BeginPaint, CreateFontIndirectW, CreateSolidBrush, DeleteObject, DrawTextW, EndPaint, FillRect,
+    GetMonitorInfoW, InvalidateRect, MonitorFromWindow, SelectObject, SetBkMode, SetTextColor,
+    CLEARTYPE_QUALITY, DT_CENTER, DT_END_ELLIPSIS, DT_NOPREFIX, DT_RTLREADING, DT_SINGLELINE,
+    DT_VCENTER, HFONT, LOGFONTW, MONITORINFO, MONITOR_DEFAULTTONEAREST, PAINTSTRUCT, TRANSPARENT,
 };
 use windows::Win32::System::Com::{
     CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED, STREAM_SEEK_END, STREAM_SEEK_SET,
@@ -67,13 +70,15 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowThreadProcessId, IsIconic, KillTimer, LoadCursorW, MessageBoxW, PostMessageW,
     PostQuitMessage, RegisterClassExW, SendMessageW, SetForegroundWindow, SetTimer,
     SetWindowDisplayAffinity, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow,
-    SystemParametersInfoW, TranslateMessage, GWL_STYLE, HICON, HWND_TOP, ICON_BIG, ICON_SMALL,
-    IDC_ARROW, LR_DEFAULTCOLOR, MB_ICONWARNING, MB_OK, MINMAXINFO, MSG, SIZE_MINIMIZED,
-    SPI_GETWORKAREA, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, SW_RESTORE,
-    SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WDA_EXCLUDEFROMCAPTURE,
-    WDA_MONITOR, WDA_NONE, WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA, WM_DESTROY,
-    WM_DPICHANGED, WM_GETMINMAXINFO, WM_MOVE, WM_MOVING, WM_SETFOCUS, WM_SETICON, WM_SIZE,
-    WM_TIMER, WNDCLASSEXW, WS_OVERLAPPEDWINDOW,
+    SystemParametersInfoW, TranslateMessage, GWL_STYLE, HICON, HWND_NOTOPMOST, HWND_TOP,
+    HWND_TOPMOST, ICON_BIG, ICON_SMALL, IDC_APPSTARTING, IDC_ARROW, LR_DEFAULTCOLOR,
+    MB_ICONWARNING, MB_OK, MINMAXINFO, MSG, SIZE_MINIMIZED, SPI_GETWORKAREA, SWP_FRAMECHANGED,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW,
+    SW_RESTORE, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    WDA_EXCLUDEFROMCAPTURE, WDA_MONITOR, WDA_NONE, WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA,
+    WM_DESTROY, WM_DPICHANGED, WM_GETMINMAXINFO, WM_MOVE, WM_MOVING, WM_PAINT, WM_SETFOCUS,
+    WM_SETICON, WM_SIZE, WM_TIMER, WNDCLASSEXW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_OVERLAPPEDWINDOW, WS_POPUP,
 };
 
 /// Before the session says otherwise (1.0.46, [`Orden::Marco`]): the browser's whole bar (top
@@ -507,8 +512,252 @@ fn muestra_ventana() {
     // pantalla completa»). The 85 % size above stays as the size it returns to when restored.
     unsafe {
         let _ = ShowWindow(h, SW_SHOWMAXIMIZED);
+        // In front of whatever had the screen (1.0.59, the owner, 16 Nov 2026, 07:48: «al terminar
+        // la instalación, aparezca directo en pantalla… que no tenga que buscarlo»): Windows does
+        // not always let a program the installer opened take the front by itself, and it opened
+        // behind the browser it was downloaded from. A moment above the rest, then as any other.
+        let _ = SetWindowPos(
+            h,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+        );
+        let _ = SetWindowPos(
+            h,
+            Some(HWND_NOTOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+        );
         let _ = SetForegroundWindow(h);
     }
+    cierra_portada();
+}
+
+/// 1.0.59 (the owner, 16 Nov 2026, 07:48 and 07:50: «que no se quede la pantalla sin nada… y piense
+/// que a lo mejor es un fallo»): from the first moment until the window appears, a small GUARDIANA
+/// window in the middle of the screen, above the rest, with the name, «Abriendo GUARDIANA…» and a
+/// line that moves, on a thread of its own so it keeps moving while this one prepares the engine.
+/// It goes when the window shows ([`muestra_ventana`]), before any notice ([`aviso`]), or with
+/// the process.
+const CLASE_PORTADA: PCWSTR = w!("GuardianaZeroAbriendo");
+static PORTADA: AtomicIsize = AtomicIsize::new(0);
+static PORTADA_FIN: AtomicBool = AtomicBool::new(false);
+static PORTADA_FASE: AtomicU32 = AtomicU32::new(0);
+thread_local! {
+    static PORTADA_TEXTO: std::cell::RefCell<Vec<u16>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+const PORTADA_FONDO: COLORREF = COLORREF(0x000C_0806); // #06080C
+const PORTADA_NOMBRE: COLORREF = COLORREF(0x00F8_F6F4); // #F4F6F8
+const PORTADA_ACENTO: COLORREF = COLORREF(0x00E4_C39C); // #9CC3E4
+const PORTADA_PISTA: COLORREF = COLORREF(0x0030_231A);
+
+fn abre_portada(texto: String) {
+    let _ = std::thread::Builder::new()
+        .name("portada".into())
+        .spawn(move || unsafe { portada(&texto) });
+}
+
+fn cierra_portada() {
+    PORTADA_FIN.store(true, Ordering::SeqCst);
+    let v = PORTADA.load(Ordering::SeqCst);
+    if v != 0 {
+        let _ =
+            unsafe { PostMessageW(Some(HWND(v as *mut c_void)), WM_CLOSE, WPARAM(0), LPARAM(0)) };
+    }
+}
+
+/// The thread of [`abre_portada`]: its window and its own messages.
+unsafe fn portada(texto: &str) {
+    PORTADA_TEXTO.with(|t| *t.borrow_mut() = texto.encode_utf16().collect());
+    let Ok(m) = GetModuleHandleW(PCWSTR::null()) else {
+        return;
+    };
+    let instancia: HINSTANCE = m.into();
+    let clase = WNDCLASSEXW {
+        cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+        lpfnWndProc: Some(proc_portada),
+        hInstance: instancia,
+        hCursor: LoadCursorW(None, IDC_APPSTARTING).unwrap_or_default(),
+        hbrBackground: CreateSolidBrush(PORTADA_FONDO),
+        lpszClassName: CLASE_PORTADA,
+        ..Default::default()
+    };
+    RegisterClassExW(&clase);
+    let Ok(h) = CreateWindowExW(
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+        CLASE_PORTADA,
+        w!("GUARDIANA"),
+        WS_POPUP,
+        0,
+        0,
+        0,
+        0,
+        None,
+        None,
+        Some(instancia),
+        None,
+    ) else {
+        return;
+    };
+    PORTADA.store(h.0 as isize, Ordering::SeqCst);
+    if PORTADA_FIN.load(Ordering::SeqCst) {
+        let _ = DestroyWindow(h);
+        return;
+    }
+    let s = escala(h);
+    let (ancho, alto) = (px(420, s), px(190, s));
+    let mut area = RECT::default();
+    let _ = SystemParametersInfoW(
+        SPI_GETWORKAREA,
+        0,
+        Some((&mut area as *mut RECT).cast::<c_void>()),
+        SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+    );
+    let x = area.left + (area.right - area.left - ancho) / 2;
+    let y = area.top + (area.bottom - area.top - alto) / 2;
+    let _ = SetWindowPos(
+        h,
+        Some(HWND_TOPMOST),
+        x,
+        y,
+        ancho,
+        alto,
+        SWP_SHOWWINDOW | SWP_NOACTIVATE,
+    );
+    SetTimer(Some(h), 1, 40, None);
+    let mut msg = MSG::default();
+    while GetMessageW(&mut msg, None, 0, 0).0 > 0 {
+        let _ = TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+}
+
+extern "system" fn proc_portada(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
+    match msg {
+        WM_TIMER => {
+            if PORTADA_FIN.load(Ordering::SeqCst) {
+                let _ = unsafe { DestroyWindow(h) };
+            } else {
+                PORTADA_FASE.fetch_add(1, Ordering::Relaxed);
+                let b = barra_portada(h);
+                let _ = unsafe { InvalidateRect(Some(h), Some(std::ptr::from_ref(&b)), false) };
+            }
+            LRESULT(0)
+        }
+        WM_PAINT => {
+            unsafe { pinta_portada(h) };
+            LRESULT(0)
+        }
+        WM_DESTROY => {
+            unsafe { PostQuitMessage(0) };
+            LRESULT(0)
+        }
+        _ => unsafe { DefWindowProcW(h, msg, wp, lp) },
+    }
+}
+
+/// Where the moving line goes, in the window's own pixels.
+fn barra_portada(h: HWND) -> RECT {
+    let mut r = RECT::default();
+    let _ = unsafe { GetClientRect(h, &mut r) };
+    let s = escala(h);
+    let medio = (r.left + r.right) / 2;
+    let ancho = px(220, s);
+    let y = r.top + px(140, s);
+    RECT {
+        left: medio - ancho / 2,
+        top: y,
+        right: medio + ancho / 2,
+        bottom: y + px(3, s).max(2),
+    }
+}
+
+unsafe fn fuente(alto: i32, peso: i32) -> HFONT {
+    let mut lf = LOGFONTW {
+        lfHeight: -alto,
+        lfWeight: peso,
+        lfQuality: CLEARTYPE_QUALITY,
+        ..Default::default()
+    };
+    for (i, c) in "Segoe UI".encode_utf16().enumerate() {
+        lf.lfFaceName[i] = c;
+    }
+    CreateFontIndirectW(&lf)
+}
+
+unsafe fn pinta_portada(h: HWND) {
+    let mut ps = PAINTSTRUCT::default();
+    let dc = BeginPaint(h, &mut ps);
+    let mut r = RECT::default();
+    let _ = GetClientRect(h, &mut r);
+    let s = escala(h);
+    let fondo = CreateSolidBrush(PORTADA_FONDO);
+    let _ = FillRect(dc, &r, fondo);
+    let _ = DeleteObject(fondo.into());
+    let _ = SetBkMode(dc, TRANSPARENT);
+    let grande = fuente(px(28, s), 600);
+    let chica = fuente(px(15, s), 400);
+    let antes = SelectObject(dc, grande.into());
+    let _ = SetTextColor(dc, PORTADA_NOMBRE);
+    let mut nombre: Vec<u16> = "GUARDIANA".encode_utf16().collect();
+    let mut rn = RECT {
+        left: r.left,
+        top: r.top + px(40, s),
+        right: r.right,
+        bottom: r.top + px(90, s),
+    };
+    let _ = DrawTextW(
+        dc,
+        &mut nombre,
+        &mut rn,
+        DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX,
+    );
+    let _ = SelectObject(dc, chica.into());
+    let _ = SetTextColor(dc, PORTADA_ACENTO);
+    let mut texto = PORTADA_TEXTO.with(|t| t.borrow().clone());
+    // Arabic, Persian, Urdu and Hebrew read from the right
+    let derecha = texto.iter().any(|c| (0x0590..0x0900).contains(c));
+    let mut rt = RECT {
+        left: r.left + px(16, s),
+        top: r.top + px(96, s),
+        right: r.right - px(16, s),
+        bottom: r.top + px(124, s),
+    };
+    let mut formato = DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS;
+    if derecha {
+        formato |= DT_RTLREADING;
+    }
+    let _ = DrawTextW(dc, &mut texto, &mut rt, formato);
+    let _ = SelectObject(dc, antes);
+    let _ = DeleteObject(grande.into());
+    let _ = DeleteObject(chica.into());
+    // The line: a lit stretch that crosses it again and again.
+    let b = barra_portada(h);
+    let pista = CreateSolidBrush(PORTADA_PISTA);
+    let _ = FillRect(dc, &b, pista);
+    let _ = DeleteObject(pista.into());
+    let ancho = b.right - b.left;
+    let tramo = ancho / 3;
+    let fase = i32::try_from(PORTADA_FASE.load(Ordering::Relaxed) % 60).unwrap_or(0);
+    let x0 = b.left - tramo + (ancho + tramo) * fase / 60;
+    let lit = RECT {
+        left: x0.max(b.left),
+        top: b.top,
+        right: (x0 + tramo).min(b.right),
+        bottom: b.bottom,
+    };
+    if lit.right > lit.left {
+        let acento = CreateSolidBrush(PORTADA_ACENTO);
+        let _ = FillRect(dc, &lit, acento);
+        let _ = DeleteObject(acento.into());
+    }
+    let _ = EndPaint(h, &ps);
 }
 
 /// A line in the browser's own log (`datos/registro.txt`): what failed, for whoever has to look.
@@ -2558,6 +2807,8 @@ pub(crate) fn idioma_sistema() -> String {
 }
 
 fn aviso(textos: &Textos, titulo: &str, cuerpo: &str) {
+    // never under the window of «Abriendo GUARDIANA…»
+    cierra_portada();
     let t = Ancho::de(&textos.t(titulo));
     let c = Ancho::de(&textos.t(cuerpo));
     unsafe {
@@ -2662,6 +2913,8 @@ pub fn arranca() {
         }
         // Kept open on purpose until the process ends (see above).
         std::mem::forget(mutex);
+        // This copy is the one that opens: «Abriendo GUARDIANA…» until its window is there.
+        abre_portada(textos.t("abriendo"));
         registra(
             "arranque",
             &format!("GUARDIANA ZERO {}", env!("CARGO_PKG_VERSION")),

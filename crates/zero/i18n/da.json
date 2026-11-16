@@ -1635,5 +1635,6 @@
   "sala_ent_cifras": "{hecho} af {total} · {v}/s · {r} tilbage",
   "sala_ent_cerrar": "Luk",
   "sala_e_mirando": "Det første tjek er ikke foretaget endnu",
-  "sala_in_alcance": "Signaturen beviser, at denne rapport ikke er ændret, efter at den blev forseglet. Den garanterer ikke, at alle hændelser i systemet er blevet registreret."
+  "sala_in_alcance": "Signaturen beviser, at denne rapport ikke er ændret, efter at den blev forseglet. Den garanterer ikke, at alle hændelser i systemet er blevet registreret.",
+  "abriendo": "Åbner GUARDIANA…"
 }

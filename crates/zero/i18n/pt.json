@@ -1701,5 +1701,6 @@
   "sala_ent_cifras": "{hecho} de {total} · {v}/s · faltam {r}",
   "sala_ent_cerrar": "Fechar",
   "sala_e_mirando": "A primeira verificação ainda não foi feita",
-  "sala_in_alcance": "A assinatura comprova que este relatório não foi alterado depois de selado. Não garante que todos os eventos do sistema tenham sido detectados."
+  "sala_in_alcance": "A assinatura comprova que este relatório não foi alterado depois de selado. Não garante que todos os eventos do sistema tenham sido detectados.",
+  "abriendo": "Abrindo o GUARDIANA…"
 }

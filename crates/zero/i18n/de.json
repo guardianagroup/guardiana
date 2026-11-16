@@ -1660,5 +1660,6 @@
   "sala_ent_cifras": "{hecho} von {total} · {v}/s · noch {r}",
   "sala_ent_cerrar": "Schließen",
   "sala_e_mirando": "Die erste Prüfung ist noch nicht erfolgt",
-  "sala_in_alcance": "Die Signatur beweist, dass dieser Bericht nach dem Versiegeln nicht verändert wurde. Sie garantiert nicht, dass jedes Systemereignis erkannt wurde."
+  "sala_in_alcance": "Die Signatur beweist, dass dieser Bericht nach dem Versiegeln nicht verändert wurde. Sie garantiert nicht, dass jedes Systemereignis erkannt wurde.",
+  "abriendo": "GUARDIANA wird geöffnet…"
 }

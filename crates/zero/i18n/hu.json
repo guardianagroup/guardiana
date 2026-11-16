@@ -1635,5 +1635,6 @@
   "sala_ent_cifras": "{hecho} / {total} · {v}/s · még {r}",
   "sala_ent_cerrar": "Bezárás",
   "sala_e_mirando": "Az első ellenőrzés még nem történt meg",
-  "sala_in_alcance": "Az aláírás azt bizonyítja, hogy ezt a jelentést a lepecsételése óta nem módosították. Azt nem garantálja, hogy a rendszer minden eseményét észlelték."
+  "sala_in_alcance": "Az aláírás azt bizonyítja, hogy ezt a jelentést a lepecsételése óta nem módosították. Azt nem garantálja, hogy a rendszer minden eseményét észlelték.",
+  "abriendo": "A GUARDIANA megnyitása…"
 }

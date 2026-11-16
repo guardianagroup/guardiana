@@ -1635,5 +1635,6 @@
   "sala_ent_cifras": "{hecho} od {total} · {v}/s · preostalo {r}",
   "sala_ent_cerrar": "Zatvori",
   "sala_e_mirando": "Prva provjera još nije obavljena",
-  "sala_in_alcance": "Potpis dokazuje da ovo izvješće nije izmijenjeno nakon pečaćenja. Ne jamči da je otkriven svaki događaj u sustavu."
+  "sala_in_alcance": "Potpis dokazuje da ovo izvješće nije izmijenjeno nakon pečaćenja. Ne jamči da je otkriven svaki događaj u sustavu.",
+  "abriendo": "Otvaranje GUARDIANA…"
 }

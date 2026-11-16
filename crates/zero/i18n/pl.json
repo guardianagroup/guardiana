@@ -1635,5 +1635,6 @@
   "sala_ent_cifras": "{hecho} z {total} · {v}/s · pozostało {r}",
   "sala_ent_cerrar": "Zamknij",
   "sala_e_mirando": "Pierwsze sprawdzenie jeszcze się nie odbyło",
-  "sala_in_alcance": "Podpis dowodzi, że ten raport nie został zmieniony po zapieczętowaniu. Nie gwarantuje, że wykryto każde zdarzenie w systemie."
+  "sala_in_alcance": "Podpis dowodzi, że ten raport nie został zmieniony po zapieczętowaniu. Nie gwarantuje, że wykryto każde zdarzenie w systemie.",
+  "abriendo": "Otwieranie GUARDIANA…"
 }

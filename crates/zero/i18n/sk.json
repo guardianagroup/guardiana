@@ -1635,5 +1635,6 @@
   "sala_ent_cifras": "{hecho} z {total} · {v}/s · zostáva {r}",
   "sala_ent_cerrar": "Zavrieť",
   "sala_e_mirando": "Prvá kontrola sa ešte neuskutočnila",
-  "sala_in_alcance": "Podpis dokazuje, že táto správa sa po zapečatení nezmenila. Nezaručuje, že bola zistená každá udalosť systému."
+  "sala_in_alcance": "Podpis dokazuje, že táto správa sa po zapečatení nezmenila. Nezaručuje, že bola zistená každá udalosť systému.",
+  "abriendo": "Otváranie GUARDIANA…"
 }
