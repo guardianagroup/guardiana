@@ -4032,6 +4032,8 @@ fn subasta_eltiempo(zg: &str) -> String {
 #[test]
 fn the_auction_of_a_page_is_seen_cut_and_counted_for_the_day() {
     let (mut s, _, id) = con_pagina(true);
+    // 1.0.59: «No me subastes» is off unless the person turns it on; here they do
+    s.prefs.reglas.subastas_cortadas = true;
     let web = "https://www.eltiempo.com/";
     // The page's own Prebid.js and a bid request to another company: cut.
     assert!(
@@ -4097,6 +4099,8 @@ fn the_auction_of_a_page_is_seen_cut_and_counted_for_the_day() {
 #[test]
 fn auctions_can_be_allowed_on_one_site_and_the_settings_reach_the_page_script() {
     let (mut s, _, id) = con_pagina(true);
+    // 1.0.59: «No me subastes» is off unless the person turns it on; here they do
+    s.prefs.reglas.subastas_cortadas = true;
     let o = s.mensaje(
         Origen::Panel,
         PANEL,
@@ -4151,6 +4155,46 @@ fn auctions_can_be_allowed_on_one_site_and_the_settings_reach_the_page_script() 
         r#"{"tipo":"ajuste","clave":"subastas","valor":false}"#,
     );
     assert!(!s.prefs.reglas.corta_subastas("otra.co"));
+}
+
+#[test]
+fn the_auction_runs_by_default_and_the_switch_cuts_it() {
+    // 1.0.59 (the owner, 15 Nov 2026, 23:32): the auction runs unless the person turns «No me
+    // subastes» on, so ZERO can show what the companies bid; whatever a 1.0.58 kept is not read
+    let (mut s, _, _) = con_pagina(true);
+    assert!(!s.prefs.reglas.corta_subastas("eltiempo.com"));
+    let viejas: crate::decision::Ajustes =
+        serde_json::from_str(r#"{"cortar_seguimiento":true,"subastas_sin_cortar":false}"#)
+            .unwrap_or_default();
+    assert!(!viejas.corta_subastas("eltiempo.com"));
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"subastas","valor":true}"#,
+    );
+    assert_eq!(
+        del_tipo(&o, Origen::Panel, "ajustes").unwrap_or_default()["subastas"],
+        true
+    );
+    assert!(s.prefs.reglas.corta_subastas("eltiempo.com"));
+    // Maximum protection cuts it too; letting it run again is no longer maximum
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"subastas","valor":false}"#,
+    );
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"maxima","valor":true}"#,
+    );
+    assert!(s.prefs.reglas.corta_subastas("eltiempo.com"));
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"subastas","valor":false}"#,
+    );
+    assert!(!s.prefs.reglas.maxima && !s.prefs.reglas.corta_subastas("eltiempo.com"));
 }
 
 #[test]

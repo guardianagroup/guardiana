@@ -31,23 +31,34 @@ pub struct Ajustes {
     /// mandate, their marked data and the open lists' dangerous addresses still hold there.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub webs_permitidas: BTreeSet<String>,
-    /// «No me subastes» turned off by the person (1.0.46): on with the protection unless they
-    /// turn it off.
+    /// «No me subastes» turned on by the person. Since 1.0.59 (the owner, 15 Nov 2026, 23:32: «que de
+    /// serie se permita la subasta y la persona la pueda cortar») the auction runs unless they do,
+    /// and ZERO shows what the companies bid for the visit. The field of 1.0.46 to 1.0.58
+    /// (`subastas_sin_cortar`) is no longer read: everyone starts from the new default.
     #[serde(default)]
-    pub subastas_sin_cortar: bool,
-    /// Webs where the person lets the page's auction program run (its Prebid, its crossings of
-    /// identifiers). The companies the lists call advertising stay cut by the lists.
+    pub subastas_cortadas: bool,
+    /// Webs where the person lets the auction run while «No me subastes» is on: there, as
+    /// everywhere when it is off, the auction is open (see [`Ajustes::subasta_abierta`]).
     #[serde(default)]
     pub subastas_permitidas: BTreeSet<String>,
 }
 
 impl Ajustes {
     /// Whether «No me subastes» cuts on a page of `sitio_pagina` (with the protection on).
+    /// Maximum protection includes it, as it includes refusing cookie notices.
     #[must_use]
     pub fn corta_subastas(&self, sitio_pagina: &str) -> bool {
         self.cortar_seguimiento
-            && !self.subastas_sin_cortar
+            && (self.subastas_cortadas || self.maxima)
             && !self.subastas_permitidas.contains(sitio_pagina)
+    }
+
+    /// Whether the auction is open on a page of `sitio_pagina` (1.0.59, the default): with the
+    /// protection on and «No me subastes» not cutting there, the bid requests and the page's
+    /// auction program pass the lists, so the companies can bid and ZERO can show what they bid.
+    #[must_use]
+    pub fn subasta_abierta(&self, sitio_pagina: &str) -> bool {
+        self.cortar_seguimiento && !self.corta_subastas(sitio_pagina)
     }
 }
 
@@ -230,15 +241,30 @@ pub fn decide_con(
                 crate::filtros::Lista::Peligro => Motivo::Peligro,
             })
     });
-    // «No me subastes» (1.0.46): the auction's own machinery, when the person has not let it run
-    // on this web. Never the page the person opens.
+    let ruta = url::Url::parse(p.url)
+        .map(|u| u.path().to_string())
+        .unwrap_or_default();
+    // 1.0.59, the auction open unless the person cuts it (the owner, 15 Nov 2026, 23:32: «que de
+    // serie se permita la subasta y la persona la pueda cortar… que se pueda ver el precio»): its
+    // bid requests and the page's auction program pass the lists, so the companies can bid and
+    // ZERO can show the bids. The rest of the advertising stays cut: the ad program that picks
+    // and serves the ad (so no advert is shown), the crossings of identifiers, the identifiers
+    // and the trackers. Never a dangerous address; the person's own cuts, the mandate, the decoy
+    // and their marked data still hold, below.
+    // Only as what they are: the program as a script, a bid request as the page's own request
+    // (a bidder's ad tag or pixel on the same name stays cut).
+    let de_la_puja = (p.recurso == Recurso::Script
+        && crate::subasta::es_programa_de_subasta(&ruta))
+        || (p.recurso == Recurso::Datos && crate::subasta::es_nombre_de_puja(&destino.host));
+    let lista = lista.filter(|m| {
+        *m == Motivo::Peligro || !de_la_puja || !ajustes.subasta_abierta(p.sitio_pagina)
+    });
+    // «No me subastes» (1.0.46): the auction's own machinery, when the person turned it on and
+    // has not let it run on this web. Never the page the person opens.
     let lista = lista.or_else(|| {
         if p.recurso == Recurso::Documento || !ajustes.corta_subastas(p.sitio_pagina) {
             return None;
         }
-        let ruta = url::Url::parse(p.url)
-            .map(|u| u.path().to_string())
-            .unwrap_or_default();
         let otro_sitio = !destino.sitio.is_empty() && destino.sitio != p.sitio_pagina;
         crate::subasta::corta(&destino.host, &ruta, otro_sitio, destino.sigue())
             .then_some(Motivo::Subasta)
@@ -324,6 +350,66 @@ mod tests {
             recurso,
             sitio_pagina: "eltiempo.com",
         }
+    }
+
+    #[test]
+    fn the_auction_is_open_by_default_and_the_rest_of_the_advertising_stays_cut() {
+        // 1.0.59 (the owner, 15 Nov 2026, 23:32): the bids can be seen unless the person cuts it
+        let mut a = Ajustes {
+            cortar_seguimiento: true,
+            ..Ajustes::default()
+        };
+        let puja = pet(
+            "https://grid-bidder.criteo.com/openrtb_2_5/pbjs/auction/request",
+            b"{}",
+            Recurso::Datos,
+        );
+        let programa = pet(
+            "https://www.eltiempo.com/static/js/prebid11.12.min.js",
+            b"",
+            Recurso::Script,
+        );
+        let anuncio = pet(
+            "https://securepubads.g.doubleclick.net/tag/js/gpt.js",
+            b"",
+            Recurso::Script,
+        );
+        let id = pet("https://prod.uidapi.com/v2/token", b"", Recurso::Datos);
+        let etiqueta = pet(
+            "https://static.criteo.net/js/ld/publishertag.js",
+            b"",
+            Recurso::Script,
+        );
+        assert!(!decide(&puja, &a, &[], None, None).cortar);
+        assert!(!decide(&programa, &a, &[], None, None).cortar);
+        assert!(decide(&anuncio, &a, &[], None, None).cortar);
+        assert!(decide(&id, &a, &[], None, None).cortar);
+        assert!(decide(&etiqueta, &a, &[], None, None).cortar);
+        // the bid request's name as an image (a pixel): cut
+        let pixel = pet(
+            "https://grid-bidder.criteo.com/openrtb_2_5/pbjs/auction/request",
+            b"",
+            Recurso::Imagen,
+        );
+        assert!(decide(&pixel, &a, &[], None, None).cortar);
+        // what the person cut by hand still holds
+        a.cortados.insert("criteo.com".into());
+        assert_eq!(
+            decide(&puja, &a, &[], None, None).motivo,
+            Some(Motivo::CorteTuyo)
+        );
+        a.cortados.clear();
+        // «No me subastes» on, or maximum protection: cut
+        a.subastas_cortadas = true;
+        assert!(decide(&puja, &a, &[], None, None).cortar);
+        assert!(decide(&programa, &a, &[], None, None).cortar);
+        // a web where the person lets it run: open there
+        a.subastas_permitidas.insert("eltiempo.com".into());
+        assert!(!decide(&puja, &a, &[], None, None).cortar);
+        a.subastas_permitidas.clear();
+        a.subastas_cortadas = false;
+        a.maxima = true;
+        assert!(decide(&puja, &a, &[], None, None).cortar);
     }
 
     #[test]

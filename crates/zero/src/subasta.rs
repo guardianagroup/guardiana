@@ -361,6 +361,14 @@ pub fn es_programa_de_subasta(ruta: &str) -> bool {
     archivo.ends_with(".js") && (archivo.contains("prebid") || archivo.starts_with("pbjs"))
 }
 
+/// A name Prebid.js sends its bid requests to (1.0.59, the auction open by default: with the
+/// page's auction program, all the auction needs to run). Not the ad program that picks and
+/// serves the ad, not the crossings of identifiers, not the identifiers.
+#[must_use]
+pub fn es_nombre_de_puja(host: &str) -> bool {
+    papel_de(host).is_some_and(|r| r.papel == Papel::Puja)
+}
+
 /// Whether «No me subastes» cuts this request: the page's auction program by its name, any
 /// name the auction list knows (bid requests, identifier crossings, the ad program), or another
 /// company's address that is a crossing of identifiers.
@@ -1235,6 +1243,15 @@ mod tests {
             e.baja.as_deref(),
             Some("https://www.transparentadvertising.com/")
         );
+    }
+
+    #[test]
+    fn the_open_auction_needs_only_its_program_and_its_bid_requests() {
+        assert!(es_nombre_de_puja("grid-bidder.criteo.com"));
+        assert!(!es_nombre_de_puja("gum.criteo.com"));
+        assert!(!es_nombre_de_puja("prod.uidapi.com"));
+        assert!(!es_nombre_de_puja("securepubads.g.doubleclick.net"));
+        assert!(!es_nombre_de_puja("www.eltiempo.com"));
     }
 
     #[test]

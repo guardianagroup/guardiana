@@ -162,7 +162,8 @@
   }
 
   function interruptor(d) {
-    if (!d.activo) return '<p class="sub-nota">' + esc(t('sub_apagado')) + '</p>';
+    // 1.0.59: the auction runs unless the person turns «No me subastes» on, so its bids can be seen
+    if (!d.activo) return '<p class="sub-nota">' + esc(t(d.proteccion === false ? 'sub_apagado' : 'sub_abierta')) + '</p>';
     const G = window.GuardianaInterruptor;
     if (!G) return '';
     return '<div class="sub-permitir"><label>' + esc(t('sub_interruptor')) + '</label><span class="sub-sw">'

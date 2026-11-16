@@ -1947,7 +1947,7 @@ impl Sesion {
             // --- 1.0.46 (subastas-1.0.46) ---
             "gpc": self.gpc(),
             "youtube": self.youtube_sin_anuncios(),
-            "subastas": !self.prefs.reglas.subastas_sin_cortar,
+            "subastas": self.prefs.reglas.subastas_cortadas || self.prefs.reglas.maxima,
             "huella_ruido": !self.prefs.huella_sin_ruido || self.prefs.reglas.maxima,
             "huella_uniforme": self.prefs.huella_uniforme,
             "subastas_permitidas": self.prefs.reglas.subastas_permitidas,
@@ -3357,6 +3357,7 @@ impl Sesion {
                     r.maxima = si;
                     if si {
                         r.cortar_seguimiento = true;
+                        r.subastas_cortadas = true;
                         self.prefs.cookies_sin_tocar = false;
                         self.prefs.emergentes_sin_tocar = false;
                     }
@@ -3384,7 +3385,14 @@ impl Sesion {
             "subastas" | "gpc" | "huella_ruido" | "huella_uniforme" | "youtube" => {
                 let v = valor.as_bool().unwrap_or(clave != "huella_uniforme");
                 match clave {
-                    "subastas" => self.prefs.reglas.subastas_sin_cortar = !v,
+                    "subastas" => {
+                        self.prefs.reglas.subastas_cortadas = v;
+                        // Maximum protection cuts the auction too: letting it run is no longer
+                        // maximum, and the shield must not say it is.
+                        if !v {
+                            self.prefs.reglas.maxima = false;
+                        }
+                    }
                     "gpc" => self.prefs.gpc_apagado = !v,
                     "youtube" => self.prefs.youtube_con_anuncios = !v,
                     "huella_ruido" => self.prefs.huella_sin_ruido = !v,
@@ -4159,8 +4167,9 @@ impl Sesion {
             o.insert("semana".into(), self.subastas.suma(&semana, &hoy));
             o.insert(
                 "activo".into(),
-                json!(r.cortar_seguimiento && !r.subastas_sin_cortar),
+                json!(r.cortar_seguimiento && (r.subastas_cortadas || r.maxima)),
             );
+            o.insert("proteccion".into(), json!(r.cortar_seguimiento));
             o.insert("corta".into(), json!(r.corta_subastas(&p.subasta.sitio)));
             o.insert(
                 "permitida".into(),
