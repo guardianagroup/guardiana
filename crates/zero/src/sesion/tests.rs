@@ -1463,12 +1463,12 @@ fn the_new_tab_lists_the_engines_and_can_change_the_one_in_use() {
     let o = s.mensaje(
         Origen::Pestana(id),
         INICIO,
-        r#"{"tipo":"ajuste","clave":"buscador","valor":"qwant"}"#,
+        r#"{"tipo":"ajuste","clave":"buscador","valor":"duckduckgo"}"#,
     );
-    assert_eq!(s.msg_hoy()["motor_id"], "qwant");
+    assert_eq!(s.msg_hoy()["motor_id"], "duckduckgo");
     assert_eq!(
         del_tipo(&o, Origen::Pestana(id), "hoy").unwrap_or_default()["motor_id"],
-        "qwant"
+        "duckduckgo"
     );
     // Any other setting stays out of a page's reach.
     let _ = s.mensaje(

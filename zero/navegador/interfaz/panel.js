@@ -504,6 +504,7 @@
   en('guardado', (m) => { if (m.que === 'chivatos') $('e-tarjeta-guardada').textContent = m.texto || m.ruta || ''; });
   $('e-recargar').addEventListener('click', () => { manda({ tipo: 'recargar' }); $('e-recarga').classList.add('oculto'); });
   $('e-ver-todo').addEventListener('click', () => manda({ tipo: 'abrir_cortes' }));
+  $('e-ajustes').addEventListener('click', () => manda({ tipo: 'panel', vista: 'ajustes' }));
   $('e-proteccion').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'cortar_seguimiento', valor: e.target.checked }));
   $('e-maxima-activar').addEventListener('click', () => { manda({ tipo: 'ajuste', clave: 'maxima', valor: true }); $('e-recarga').classList.remove('oculto'); });
   $('e-maxima-quitar').addEventListener('click', () => manda({ tipo: 'ajuste', clave: 'maxima', valor: false }));

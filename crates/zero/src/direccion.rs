@@ -19,11 +19,12 @@ pub struct Buscador {
     pub privado: bool,
 }
 
-/// The engines on offer, in the order the box and the settings show them (2 Nov 2026; the owner,
-/// 16:47: «primero Google, después Brave, después DuckDuckGo, y luego ya Tor, y luego el resto»):
-/// Google, Brave, DuckDuckGo, then the rest as they were. Tor is not here: this browser has no way
-/// to reach the Tor network (no Tor of its own and no proxy to one), and an entry that only says
-/// «Tor» without going through it would be a lie.
+/// The engines on offer, in the order the box and the settings show them. Since 1.0.58 (the owner,
+/// 15 Nov 2026: only Google, Brave and DuckDuckGo) there are three: Google, the default; Brave
+/// Search and DuckDuckGo, which say they keep no record of who searches what. Whoever had chosen
+/// another one goes back to Google (`buscador` falls back to the default). Tor is not here: this
+/// browser has no way to reach the Tor network, and an entry that only says «Tor» without going
+/// through it would be a lie.
 pub const BUSCADORES: &[Buscador] = &[
     Buscador {
         id: "google",
@@ -42,114 +43,6 @@ pub const BUSCADORES: &[Buscador] = &[
         nombre: "DuckDuckGo",
         plantilla: "https://duckduckgo.com/?q={}",
         privado: true,
-    },
-    Buscador {
-        id: "startpage",
-        nombre: "Startpage",
-        plantilla: "https://www.startpage.com/do/search?query={}",
-        privado: true,
-    },
-    Buscador {
-        id: "ecosia",
-        nombre: "Ecosia",
-        plantilla: "https://www.ecosia.org/search?q={}",
-        privado: true,
-    },
-    Buscador {
-        id: "qwant",
-        nombre: "Qwant",
-        plantilla: "https://www.qwant.com/?q={}",
-        privado: true,
-    },
-    Buscador {
-        id: "mojeek",
-        nombre: "Mojeek",
-        plantilla: "https://www.mojeek.com/search?q={}",
-        privado: true,
-    },
-    Buscador {
-        id: "swisscows",
-        nombre: "Swisscows",
-        plantilla: "https://swisscows.com/web?query={}",
-        privado: true,
-    },
-    Buscador {
-        id: "metager",
-        nombre: "MetaGer",
-        plantilla: "https://metager.org/meta/meta.ger3?eingabe={}",
-        privado: true,
-    },
-    Buscador {
-        id: "bing",
-        nombre: "Bing",
-        plantilla: "https://www.bing.com/search?q={}",
-        privado: false,
-    },
-    Buscador {
-        id: "chatgpt",
-        nombre: "ChatGPT",
-        plantilla: "https://chatgpt.com/?hints=search&q={}",
-        privado: false,
-    },
-    Buscador {
-        id: "perplexity",
-        nombre: "Perplexity",
-        plantilla: "https://www.perplexity.ai/search?q={}",
-        privado: false,
-    },
-    Buscador {
-        id: "yahoo",
-        nombre: "Yahoo",
-        plantilla: "https://search.yahoo.com/search?p={}",
-        privado: false,
-    },
-    Buscador {
-        id: "youtube",
-        nombre: "YouTube",
-        plantilla: "https://www.youtube.com/results?search_query={}",
-        privado: false,
-    },
-    Buscador {
-        id: "you",
-        nombre: "You.com",
-        plantilla: "https://you.com/search?q={}",
-        privado: false,
-    },
-    Buscador {
-        id: "ask",
-        nombre: "Ask",
-        plantilla: "https://www.ask.com/web?q={}",
-        privado: false,
-    },
-    Buscador {
-        id: "aol",
-        nombre: "AOL",
-        plantilla: "https://search.aol.com/aol/search?q={}",
-        privado: false,
-    },
-    Buscador {
-        id: "yandex",
-        nombre: "Yandex",
-        plantilla: "https://yandex.com/search/?text={}",
-        privado: false,
-    },
-    Buscador {
-        id: "baidu",
-        nombre: "Baidu",
-        plantilla: "https://www.baidu.com/s?wd={}",
-        privado: false,
-    },
-    Buscador {
-        id: "naver",
-        nombre: "Naver",
-        plantilla: "https://search.naver.com/search.naver?query={}",
-        privado: false,
-    },
-    Buscador {
-        id: "seznam",
-        nombre: "Seznam",
-        plantilla: "https://search.seznam.cz/?q={}",
-        privado: false,
     },
 ];
 
@@ -276,34 +169,13 @@ mod tests {
             assert_eq!(b.plantilla.matches("{}").count(), 1, "{}", b.id);
             assert_eq!(buscador(b.id).id, b.id);
         }
-        // 2 Nov 2026 (the owner, 16:47): Google, Brave, DuckDuckGo, then the rest as they were.
+        // 15 Nov 2026 (the owner): only Google, Brave and DuckDuckGo, in that order.
         let ids: Vec<&str> = BUSCADORES.iter().map(|b| b.id).collect();
-        assert_eq!(
-            ids,
-            [
-                "google",
-                "brave",
-                "duckduckgo",
-                "startpage",
-                "ecosia",
-                "qwant",
-                "mojeek",
-                "swisscows",
-                "metager",
-                "bing",
-                "chatgpt",
-                "perplexity",
-                "yahoo",
-                "youtube",
-                "you",
-                "ask",
-                "aol",
-                "yandex",
-                "baidu",
-                "naver",
-                "seznam",
-            ]
-        );
+        assert_eq!(ids, ["google", "brave", "duckduckgo"]);
+        // An engine chosen before 1.0.58 and gone since goes back to the default.
+        for viejo in ["bing", "qwant", "startpage", "yandex"] {
+            assert_eq!(buscador(viejo).id, POR_DEFECTO);
+        }
         // Nothing that claims the Tor network: this browser cannot reach it.
         assert!(BUSCADORES
             .iter()

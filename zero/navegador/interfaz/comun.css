@@ -49,10 +49,17 @@ textarea.campo { resize: vertical; min-height: 84px; line-height: 1.45; }
 /* The switch the person flips: protection on or off. Only the settings' checkboxes: the cut
    switch (a button, role="switch") is the standard one of diseno.css, untouched here (1.0.46: these
    rules turned it grey with a second knob in the side summary). */
-input.interruptor { position: relative; width: 38px; height: 22px; flex: none; appearance: none; background: var(--linea); border-radius: 11px; transition: background .15s; cursor: pointer; margin: 0; }
-input.interruptor:checked { background: var(--verde); }
-input.interruptor:hover { background: var(--linea); }
-input.interruptor:checked:hover { background: var(--verde); }
+/* 15 Nov 2026 (the owner: the switches of the settings stayed with the wrong colour). diseno.css draws a checkbox
+   .interruptor as «checked = cut» (green when off, red when on, the knob the other way round), and the rules here only
+   won on hover, so a protection that was on looked off and the colour changed under the mouse. Here «checked» means
+   «on»: a plain on/off switch like the bar's. On, steel with the knob to the right; off, grey with the knob to the
+   left. The doubled class wins over diseno.css whatever the order; hovering only brightens it. */
+input[type="checkbox"].interruptor.interruptor { position: relative; width: 44px; height: 24px; flex: none; appearance: none; margin: 0; border-radius: 12px; background: #2A3441; cursor: pointer; transition: background .15s, filter .15s; }
+input[type="checkbox"].interruptor.interruptor::before { transform: none; background: #C7D0DA; }
+input[type="checkbox"].interruptor.interruptor:checked { background: var(--accent); }
+input[type="checkbox"].interruptor.interruptor:checked::before { transform: translateX(20px); background: var(--accent-fg); }
+input[type="checkbox"].interruptor.interruptor:hover { filter: brightness(1.12); }
+input[type="checkbox"].interruptor.interruptor:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* 2 Nov 2026: its knob is the one diseno.css draws (::before) for a checkbox switch. A second one drawn here (::after)
    showed two knobs on every switch of the settings and the shield. */
 

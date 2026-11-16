@@ -151,6 +151,15 @@ function pantalla(nombre) {
   const abreVista = async (id) => {
     if (!(await barra.evaluate((i) => document.getElementById(i).classList.contains('activo'), id))) await barra.click('#' + id);
   };
+  // 15 Nov 2026 (the owner): no «Ajustes» in the bar; the settings open from «Ajustes de ZERO» in the shield panel (and on
+  // the new tab). From a web: the shield, unfolded if it was folded into its rail, and then that link.
+  const abreAjustes = async () => {
+    if (!(await panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')))) await abreVista('b-escudo');
+    await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa')));
+    if (await panel.evaluate(() => document.body.classList.contains('plegado'))) await panel.click('#carril-emblema');
+    await hasta(() => panel.evaluate(() => !document.body.classList.contains('plegado')));
+    await panel.click('#e-ajustes');
+  };
   const inicio = await paginaQue(nav, (u) => u.endsWith('/inicio.html'));
   comprueba(true, 'barra, panel y pestaña nueva cargados desde zero.guardiana');
   comprueba(await hasta(async () => ['Nueva pestaña', 'New tab', 'Nova aba'].includes(await barra.textContent('.pestana .titulo'))), 'la barra habla el idioma de Windows y nombra la pestaña');
@@ -162,7 +171,8 @@ function pantalla(nombre) {
   comprueba(await hasta(() => barra.evaluate(() => !document.querySelector('#b-escudo').classList.contains('mirando'))), 'tras «Sí, cortarlos» el escudo corta');
   comprueba(await hasta(() => panel.evaluate(() => document.querySelector('#v-escudo').classList.contains('vista-activa'))), 'y el escudo se queda abierto al lado, en directo');
   // The language can be chosen; the rest of the test reads Spanish.
-  await barra.click('#b-menu');
+  comprueba(await barra.evaluate(() => !document.getElementById('b-menu')), 'la barra ya no tiene «Ajustes» arriba a la derecha');
+  await panel.click('#e-ajustes');
   await hasta(() => panel.evaluate(() => document.querySelector('#v-ajustes').classList.contains('vista-activa')));
   await panel.selectOption('#a-idioma', 'es');
   comprueba(await hasta(async () => (await barra.textContent('.pestana .titulo')) === 'Nueva pestaña'), 'cambiar el idioma a español cambia la barra al momento');
@@ -223,11 +233,11 @@ function pantalla(nombre) {
   // The star keeps the page in the favourites.
   await barra.click('#estrella');
   comprueba(await hasta(() => barra.evaluate(() => document.querySelector('#estrella').getAttribute('aria-pressed') === 'true')), 'la estrella guarda la web en favoritos');
-  // 1.0.46 (Z1-b): the bar's shield counts the attempts cut on this page (the pixel, the script
-  // and the advertising frame), and says so beside the figure.
+  // 15 Nov 2026 (the owner: the shield adds up from one page to the next): on a web the bar's shield says the day's
+  // figure, which takes in the attempts cut on this page (the pixel, the script and the advertising frame).
   const n = Number((await barra.textContent('#b-escudo-n')).replace(/\D/g, ''));
-  comprueba(n >= 3, `el escudo cuenta los intentos cortados en esta página (${n})`);
-  comprueba((await barra.textContent('#b-escudo-que')) === 'en esta página', 'y dice «en esta página»');
+  comprueba(n >= 3, `el escudo suma los intentos cortados, también los de esta página (${n})`);
+  comprueba((await barra.textContent('#b-escudo-que')) === 'hoy', 'y dice «hoy»: la cifra sigue de una página a otra');
   // 2 Nov 2026 (the owner, 08:01: no doors between sections): the bar has no products' selector, only «Inicio» (back to
   // the main cover, Órbita's tab), and nothing else that leads to another section.
   comprueba(await barra.evaluate(() => { const b = [...document.querySelectorAll('#productos [data-producto]')]; return b.length === 1 && b[0].dataset.producto === 'orbita'; }), 'la barra solo tiene «Inicio», que vuelve a la portada');
@@ -237,7 +247,7 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => (await barra.textContent('#aviso-corte')).includes('Google')), 'la barra dice a quién cortó');
   await abreVista('b-escudo');
   comprueba(await hasta(async () => (await panel.locator('#e-terceros li.cortado').count()) >= 1), 'el panel lista lo cortado');
-  comprueba(await hasta(async () => Number((await panel.textContent('#z1-n')).replace(/\D/g, '')) === n), 'el resumen de la web dice la misma cifra que la barra');
+  comprueba(await hasta(async () => { const p = Number((await panel.textContent('#z1-n')).replace(/\D/g, '')); return p >= 3 && p <= n; }), 'el resumen de la web cuenta lo de esta página, dentro de la cifra del día de la barra');
   comprueba(await panel.evaluate(() => !!document.getElementById('zero-subasta')), 'y deja su sitio a «Tu visita, a subasta»');
   await espera(600);
   pantalla('z1-b-resumen.png');
@@ -525,7 +535,7 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => (await barra.textContent('.pestana[aria-selected="true"] .titulo')) === tituloWeb), `y vuelve a la web en la que estabas (${tituloWeb})`);
 
   // «Buscar actualización»: one read of the public ledger, when asked, and written down.
-  await barra.click('#b-menu');
+  await abreAjustes();
   await hasta(() => panel.evaluate(() => document.querySelector('#v-ajustes').classList.contains('vista-activa')));
   await panel.click('#a-buscar-version');
   comprueba(await hasta(async () => /última versión|versión nueva/.test(await panel.textContent('#a-version-res')), 30000), `«Buscar actualización» lee el registro público (${await panel.textContent('#a-version-res')})`);
@@ -533,7 +543,7 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => (await panel.textContent('#l-conexiones')).includes('raw.githubusercontent.com')), 'y esa conexión queda anotada en «Suscripción»');
 
   // Z4 (1.0.46): the wheel scrolls the page in front right after the bar had the focus.
-  await barra.click('#b-menu');
+  await barra.click('#campo-dir');
   // «Ir» (2 Nov 2026, the owner, 16:50): next to the address, for whoever does not press Enter; it does what Enter does.
   comprueba(await barra.getByRole('button', { name: 'Ir', exact: true }).isVisible(), 'junto a la dirección está el botón «Ir», a la vista y con ese nombre');
   await barra.fill('#campo-dir', `${SITIO}/largo`);

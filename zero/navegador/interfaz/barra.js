@@ -125,7 +125,8 @@
   $('atras').addEventListener('click', () => manda({ tipo: 'atras' }));
   $('adelante').addEventListener('click', () => manda({ tipo: 'adelante' }));
   $('recargar').addEventListener('click', () => manda({ tipo: $('ic-detener').classList.contains('oculto') ? 'recargar' : 'detener' }));
-  const vistas = { 'b-escudo': 'escudo', 'b-menu': 'ajustes' };
+  // 15 Nov 2026 (the owner): no «Ajustes» in the bar; the settings open from the new tab and the shield panel.
+  const vistas = { 'b-escudo': 'escudo' };
   for (const [id, v] of Object.entries(vistas)) {
     $(id).addEventListener('click', () => {
       // On the browser's own pages the shield is the day's: it leads to the day's list of cuts.
@@ -152,7 +153,19 @@
     const m = escudoUltimo || {};
     const r = m.resumen || {};
     const mirando = !m.cortando;
-    const cifra = mirando ? (r.empresas || 0) : (r.cortadas || 0);
+    // 15 Nov 2026 (the owner: the shield has to add up from one page to the next): while it cuts, the figure is the
+    // day's, which goes on growing from page to page (it beats when this page cuts one more); watching, the companies
+    // of this page, as before.
+    if (!mirando) {
+      const h = hoyUltimo || {};
+      const total = Math.max(Number((h.hoy && h.hoy.cortadas) || 0), r.cortadas || 0);
+      b.classList.remove('mirando');
+      b.classList.toggle('cero', total === 0);
+      $('b-escudo-n').textContent = Z.n(total);
+      $('b-escudo-que').textContent = t('z1_pastilla_hoy');
+      return;
+    }
+    const cifra = r.empresas || 0;
     b.classList.toggle('mirando', mirando);
     b.classList.toggle('cero', cifra === 0);
     $('b-escudo-n').textContent = Z.n(cifra);
