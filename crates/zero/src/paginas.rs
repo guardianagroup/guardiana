@@ -569,6 +569,9 @@ const GUION: &str = r#"(() => {
     // 1.0.60: this program opens the window of a call (sesion::VENTANA_LLAMADA) as a small window of its own, always in
     // front; Comunicaciones asks for it only when it sees this mark (an older program would open it as a tab).
     marca('ventanaLlamada');
+    // 1.0.61: and that window does what its page asks at the end of its title (sesion::orden_ventana_llamada): «Volver a la
+    // llamada» brings this window to the front; «Agrandar» and «Reducir» change its size.
+    marca('ventanaOrdenes');
     // 5 Nov 2026 (the VPN next to Windows' clock): with Órbita already open, its icon, its menu or one of its notices
     // (guardiana://vpn) only changes the address's fragment to #vpn, and the VPN's page opens on an arrival only; it
     // opens here as it would on arriving, the way the Antivirus opens on #escaner.
@@ -1104,9 +1107,14 @@ const GUION: &str = r#"(() => {
         return R2(f, ese, a);
       } }) });
     });
+    // 1.0.61: the window of a call (sesion::VENTANA_LLAMADA), asked by Comunicaciones by its name, blank, also with no press
+    // in the moment before (the person left the call's tab or put the program away): the program makes it, small and in
+    // front of everything; it is not a pop-up (the owner, 16 Nov 2026, 12:20: «yo a él no lo veía»).
+    const llamada = (a) => !!a && a.length > 1 && a[1] === 'guardiana-flotante' && (a[0] == null || a[0] === '' || a[0] === 'about:blank')
+      && location.origin === 'https://guardianagroup.com' && location.pathname.startsWith('/orbita/comunicaciones/');
     envuelve2(window, 'open', (ese, a) => {
       const u = a && a.length && a[0] != null ? String(a[0]) : '';
-      if (abre(u)) return;
+      if (llamada(a) || abre(u)) return;
       informa(u);
       return () => null;
     });
@@ -1654,6 +1662,26 @@ mod tests {
         assert!(dia.contains("color-scheme:light;") && !dia.contains("#0F1528"));
     }
 
+    /// 1.0.61 (the owner, 16 Nov 2026, 12:20: «yo a él no lo veía»): the window of a call goes through the pop-up guard
+    /// without a press in the moment before, only blank, only by its name and only from Comunicaciones.
+    #[test]
+    fn the_window_of_a_call_is_not_a_pop_up() {
+        let g = guion_paginas();
+        let paso = g.find("const llamada = (a) =>").unwrap_or(usize::MAX);
+        let guarda = g.find("envuelve2(window, 'open'").unwrap_or(0);
+        assert!(paso < guarda, "before the guard");
+        for parte in [
+            "a[1] === 'guardiana-flotante'",
+            "(a[0] == null || a[0] === '' || a[0] === 'about:blank')",
+            "location.origin === 'https://guardianagroup.com'",
+            "location.pathname.startsWith('/orbita/comunicaciones/')",
+            "if (llamada(a) || abre(u)) return;",
+        ] {
+            assert!(g.contains(parte), "{parte}");
+        }
+        assert!(g.contains(&format!("'{}'", crate::sesion::VENTANA_LLAMADA)));
+    }
+
     #[test]
     fn the_page_script_leaves_nothing_a_page_can_find() {
         let g = guion_paginas();
@@ -1716,6 +1744,8 @@ mod tests {
             "enZero",
             // 1.0.60: the window of a call, only for GUARDIANA's own web in the program
             "ventanaLlamada",
+            // 1.0.61: and what its page asks of it
+            "ventanaOrdenes",
             // 5 Nov 2026: Órbita on the VPN from the icon next to the clock
             "window.OrbitaVpn",
         ] {

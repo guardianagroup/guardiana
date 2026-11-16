@@ -69,8 +69,8 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateIconFromResourceEx, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
     FindWindowW, GetClientRect, GetMessageW, GetWindowLongPtrW, GetWindowRect,
-    GetWindowThreadProcessId, IsIconic, KillTimer, LoadCursorW, MessageBoxW, PostMessageW,
-    PostQuitMessage, RegisterClassExW, SendMessageW, SetForegroundWindow, SetTimer,
+    GetWindowThreadProcessId, IsIconic, IsZoomed, KillTimer, LoadCursorW, MessageBoxW,
+    PostMessageW, PostQuitMessage, RegisterClassExW, SendMessageW, SetForegroundWindow, SetTimer,
     SetWindowDisplayAffinity, SetWindowLongPtrW, SetWindowPos, SetWindowTextW, ShowWindow,
     SystemParametersInfoW, TranslateMessage, GWL_STYLE, HICON, HWND_NOTOPMOST, HWND_TOP,
     HWND_TOPMOST, ICON_BIG, ICON_SMALL, IDC_APPSTARTING, IDC_ARROW, LR_DEFAULTCOLOR,
@@ -78,10 +78,10 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW,
     SW_RESTORE, SW_SHOWMAXIMIZED, SW_SHOWNOACTIVATE, SW_SHOWNORMAL,
     SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WDA_EXCLUDEFROMCAPTURE, WDA_MONITOR, WDA_NONE,
-    WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA, WM_DESTROY, WM_DPICHANGED, WM_GETMINMAXINFO,
-    WM_MOVE, WM_MOVING, WM_PAINT, WM_SETFOCUS, WM_SETICON, WM_SIZE, WM_TIMER, WNDCLASSEXW,
-    WS_CAPTION, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_SYSMENU,
-    WS_THICKFRAME,
+    WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA, WM_DESTROY, WM_DPICHANGED,
+    WM_GETMINMAXINFO, WM_MOVE, WM_MOVING, WM_PAINT, WM_SETFOCUS, WM_SETICON, WM_SIZE, WM_TIMER,
+    WNDCLASSEXW, WS_CAPTION, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_MAXIMIZEBOX, WS_OVERLAPPEDWINDOW,
+    WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
 };
 
 /// Before the session says otherwise (1.0.46, [`Orden::Marco`]): the browser's whole bar (top
@@ -3194,7 +3194,17 @@ fn pide_ventana_llamada(
     let pide = w
         .map(|w| texto_de(|p| unsafe { w.Source(p) }))
         .unwrap_or_default();
-    sesion::es_ventana_llamada(&nombre, &pide)
+    let es = sesion::es_ventana_llamada(&nombre, &pide);
+    // 1.0.61: written down, without the address (it can carry an invitation's key)
+    registra(
+        "ventana de la llamada",
+        &if es {
+            "pedida"
+        } else {
+            "pedida desde otra página: se abre como cualquier otra"
+        },
+    );
+    es
 }
 
 /// The window of a call (1.0.60; the owner, 16 Nov 2026, 09:44: «tenemos que poder movernos por toda la web… y el
@@ -3243,6 +3253,7 @@ fn abre_ventana_llamada() {
             Ok(web) => unsafe {
                 vale("ventana de la llamada", args.SetNewWindow(&web));
                 vale("ventana de la llamada", aplazado.Complete());
+                registra("ventana de la llamada", &"abierta");
             },
             Err(e) => {
                 registra("ventana de la llamada", &e);
@@ -3270,6 +3281,15 @@ fn rechaza_ventana(
     }
 }
 
+/// Its styles: a bar to take it by, its ×, a border to make it bigger, and (1.0.61) a double click on its bar makes it fill
+/// the screen and another brings it back; in front of everything and out of the taskbar.
+fn estilos_llamada() -> (WINDOW_STYLE, WINDOW_EX_STYLE) {
+    (
+        WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MAXIMIZEBOX,
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+    )
+}
+
 /// The window itself: 400 × 260 inside (at this screen's scale), with a thin dark bar to take it by and its ×.
 fn crea_ventana_llamada() -> windows::core::Result<HWND> {
     unsafe {
@@ -3290,8 +3310,7 @@ fn crea_ventana_llamada() -> windows::core::Result<HWND> {
         }
         let principal = hwnd();
         let s = escala(principal);
-        let estilo = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME;
-        let ex = WS_EX_TOPMOST | WS_EX_TOOLWINDOW;
+        let (estilo, ex) = estilos_llamada();
         let mut r = RECT {
             left: 0,
             top: 0,
@@ -3418,6 +3437,7 @@ fn prepara_ventana_llamada(
                         let url = texto_de(|p| a.Uri(p));
                         if url != "about:blank" {
                             a.SetCancel(true)?;
+                            registra("ventana de la llamada", &"otra dirección: no se abre");
                         }
                     }
                     Ok(())
@@ -3430,6 +3450,20 @@ fn prepara_ventana_llamada(
                 let _ = PostMessageW(Some(h), WM_CLOSE, WPARAM(0), LPARAM(0));
                 Ok(())
             })),
+            &mut t,
+        )?;
+        // 1.0.61: what the page asks of its window, by the end of its title (the owner, 16 Nov 2026, 12:20: «la pantalla
+        // no la puede hacer más grande… no podemos volver a la llamada»)
+        web.add_DocumentTitleChanged(
+            &DocumentTitleChangedEventHandler::create(Box::new(
+                move |w: Option<ICoreWebView2>, _| {
+                    if let Some(w) = w {
+                        let titulo = texto_de(|p| w.DocumentTitle(p));
+                        orden_de_la_llamada(h, &titulo);
+                    }
+                    Ok(())
+                },
+            )),
             &mut t,
         )?;
         let mut r = RECT::default();
@@ -3450,6 +3484,86 @@ fn prepara_ventana_llamada(
     Ok(web)
 }
 
+/// What the page of a call's window asks by its title (1.0.61; `sesion::orden_ventana_llamada`): «Volver a la llamada»
+/// brings GUARDIANA's own window to the front (restored if it was minimised: the page has already put the call's tab in
+/// front); «Agrandar» and «Reducir» change the window's size.
+fn orden_de_la_llamada(h: HWND, titulo: &str) {
+    match sesion::orden_ventana_llamada(titulo) {
+        Some(sesion::OrdenLlamada::Volver) => {
+            let p = hwnd();
+            unsafe {
+                if IsIconic(p).as_bool() {
+                    let _ = ShowWindow(p, SW_RESTORE);
+                }
+                let _ = SetForegroundWindow(p);
+            }
+        }
+        Some(sesion::OrdenLlamada::Grande) => tam_llamada(h, true),
+        Some(sesion::OrdenLlamada::Normal) => tam_llamada(h, false),
+        None => {}
+    }
+}
+
+/// The window of a call bigger (half the width of its screen's work area, up to 960 inside, at 62 % of that in height)
+/// or back to its 400 × 260. Its corner nearest the screen's edge stays where it is, and the whole window stays on its
+/// screen.
+fn tam_llamada(h: HWND, grande: bool) {
+    // SAFETY: plain calls on our own window with pointers to locals that outlive them.
+    unsafe {
+        if IsZoomed(h).as_bool() {
+            let _ = ShowWindow(h, SW_RESTORE);
+        }
+        let s = escala(h);
+        let mut r = RECT::default();
+        if GetWindowRect(h, &mut r).is_err() {
+            return;
+        }
+        let monitor = MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST);
+        let mut mi = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if !GetMonitorInfoW(monitor, &mut mi).as_bool() {
+            return;
+        }
+        let a = mi.rcWork;
+        let (ancho, alto) = if grande {
+            let w = ((a.right - a.left) / 2).min(px(960, s));
+            (w, (w * 62 / 100).min((a.bottom - a.top) * 7 / 10))
+        } else {
+            (px(400, s), px(260, s))
+        };
+        let (estilo, ex) = estilos_llamada();
+        let mut f = RECT {
+            left: 0,
+            top: 0,
+            right: ancho,
+            bottom: alto,
+        };
+        let _ = AdjustWindowRectExForDpi(&mut f, estilo, false, ex, GetDpiForWindow(h).max(96));
+        let (w, hh) = (f.right - f.left, f.bottom - f.top);
+        let medio_x = (a.left + a.right) / 2;
+        let medio_y = (a.top + a.bottom) / 2;
+        let x = if (r.left + r.right) / 2 >= medio_x {
+            r.right - w
+        } else {
+            r.left
+        };
+        let y = if (r.top + r.bottom) / 2 >= medio_y {
+            r.bottom - hh
+        } else {
+            r.top
+        };
+        let x = x.min(a.right - w).max(a.left);
+        let y = y.min(a.bottom - hh).max(a.top);
+        let _ = SetWindowPos(h, None, x, y, w, hh, SWP_NOZORDER | SWP_NOACTIVATE);
+        registra(
+            "ventana de la llamada",
+            &if grande { "agrandada" } else { "reducida" },
+        );
+    }
+}
+
 /// The view of the window of a call (taken out of the borrow before the engine is called).
 fn controlador_llamada(h: HWND) -> Option<ICoreWebView2Controller> {
     con_vistas(|v| {
@@ -3468,9 +3582,13 @@ fn cierra_ventana_llamada() {
         return;
     };
     let mut r = RECT::default();
-    if unsafe { GetWindowRect(l.hwnd, &mut r) }.is_ok() && !unsafe { IsIconic(l.hwnd) }.as_bool() {
+    if unsafe { GetWindowRect(l.hwnd, &mut r) }.is_ok()
+        && !unsafe { IsIconic(l.hwnd) }.as_bool()
+        && !unsafe { IsZoomed(l.hwnd) }.as_bool()
+    {
         SITIO_LLAMADA.with(|x| *x.borrow_mut() = Some(r));
     }
+    registra("ventana de la llamada", &"cerrada");
     if let Some(v) = l.vista {
         vale("cerrar la ventana de la llamada", unsafe {
             v.controlador.Close()

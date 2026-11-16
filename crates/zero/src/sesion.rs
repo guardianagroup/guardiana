@@ -81,6 +81,29 @@ pub fn es_ventana_llamada(nombre: &str, pide: &str) -> bool {
     nombre == VENTANA_LLAMADA && pide.starts_with(SECURE)
 }
 
+/// What the page of a call's window asks of it (1.0.61; the owner, 16 Nov 2026, 12:20: «la pantalla no la puede hacer
+/// más grande… no podemos volver a la llamada»).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OrdenLlamada {
+    /// «Volver a la llamada»: GUARDIANA's own window to the front.
+    Volver,
+    /// «Agrandar»: the window to half the screen.
+    Grande,
+    /// «Reducir»: the window back to its size.
+    Normal,
+}
+
+/// The page says it at the end of its window's title, after a `#` (`GUARDIANA #grande`); only those three words count.
+#[must_use]
+pub fn orden_ventana_llamada(titulo: &str) -> Option<OrdenLlamada> {
+    match titulo.trim_end().rsplit_once('#').map(|(_, o)| o) {
+        Some("volver") => Some(OrdenLlamada::Volver),
+        Some("grande") => Some(OrdenLlamada::Grande),
+        Some("normal") => Some(OrdenLlamada::Normal),
+        _ => None,
+    }
+}
+
 /// Órbita's own page (Comunicaciones lives under the same folder and is its own product).
 fn es_orbita(url: &str) -> bool {
     url.starts_with(ORBITA) && !url.starts_with(SECURE)
@@ -2138,10 +2161,12 @@ impl Sesion {
                 Some(id) => self.activar(id),
                 None => return vec![Orden::PideGuardiana],
             },
+            // 1.0.61: the program's own tab first; another with the same address (one a page opened) only if there is none
             "secure" => match self
                 .pestanas
                 .iter()
-                .find(|p| p.url.starts_with(SECURE))
+                .find(|p| p.fija && p.url.starts_with(SECURE))
+                .or_else(|| self.pestanas.iter().find(|p| p.url.starts_with(SECURE)))
                 .map(|p| p.id)
             {
                 Some(id) => self.activa_web(id),
@@ -2153,10 +2178,11 @@ impl Sesion {
                     o
                 }
             },
+            // (Órbita: only the program's own tab; one a page opened with its address is not it, and stays as it is)
             "orbita" => match self
                 .pestanas
                 .iter()
-                .find(|p| es_orbita(&p.url))
+                .find(|p| p.fija && es_orbita(&p.url))
                 .map(|p| p.id)
             {
                 Some(id) => self.activa_web(id),

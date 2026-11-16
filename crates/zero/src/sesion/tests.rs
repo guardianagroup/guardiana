@@ -3427,6 +3427,89 @@ fn orbita_is_the_fourth_product_and_its_tab_is_made_once() {
 }
 
 #[test]
+fn the_selector_brings_the_programs_own_tab_not_another_with_its_address() {
+    // 1.0.61 (the owner, 16 Nov 2026, 12:41: «le doy a órbita y no me abre órbita ni nada»): a tab a page opened with
+    // the address of Órbita or Comunicaciones, before the program's own one in the bar, does not take its place.
+    let (mut s, _, _) = abre();
+    let url = format!("http://127.0.0.1:7443/?t={}", "f".repeat(64));
+    let _ = s.abre_guardiana(&url);
+    let (otra, _) = s.ventana_nueva(1, "").unwrap_or_default();
+    let _ = s.fuente(otra, "https://guardianagroup.com/orbita/#llamada");
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"orbita"}"#,
+    );
+    let orbita = s.activa();
+    assert_ne!(orbita, otra);
+    assert!(s.pestana(orbita).is_some_and(|p| p.fija && p.url == ORBITA));
+    assert!(
+        s.pestana(otra).is_some_and(|p| !p.fija),
+        "the other one stays"
+    );
+    // Comunicaciones: its own tab first, when both are there
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"secure"}"#,
+    );
+    let suya = s.activa();
+    assert!(s
+        .pestana(suya)
+        .is_some_and(|p| p.fija && p.url.starts_with(SECURE)));
+    let (otra2, _) = s.ventana_nueva(1, "").unwrap_or_default();
+    let _ = s.fuente(otra2, "https://guardianagroup.com/orbita/comunicaciones/#c");
+    let pos = |id: u32| {
+        s.pestanas
+            .iter()
+            .position(|p| p.id == id)
+            .unwrap_or(usize::MAX)
+    };
+    assert!(
+        pos(otra2) < pos(suya),
+        "the other one is before it in the bar"
+    );
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"orbita"}"#,
+    );
+    let _ = s.mensaje(
+        Origen::Barra,
+        BARRA,
+        r#"{"tipo":"producto","producto":"secure"}"#,
+    );
+    assert_eq!(s.activa(), suya);
+}
+
+#[test]
+fn the_window_of_a_call_asks_by_the_end_of_its_title() {
+    // 1.0.61 (the owner, 16 Nov 2026, 12:20: «la pantalla no la puede hacer más grande… no podemos volver a la llamada»)
+    assert_eq!(
+        orden_ventana_llamada("GUARDIANA #volver"),
+        Some(OrdenLlamada::Volver)
+    );
+    assert_eq!(
+        orden_ventana_llamada("GUARDIANA #grande"),
+        Some(OrdenLlamada::Grande)
+    );
+    assert_eq!(
+        orden_ventana_llamada("GUARDIANA #normal "),
+        Some(OrdenLlamada::Normal)
+    );
+    for nada in [
+        "GUARDIANA",
+        "",
+        "#",
+        "GUARDIANA #otra",
+        "volver",
+        "GUARDIANA #volver2",
+    ] {
+        assert_eq!(orden_ventana_llamada(nada), None, "{nada}");
+    }
+}
+
+#[test]
 fn the_program_opens_on_its_web_and_the_panel_waits_behind_it() {
     // 1.0.50 (the owner, 30 Oct 2026, 22:29: «la versión web que teníamos, que ya estaba
     // terminada, quiero que la metas en el programa»).
