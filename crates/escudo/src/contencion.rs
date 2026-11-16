@@ -90,8 +90,10 @@ fn powershell_en_claro(linea: &str) -> Option<String> {
             let b64 = partes.next()?.trim_matches('"');
             let bytes = base64_decodifica(b64)?;
             let u: Vec<u16> = bytes
-                .chunks_exact(2)
-                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|c| u16::from_le_bytes(*c))
                 .collect();
             return Some(String::from_utf16_lossy(&u).to_ascii_lowercase());
         }

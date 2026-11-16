@@ -69,8 +69,10 @@ fn nombre_de_tipo(tipo: u32) -> &'static str {
 
 fn unidades(datos: &[u8]) -> Vec<u16> {
     datos
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|c| u16::from_le_bytes(*c))
         .collect()
 }
 

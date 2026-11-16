@@ -893,7 +893,7 @@ impl Policy for EnginePolicy {
         // written down, so «out of hours» started from zero at every restart (review of 8 Oct
         // 2026).
         inner.recorded += 1;
-        if inner.recorded % 50 == 0 {
+        if inner.recorded.is_multiple_of(50) {
             Self::volcar_perfiles(&mut inner);
         }
         if p.device_id == guardiana_core::SELF_DEVICE_ID {

@@ -257,7 +257,7 @@ pub fn linea_de_ordenes(pid: u32) -> Option<String> {
         let base = buf.as_ptr() as usize;
         let desde = puntero.checked_sub(base)?;
         let total = buf.len() * 8;
-        if desde.checked_add(bytes)? > total || desde % 2 != 0 {
+        if desde.checked_add(bytes)? > total || !desde.is_multiple_of(2) {
             return None;
         }
         let palabras: Vec<u16> = buf
@@ -265,8 +265,10 @@ pub fn linea_de_ordenes(pid: u32) -> Option<String> {
             .flat_map(|x| x.to_le_bytes())
             .collect::<Vec<u8>>()
             .get(desde..desde + bytes)?
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_le_bytes(*c))
             .collect();
         Some(String::from_utf16_lossy(&palabras))
     })

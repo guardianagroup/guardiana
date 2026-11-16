@@ -165,8 +165,10 @@ fn dato_de_sesion(sesion: u32, clase: WTS_INFO_CLASS) -> Option<Vec<u8>> {
 /// Bytes UTF-16 (little endian) acabados en cero, como texto.
 fn texto_de(bytes: &[u8]) -> String {
     let unidades: Vec<u16> = bytes
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|c| u16::from_le_bytes(*c))
         .take_while(|&c| c != 0)
         .take(256)
         .collect();

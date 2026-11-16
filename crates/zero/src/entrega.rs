@@ -273,11 +273,7 @@ impl Sala {
         let hojas = (0..e.archivos.len())
             .map(|i| {
                 let b = std::fs::read(dir.join(format!("f{i}.hojas"))).unwrap_or_default();
-                Arc::new(
-                    b.chunks_exact(32)
-                        .filter_map(|c| <[u8; 32]>::try_from(c).ok())
-                        .collect::<Vec<_>>(),
-                )
+                Arc::new(b.as_chunks::<32>().0.to_vec())
             })
             .collect();
         Some(Self {

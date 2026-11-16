@@ -168,8 +168,10 @@ impl Clave {
     fn texto(&self, nombre: &str) -> Option<String> {
         let (tipo, datos) = self.valor(nombre)?;
         let unidades: Vec<u16> = datos
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|c| u16::from_le_bytes(*c))
             .collect();
         Some(match tipo {
             REG_SZ | REG_EXPAND_SZ => {

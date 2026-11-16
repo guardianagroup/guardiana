@@ -4854,7 +4854,7 @@ fn cuanto_tarda_una_peticion() {
                 cortadas += 1;
             }
         }
-        if i % 100 == 0 {
+        if i.is_multiple_of(100) {
             // The beat empties what the bar is told, as in the program.
             let _ = s.tic();
         }

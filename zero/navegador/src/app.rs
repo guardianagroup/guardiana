@@ -2243,7 +2243,11 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
                 PROTEGIDA.store(conversando && ok, Ordering::Relaxed);
                 TICS_VIGIA.store(0, Ordering::Relaxed);
             }
-            if conversando && TICS_VIGIA.fetch_add(1, Ordering::Relaxed) % 10 == 0 {
+            if conversando
+                && TICS_VIGIA
+                    .fetch_add(1, Ordering::Relaxed)
+                    .is_multiple_of(10)
+            {
                 let usos = lee_usos();
                 let protegida = PROTEGIDA.load(Ordering::Relaxed);
                 let _ = con_sesion(|s| {

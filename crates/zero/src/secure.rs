@@ -2820,7 +2820,7 @@ impl Secure {
                                 fallo = Some("sec_err_archivo");
                                 break;
                             }
-                            if r.bloques() % CONFIRMA_CADA == 0 {
+                            if r.bloques().is_multiple_of(CONFIRMA_CADA) {
                                 confirma = Some((e.nombre.clone(), r.bloques()));
                             }
                         }

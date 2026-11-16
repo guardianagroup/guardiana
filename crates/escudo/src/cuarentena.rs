@@ -254,11 +254,13 @@ fn escribe_entero(ruta: &Path, datos: &[u8]) -> Result<(), ErrorCuarentena> {
 }
 
 fn de_hex(s: &str) -> Option<Vec<u8>> {
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         return None;
     }
     s.as_bytes()
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|p| {
             let t = std::str::from_utf8(p).ok()?;
             u8::from_str_radix(t, 16).ok()

@@ -71,7 +71,7 @@ impl Caducidad {
     #[must_use]
     pub fn nombre(self) -> String {
         match self {
-            Self::Horas(h) if h % 24 == 0 => format!("{}d", h / 24),
+            Self::Horas(h) if h.is_multiple_of(24) => format!("{}d", h / 24),
             Self::Horas(h) => format!("{h}h"),
             Self::PrimeraDescarga => "primera_descarga".to_owned(),
         }

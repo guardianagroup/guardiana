@@ -114,9 +114,8 @@ impl Huellas {
             return Err(ErrorLista::Integridad);
         }
         let mut lista = Vec::with_capacity(n);
-        for trozo in datos[16..].chunks_exact(32) {
-            let mut h = [0u8; 32];
-            h.copy_from_slice(trozo);
+        for trozo in datos[16..].as_chunks::<32>().0 {
+            let h = *trozo;
             if lista.last().is_some_and(|u: &[u8; 32]| *u >= h) {
                 return Err(ErrorLista::Orden);
             }
@@ -163,7 +162,7 @@ pub fn de_hex32(s: &str) -> Option<[u8; 32]> {
         return None;
     }
     let mut h = [0u8; 32];
-    for (i, par) in s.chunks_exact(2).enumerate() {
+    for (i, par) in s.as_chunks::<2>().0.iter().enumerate() {
         let alto = valor_hex(par[0])?;
         let bajo = valor_hex(par[1])?;
         h[i] = (alto << 4) | bajo;

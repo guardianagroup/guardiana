@@ -341,7 +341,7 @@ fn a_hex(texto: &str) -> String {
 #[cfg(any(windows, test))]
 fn des_hex(hex: &str) -> Option<String> {
     let hex = hex.trim();
-    if hex.len() % 2 != 0 {
+    if !hex.len().is_multiple_of(2) {
         return None;
     }
     let bytes = (0..hex.len())

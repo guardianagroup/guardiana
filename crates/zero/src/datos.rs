@@ -106,7 +106,7 @@ fn luhn(d: &[u8]) -> bool {
         }
         suma += v;
     }
-    suma % 10 == 0
+    suma.is_multiple_of(10)
 }
 
 fn cpf_valido(d: &[u8]) -> bool {

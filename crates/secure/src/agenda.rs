@@ -232,7 +232,7 @@ fn luhn(cifras: &[u8]) -> u8 {
         .enumerate()
         .map(|(i, &d)| {
             let d = u32::from(d);
-            if i % 2 == 0 {
+            if i.is_multiple_of(2) {
                 let x = d * 2;
                 if x > 9 {
                     x - 9

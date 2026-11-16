@@ -243,7 +243,10 @@ pub(crate) fn inflate(datos: &[u8]) -> Option<Vec<u8>> {
 pub(crate) fn inflate_zlib(datos: &[u8]) -> Option<Vec<u8>> {
     let cmf = *datos.first()?;
     let flg = *datos.get(1)?;
-    if cmf & 0x0f != 8 || (u16::from(cmf) * 256 + u16::from(flg)) % 31 != 0 || flg & 0x20 != 0 {
+    if cmf & 0x0f != 8
+        || !(u16::from(cmf) * 256 + u16::from(flg)).is_multiple_of(31)
+        || flg & 0x20 != 0
+    {
         return None;
     }
     inflate(datos.get(2..)?)
