@@ -66,6 +66,21 @@ pub const SECURE_INTERNA: &str = "https://zero.guardiana/secure.html";
 /// person chooses it, so the program does not draw the planet at every start.
 pub const ORBITA: &str = "https://guardianagroup.com/orbita/";
 
+/// The name Comunicaciones gives to the window of a call (1.0.60; the owner, 16 Nov 2026, 09:44: «tenemos que poder
+/// movernos por toda la web… y el programa de GUARDIANA, y nos tenemos que seguir viendo en pantalla… el cuadradito…
+/// lo tenemos que poder mover… por toda la zona de la pantalla»). A window with this name, asked by Comunicaciones,
+/// is not a tab: it is a small window of its own, always in front, without a button in the taskbar and out of screen
+/// captures, that the person takes anywhere on the screen by its bar; the page fills it with the call (the other
+/// person, your own picture, the time, the microphone, the camera and «Colgar»). Any other page, or any other name,
+/// opens its windows as always.
+pub const VENTANA_LLAMADA: &str = "guardiana-flotante";
+
+/// Whether a new window is the window of a call: its name, and the address of the page that asks for it.
+#[must_use]
+pub fn es_ventana_llamada(nombre: &str, pide: &str) -> bool {
+    nombre == VENTANA_LLAMADA && pide.starts_with(SECURE)
+}
+
 /// Órbita's own page (Comunicaciones lives under the same folder and is its own product).
 fn es_orbita(url: &str) -> bool {
     url.starts_with(ORBITA) && !url.starts_with(SECURE)

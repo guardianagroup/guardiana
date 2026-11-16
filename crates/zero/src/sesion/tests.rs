@@ -5002,3 +5002,45 @@ fn cuanto_tarda_guardar_el_diario() {
         bytes.len() / 1024
     );
 }
+
+#[test]
+fn only_comunicaciones_gets_the_window_of_a_call_and_only_by_its_name() {
+    // Comunicaciones asks for it, by its name: the call's own window
+    assert!(es_ventana_llamada(
+        VENTANA_LLAMADA,
+        "https://guardianagroup.com/orbita/comunicaciones/"
+    ));
+    assert!(es_ventana_llamada(
+        "guardiana-flotante",
+        "https://guardianagroup.com/orbita/comunicaciones/?paso=crear#c"
+    ));
+    // the same name from another page, or another name from Comunicaciones: a tab, as always
+    for (nombre, pide) in [
+        ("guardiana-flotante", "https://guardianagroup.com/orbita/"),
+        (
+            "guardiana-flotante",
+            "https://guardianagroup.com.ejemplo.com/orbita/comunicaciones/",
+        ),
+        (
+            "guardiana-flotante",
+            "http://guardianagroup.com/orbita/comunicaciones/",
+        ),
+        (
+            "guardiana-flotante",
+            "https://ejemplo.com/orbita/comunicaciones/",
+        ),
+        ("guardiana-flotante", "about:blank"),
+        ("guardiana-flotante", ""),
+        ("", "https://guardianagroup.com/orbita/comunicaciones/"),
+        (
+            "_blank",
+            "https://guardianagroup.com/orbita/comunicaciones/",
+        ),
+        (
+            "Guardiana-Flotante",
+            "https://guardianagroup.com/orbita/comunicaciones/",
+        ),
+    ] {
+        assert!(!es_ventana_llamada(nombre, pide), "{nombre} desde {pide}");
+    }
+}

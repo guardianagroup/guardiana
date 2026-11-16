@@ -507,6 +507,9 @@ const GUION: &str = r#"(() => {
   /*<programa>*/
   if (!marco && programa && location.origin === 'https://guardianagroup.com') {
     marca('enPrograma');
+    // 1.0.60: this program opens the window of a call (sesion::VENTANA_LLAMADA) as a small window of its own, always in
+    // front; Comunicaciones asks for it only when it sees this mark (an older program would open it as a tab).
+    marca('ventanaLlamada');
     // 5 Nov 2026 (the VPN next to Windows' clock): with Órbita already open, its icon, its menu or one of its notices
     // (guardiana://vpn) only changes the address's fragment to #vpn, and the VPN's page opens on an arrival only; it
     // opens here as it would on arriving, the way the Antivirus opens on #escaner.
@@ -1652,6 +1655,8 @@ mod tests {
             "guardiana-panel-pide",
             "enPrograma",
             "enZero",
+            // 1.0.60: the window of a call, only for GUARDIANA's own web in the program
+            "ventanaLlamada",
             // 5 Nov 2026: Órbita on the VPN from the icon next to the clock
             "window.OrbitaVpn",
         ] {

@@ -31,7 +31,7 @@ use webview2_com::{
     HistoryChangedEventHandler, NavigationCompletedEventHandler, NavigationStartingEventHandler,
     NewWindowRequestedEventHandler, PermissionRequestedEventHandler, PrintToPdfCompletedHandler,
     ProcessFailedEventHandler, SourceChangedEventHandler, WebMessageReceivedEventHandler,
-    WebResourceRequestedEventHandler,
+    WebResourceRequestedEventHandler, WindowCloseRequestedEventHandler,
 };
 use windows::core::{w, Interface, BOOL, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{
@@ -43,9 +43,10 @@ use windows::Win32::Graphics::Dwm::{
 };
 use windows::Win32::Graphics::Gdi::{
     BeginPaint, CreateFontIndirectW, CreateSolidBrush, DeleteObject, DrawTextW, EndPaint, FillRect,
-    GetMonitorInfoW, InvalidateRect, MonitorFromWindow, SelectObject, SetBkMode, SetTextColor,
-    CLEARTYPE_QUALITY, DT_CENTER, DT_END_ELLIPSIS, DT_NOPREFIX, DT_RTLREADING, DT_SINGLELINE,
-    DT_VCENTER, HFONT, LOGFONTW, MONITORINFO, MONITOR_DEFAULTTONEAREST, PAINTSTRUCT, TRANSPARENT,
+    GetMonitorInfoW, InvalidateRect, MonitorFromRect, MonitorFromWindow, SelectObject, SetBkMode,
+    SetTextColor, CLEARTYPE_QUALITY, DT_CENTER, DT_END_ELLIPSIS, DT_NOPREFIX, DT_RTLREADING,
+    DT_SINGLELINE, DT_VCENTER, HFONT, LOGFONTW, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    MONITOR_DEFAULTTONULL, PAINTSTRUCT, TRANSPARENT,
 };
 use windows::Win32::System::Com::{
     CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED, STREAM_SEEK_END, STREAM_SEEK_SET,
@@ -58,7 +59,8 @@ use windows::Win32::System::Registry::{
 };
 use windows::Win32::System::Threading::{CreateMutexW, WaitForSingleObject};
 use windows::Win32::UI::HiDpi::{
-    GetDpiForWindow, SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+    AdjustWindowRectExForDpi, GetDpiForWindow, SetProcessDpiAwarenessContext,
+    DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState;
 use windows::Win32::UI::Shell::{
@@ -74,11 +76,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
     HWND_TOPMOST, ICON_BIG, ICON_SMALL, IDC_APPSTARTING, IDC_ARROW, LR_DEFAULTCOLOR,
     MB_ICONWARNING, MB_OK, MINMAXINFO, MSG, SIZE_MINIMIZED, SPI_GETWORKAREA, SWP_FRAMECHANGED,
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW,
-    SW_RESTORE, SW_SHOWMAXIMIZED, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
-    WDA_EXCLUDEFROMCAPTURE, WDA_MONITOR, WDA_NONE, WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA,
-    WM_DESTROY, WM_DPICHANGED, WM_GETMINMAXINFO, WM_MOVE, WM_MOVING, WM_PAINT, WM_SETFOCUS,
-    WM_SETICON, WM_SIZE, WM_TIMER, WNDCLASSEXW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
-    WS_OVERLAPPEDWINDOW, WS_POPUP,
+    SW_RESTORE, SW_SHOWMAXIMIZED, SW_SHOWNOACTIVATE, SW_SHOWNORMAL,
+    SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WDA_EXCLUDEFROMCAPTURE, WDA_MONITOR, WDA_NONE,
+    WINDOW_EX_STYLE, WM_APP, WM_CLOSE, WM_COPYDATA, WM_DESTROY, WM_DPICHANGED, WM_GETMINMAXINFO,
+    WM_MOVE, WM_MOVING, WM_PAINT, WM_SETFOCUS, WM_SETICON, WM_SIZE, WM_TIMER, WNDCLASSEXW,
+    WS_CAPTION, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_SYSMENU,
+    WS_THICKFRAME,
 };
 
 /// Before the session says otherwise (1.0.46, [`Orden::Marco`]): the browser's whole bar (top
@@ -88,6 +91,12 @@ const MARCO_INICIAL: (i32, i32) = (sesion::ALTO_ZERO, 0);
 const CLASE: PCWSTR = w!("GuardianaZeroVentana");
 /// «The session queued orders».
 const WM_ORDENES: u32 = WM_APP + 1;
+/// «Comunicaciones asked for the window of a call» (1.0.60; [`abre_ventana_llamada`]).
+const WM_LLAMADA: u32 = WM_APP + 2;
+/// The window of a call (1.0.60): its class.
+const CLASE_LLAMADA: PCWSTR = w!("GuardianaZeroLlamada");
+/// Whether that class is registered.
+static CLASE_LLAMADA_LISTA: AtomicBool = AtomicBool::new(false);
 /// The session's clock (batches, figures, saves).
 const TIC: usize = 1;
 /// The conversations' fast clock, only while a call is going on.
@@ -140,6 +149,14 @@ struct PestanaW {
     pendiente: Option<String>,
 }
 
+/// The window of a call (1.0.60; `sesion::VENTANA_LLAMADA`): a small window of its own with the view Comunicaciones
+/// fills, and the tab that asked for it.
+struct VentanaLlamada {
+    hwnd: HWND,
+    vista: Option<Vista>,
+    de: u32,
+}
+
 struct Colores {
     oscuro: bool,
     marco: COLORREF,
@@ -172,6 +189,15 @@ struct Vistas {
     /// Pages reloaded after their process failed: when, per tab (a page that keeps crashing
     /// is not reloaded forever).
     recargas: HashMap<u32, Vec<i64>>,
+    /// The window of a call, while it is open (1.0.60).
+    llamada: Option<VentanaLlamada>,
+    /// The window of a call Comunicaciones just asked for: the tab, and the engine's request, answered from the
+    /// window's own loop ([`WM_LLAMADA`]).
+    pide_llamada: Option<(
+        u32,
+        ICoreWebView2NewWindowRequestedEventArgs,
+        ICoreWebView2Deferral,
+    )>,
 }
 
 thread_local! {
@@ -181,6 +207,8 @@ thread_local! {
     static REGISTRO: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
     static DEPURA: bool = std::env::var_os("GUARDIANA_ZERO_DEPURA").is_some();
     static TIEMPOS: RefCell<Tiempos> = RefCell::new(Tiempos::default());
+    /// Where the person left the window of a call last time (1.0.60): it opens there again.
+    static SITIO_LLAMADA: RefCell<Option<RECT>> = const { RefCell::new(None) };
 }
 
 /// 1.0.55 («más rápido»), only with GUARDIANA_ZERO_DEPURA (the automatic tests): how long the window's own thread
@@ -863,6 +891,10 @@ fn ejecuta(o: Orden) {
             if con_vistas(|v| v.completa.is_some_and(|c| c.0 == id)) == Some(true) {
                 pantalla_completa(id, false);
             }
+            // the window of its call goes with it
+            if con_vistas(|v| v.llamada.as_ref().is_some_and(|l| l.de == id)) == Some(true) {
+                cierra_ventana_llamada();
+            }
             let (quitada, ventana) =
                 con_vistas(|v| (v.pestanas.remove(&id), v.ventanas.remove(&id)))
                     .unwrap_or((None, None));
@@ -1460,9 +1492,20 @@ fn crea_controlador(
     privada: bool,
     hecho: impl FnOnce(ICoreWebView2Controller) + 'static,
 ) -> windows::core::Result<()> {
-    let (entorno, h) = con_vistas(|v| (v.entorno.clone(), v.hwnd))
+    let h = con_vistas(|v| v.hwnd).ok_or_else(|| windows::core::Error::from(E_POINTER))?;
+    crea_controlador_en(h, perfil, privada, hecho)
+}
+
+/// A view in a window of its own (1.0.60, the window of a call); the same engine and profiles as the rest.
+fn crea_controlador_en(
+    h: HWND,
+    perfil: &str,
+    privada: bool,
+    hecho: impl FnOnce(ICoreWebView2Controller) + 'static,
+) -> windows::core::Result<()> {
+    let entorno = con_vistas(|v| v.entorno.clone())
+        .flatten()
         .ok_or_else(|| windows::core::Error::from(E_POINTER))?;
-    let entorno = entorno.ok_or_else(|| windows::core::Error::from(E_POINTER))?;
     unsafe {
         let e10: ICoreWebView2Environment10 = entorno.cast()?;
         let opciones = e10.CreateCoreWebView2ControllerOptions()?;
@@ -2117,10 +2160,26 @@ fn eventos_pestana(
         )?;
         web.add_NewWindowRequested(
             &NewWindowRequestedEventHandler::create(Box::new(
-                move |_w, args: Option<ICoreWebView2NewWindowRequestedEventArgs>| {
+                move |w: Option<ICoreWebView2>,
+                      args: Option<ICoreWebView2NewWindowRequestedEventArgs>| {
                     let Some(args) = args else {
                         return Ok(());
                     };
+                    // The window of a call (1.0.60): Comunicaciones asks for it by its name, also
+                    // without a click (it opens when the person leaves the call's tab). It is not
+                    // a tab: it is made from the window's own loop ([`abre_ventana_llamada`]).
+                    if pide_ventana_llamada(&args, w.as_ref()) {
+                        let aplazado = args.GetDeferral()?;
+                        let antes =
+                            con_vistas(|v| v.pide_llamada.replace((id, args.clone(), aplazado)))
+                                .flatten();
+                        if let Some((_, a, d)) = antes {
+                            let _ = a.SetHandled(true);
+                            let _ = d.Complete();
+                        }
+                        let _ = PostMessageW(Some(hwnd()), WM_LLAMADA, WPARAM(0), LPARAM(0));
+                        return Ok(());
+                    }
                     // Windows a page opens on its own (not from a click) are not opened: a page
                     // in the background cannot flood tabs or take the front one.
                     let mut persona = BOOL::default();
@@ -2475,6 +2534,10 @@ extern "system" fn proc_ventana(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
         | windows::Win32::UI::WindowsAndMessaging::WM_DISPLAYCHANGE => {
             reajusta_maximizada(h);
             unsafe { DefWindowProcW(h, msg, wp, lp) }
+        }
+        WM_LLAMADA => {
+            abre_ventana_llamada();
+            LRESULT(0)
         }
         WM_TIMER if wp.0 == TIC_LLAMADA => {
             encola(con_sesion(Sesion::tic_llamada).unwrap_or_default());
@@ -3045,6 +3108,8 @@ pub fn arranca() {
             borrar_pendiente: false,
             completa: None,
             recargas: HashMap::new(),
+            llamada: None,
+            pide_llamada: None,
         });
     });
     encola(iniciales);
@@ -3109,6 +3174,370 @@ fn version_en_marcha(marca: &std::path::Path, ventana: HWND) -> Option<(u32, u32
     // SAFETY: reads the owner process id of a window handle into a local.
     unsafe { GetWindowThreadProcessId(ventana, Some(std::ptr::addr_of_mut!(suyo))) };
     (suyo == pid).then_some(version)
+}
+
+// --- the window of a call (1.0.60) ---------------------------------------------------------------
+
+/// Whether a new window is the window of a call: Comunicaciones asking for it by its name
+/// (`sesion::VENTANA_LLAMADA`).
+fn pide_ventana_llamada(
+    args: &ICoreWebView2NewWindowRequestedEventArgs,
+    w: Option<&ICoreWebView2>,
+) -> bool {
+    let Ok(a2) = args.cast::<ICoreWebView2NewWindowRequestedEventArgs2>() else {
+        return false;
+    };
+    let nombre = texto_de(|p| unsafe { a2.Name(p) });
+    if nombre != sesion::VENTANA_LLAMADA {
+        return false;
+    }
+    let pide = w
+        .map(|w| texto_de(|p| unsafe { w.Source(p) }))
+        .unwrap_or_default();
+    sesion::es_ventana_llamada(&nombre, &pide)
+}
+
+/// The window of a call (1.0.60; the owner, 16 Nov 2026, 09:44: «tenemos que poder movernos por toda la web… y el
+/// programa de GUARDIANA, y nos tenemos que seguir viendo en pantalla… el cuadradito… lo tenemos que poder mover… por
+/// toda la zona de la pantalla»), as Comunicaciones asked for it: a small window of its own, always in front of
+/// everything (GUARDIANA's other tabs and any other program), without a button in the taskbar, out of screen
+/// captures like GUARDIANA's window during a conversation, and taken anywhere on the screen by its bar. It is not
+/// owned by GUARDIANA's window, so it stays when that one is minimised. Its view shares the session of the tab that
+/// asked, which keeps it as its opener and fills it with the call. One at a time.
+fn abre_ventana_llamada() {
+    let Some((de, args, aplazado)) = con_vistas(|v| v.pide_llamada.take()).flatten() else {
+        return;
+    };
+    cierra_ventana_llamada();
+    let perfil =
+        con_vistas(|v| v.pestanas.get(&de).map(|p| (p.perfil.clone(), p.privada))).flatten();
+    let Some((perfil, privada)) = perfil else {
+        rechaza_ventana(&args, &aplazado);
+        return;
+    };
+    let h = match crea_ventana_llamada() {
+        Ok(h) => h,
+        Err(e) => {
+            registra("ventana de la llamada", &e);
+            rechaza_ventana(&args, &aplazado);
+            return;
+        }
+    };
+    con_vistas(|v| {
+        v.llamada = Some(VentanaLlamada {
+            hwnd: h,
+            vista: None,
+            de,
+        });
+    });
+    let (args2, aplazado2) = (args.clone(), aplazado.clone());
+    let r = crea_controlador_en(h, &perfil, privada, move |c| {
+        let suya = con_vistas(|v| v.llamada.as_ref().is_some_and(|l| l.hwnd == h)).unwrap_or(false);
+        if !suya {
+            // Closed before its view existed.
+            let _ = unsafe { c.Close() };
+            rechaza_ventana(&args, &aplazado);
+            return;
+        }
+        match prepara_ventana_llamada(h, &c) {
+            Ok(web) => unsafe {
+                vale("ventana de la llamada", args.SetNewWindow(&web));
+                vale("ventana de la llamada", aplazado.Complete());
+            },
+            Err(e) => {
+                registra("ventana de la llamada", &e);
+                let _ = unsafe { c.Close() };
+                rechaza_ventana(&args, &aplazado);
+                cierra_ventana_llamada();
+            }
+        }
+    });
+    if let Err(e) = r {
+        registra("ventana de la llamada", &e);
+        rechaza_ventana(&args2, &aplazado2);
+        cierra_ventana_llamada();
+    }
+}
+
+/// A window a page asked for that will not open: the engine must not open its own instead.
+fn rechaza_ventana(
+    args: &ICoreWebView2NewWindowRequestedEventArgs,
+    aplazado: &ICoreWebView2Deferral,
+) {
+    unsafe {
+        let _ = args.SetHandled(true);
+        let _ = aplazado.Complete();
+    }
+}
+
+/// The window itself: 400 × 260 inside (at this screen's scale), with a thin dark bar to take it by and its ×.
+fn crea_ventana_llamada() -> windows::core::Result<HWND> {
+    unsafe {
+        let instancia: HINSTANCE = GetModuleHandleW(PCWSTR::null())?.into();
+        if !CLASE_LLAMADA_LISTA.swap(true, Ordering::SeqCst) {
+            let clase = WNDCLASSEXW {
+                cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+                lpfnWndProc: Some(proc_llamada),
+                hInstance: instancia,
+                hCursor: LoadCursorW(None, IDC_ARROW)?,
+                hbrBackground: CreateSolidBrush(COLORREF(0x000C_0806)),
+                lpszClassName: CLASE_LLAMADA,
+                hIcon: icono(32).unwrap_or_default(),
+                hIconSm: icono(16).unwrap_or_default(),
+                ..Default::default()
+            };
+            RegisterClassExW(&clase);
+        }
+        let principal = hwnd();
+        let s = escala(principal);
+        let estilo = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME;
+        let ex = WS_EX_TOPMOST | WS_EX_TOOLWINDOW;
+        let mut r = RECT {
+            left: 0,
+            top: 0,
+            right: px(400, s),
+            bottom: px(260, s),
+        };
+        let _ = AdjustWindowRectExForDpi(
+            &mut r,
+            estilo,
+            false,
+            ex,
+            GetDpiForWindow(principal).max(96),
+        );
+        let (x, y, ancho, alto) = sitio_llamada(principal, r.right - r.left, r.bottom - r.top, s);
+        let h = CreateWindowExW(
+            ex,
+            CLASE_LLAMADA,
+            w!("GUARDIANA"),
+            estilo,
+            x,
+            y,
+            ancho,
+            alto,
+            None,
+            None,
+            Some(instancia),
+            None,
+        )?;
+        marco_llamada(h);
+        let _ = oculta_a_capturas(h, true);
+        let _ = ShowWindow(h, SW_SHOWNOACTIVATE);
+        Ok(h)
+    }
+}
+
+/// Where the window of a call opens: where the person left it last time, if that place is still on a screen; if
+/// not, the bottom right corner of the work area of GUARDIANA's monitor.
+fn sitio_llamada(principal: HWND, ancho: i32, alto: i32, s: f64) -> (i32, i32, i32, i32) {
+    if let Some(r) = SITIO_LLAMADA.with(|x| *x.borrow()) {
+        let m = unsafe { MonitorFromRect(&r, MONITOR_DEFAULTTONULL) };
+        if !m.0.is_null() && r.right - r.left > 0 && r.bottom - r.top > 0 {
+            return (r.left, r.top, r.right - r.left, r.bottom - r.top);
+        }
+    }
+    let monitor = unsafe { MonitorFromWindow(principal, MONITOR_DEFAULTTONEAREST) };
+    let mut mi = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    if unsafe { GetMonitorInfoW(monitor, &mut mi) }.as_bool() {
+        let a = mi.rcWork;
+        return (
+            a.right - ancho - px(24, s),
+            a.bottom - alto - px(24, s),
+            ancho,
+            alto,
+        );
+    }
+    (px(40, s), px(40, s), ancho, alto)
+}
+
+/// Its bar: GUARDIANA's night (#06080C), with the name in GUARDIANA's white.
+fn marco_llamada(h: HWND) {
+    // SAFETY: plain attribute calls on our own window with pointers to locals that outlive them.
+    unsafe {
+        let oscuro = BOOL::from(true);
+        let _ = DwmSetWindowAttribute(
+            h,
+            DWMWA_USE_IMMERSIVE_DARK_MODE,
+            (&oscuro as *const BOOL).cast::<c_void>(),
+            std::mem::size_of::<BOOL>() as u32,
+        );
+        let fondo = COLORREF(0x000C_0806);
+        let _ = DwmSetWindowAttribute(
+            h,
+            DWMWA_CAPTION_COLOR,
+            (&fondo as *const COLORREF).cast::<c_void>(),
+            std::mem::size_of::<COLORREF>() as u32,
+        );
+        let texto = COLORREF(0x00F8_F6F4);
+        let _ = DwmSetWindowAttribute(
+            h,
+            DWMWA_TEXT_COLOR,
+            (&texto as *const COLORREF).cast::<c_void>(),
+            std::mem::size_of::<COLORREF>() as u32,
+        );
+    }
+}
+
+/// Its view: the blank page Comunicaciones fills, and nothing else (no other window opens from it and it never goes
+/// to another address); when the page closes it (the call ended, or the person is back on the call's tab), it goes.
+fn prepara_ventana_llamada(
+    h: HWND,
+    c: &ICoreWebView2Controller,
+) -> windows::core::Result<ICoreWebView2> {
+    let web = unsafe { c.CoreWebView2()? };
+    ajustes_comunes(&web, false)?;
+    color_fondo(
+        c,
+        COREWEBVIEW2_COLOR {
+            A: 255,
+            R: 6,
+            G: 8,
+            B: 12,
+        },
+    );
+    let mut t = 0i64;
+    unsafe {
+        web.add_NewWindowRequested(
+            &NewWindowRequestedEventHandler::create(Box::new(
+                |_w, args: Option<ICoreWebView2NewWindowRequestedEventArgs>| {
+                    if let Some(a) = args {
+                        a.SetHandled(true)?;
+                    }
+                    Ok(())
+                },
+            )),
+            &mut t,
+        )?;
+        web.add_NavigationStarting(
+            &NavigationStartingEventHandler::create(Box::new(
+                |_w, args: Option<ICoreWebView2NavigationStartingEventArgs>| {
+                    if let Some(a) = args {
+                        let url = texto_de(|p| a.Uri(p));
+                        if url != "about:blank" {
+                            a.SetCancel(true)?;
+                        }
+                    }
+                    Ok(())
+                },
+            )),
+            &mut t,
+        )?;
+        web.add_WindowCloseRequested(
+            &WindowCloseRequestedEventHandler::create(Box::new(move |_w, _a| {
+                let _ = PostMessageW(Some(h), WM_CLOSE, WPARAM(0), LPARAM(0));
+                Ok(())
+            })),
+            &mut t,
+        )?;
+        let mut r = RECT::default();
+        let _ = GetClientRect(h, &mut r);
+        c.SetBounds(r)?;
+        c.SetIsVisible(true)?;
+    }
+    con_vistas(|v| {
+        if let Some(l) = v.llamada.as_mut() {
+            if l.hwnd == h {
+                l.vista = Some(Vista {
+                    controlador: c.clone(),
+                    web: web.clone(),
+                });
+            }
+        }
+    });
+    Ok(web)
+}
+
+/// The view of the window of a call (taken out of the borrow before the engine is called).
+fn controlador_llamada(h: HWND) -> Option<ICoreWebView2Controller> {
+    con_vistas(|v| {
+        v.llamada
+            .as_ref()
+            .filter(|l| l.hwnd == h)
+            .and_then(|l| l.vista.as_ref().map(|x| x.controlador.clone()))
+    })
+    .flatten()
+}
+
+/// Closes the window of a call, if there is one: its place is kept for the next one, its view goes first (the page
+/// that asked sees it closed) and then the window.
+fn cierra_ventana_llamada() {
+    let Some(l) = con_vistas(|v| v.llamada.take()).flatten() else {
+        return;
+    };
+    let mut r = RECT::default();
+    if unsafe { GetWindowRect(l.hwnd, &mut r) }.is_ok() && !unsafe { IsIconic(l.hwnd) }.as_bool() {
+        SITIO_LLAMADA.with(|x| *x.borrow_mut() = Some(r));
+    }
+    if let Some(v) = l.vista {
+        vale("cerrar la ventana de la llamada", unsafe {
+            v.controlador.Close()
+        });
+    }
+    let _ = unsafe { DestroyWindow(l.hwnd) };
+}
+
+extern "system" fn proc_llamada(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
+    match msg {
+        WM_SIZE => {
+            if let Some(c) = controlador_llamada(h) {
+                let mut r = RECT::default();
+                unsafe {
+                    let _ = GetClientRect(h, &mut r);
+                    let _ = c.SetBounds(r);
+                }
+            }
+            LRESULT(0)
+        }
+        WM_MOVE | WM_MOVING => {
+            if let Some(c) = controlador_llamada(h) {
+                let _ = unsafe { c.NotifyParentWindowPositionChanged() };
+            }
+            unsafe { DefWindowProcW(h, msg, wp, lp) }
+        }
+        WM_DPICHANGED => {
+            let r = lp.0 as *const RECT;
+            if !r.is_null() {
+                let r = unsafe { *r };
+                let _ = unsafe {
+                    SetWindowPos(
+                        h,
+                        None,
+                        r.left,
+                        r.top,
+                        r.right - r.left,
+                        r.bottom - r.top,
+                        SWP_NOZORDER | SWP_NOACTIVATE,
+                    )
+                };
+            }
+            LRESULT(0)
+        }
+        WM_GETMINMAXINFO => {
+            let m = lp.0 as *mut MINMAXINFO;
+            if !m.is_null() {
+                let s = escala(h);
+                unsafe {
+                    (*m).ptMinTrackSize = POINT {
+                        x: px(240, s),
+                        y: px(170, s),
+                    };
+                }
+            }
+            LRESULT(0)
+        }
+        WM_CLOSE => {
+            if con_vistas(|v| v.llamada.as_ref().is_some_and(|l| l.hwnd == h)) == Some(true) {
+                cierra_ventana_llamada();
+            } else {
+                let _ = unsafe { DestroyWindow(h) };
+            }
+            LRESULT(0)
+        }
+        _ => unsafe { DefWindowProcW(h, msg, wp, lp) },
+    }
 }
 
 fn crea_ventana(col: &Colores) -> windows::core::Result<HWND> {
