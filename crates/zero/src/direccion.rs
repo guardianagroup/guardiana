@@ -201,9 +201,13 @@ mod tests {
         // 15 Nov 2026 (the owner): only Google, Brave and DuckDuckGo, in that order.
         let ids: Vec<&str> = BUSCADORES.iter().map(|b| b.id).collect();
         assert_eq!(ids, ["google", "brave", "duckduckgo"]);
-        // An engine chosen before 1.0.58 and gone since goes back to the default.
-        for viejo in ["bing", "qwant", "startpage", "yandex"] {
-            assert_eq!(buscador(viejo).id, POR_DEFECTO);
+        // An engine chosen before 1.0.58 and gone since: the private ones go on with a private one (DuckDuckGo,
+        // second voice of the 1.0.58); any other unknown name goes back to the default.
+        for viejo in ["qwant", "startpage"] {
+            assert_eq!(buscador(viejo).id, "duckduckgo");
+        }
+        for otro in ["bing", "yandex"] {
+            assert_eq!(buscador(otro).id, POR_DEFECTO);
         }
         // Nothing that claims the Tor network: this browser cannot reach it.
         assert!(BUSCADORES
