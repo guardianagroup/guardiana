@@ -589,10 +589,12 @@ unsafe fn portada(texto: &str) {
         ..Default::default()
     };
     RegisterClassExW(&clase);
-    let Ok(h) = CreateWindowExW(
-        WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+    // Owned by a hidden window of its own: never the program's main window for Windows (the one a
+    // tool or the X of the taskbar closes), which stays ZERO's.
+    let Ok(dueno) = CreateWindowExW(
+        WINDOW_EX_STYLE(0),
         CLASE_PORTADA,
-        w!("GUARDIANA"),
+        PCWSTR::null(),
         WS_POPUP,
         0,
         0,
@@ -603,6 +605,23 @@ unsafe fn portada(texto: &str) {
         Some(instancia),
         None,
     ) else {
+        return;
+    };
+    let Ok(h) = CreateWindowExW(
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+        CLASE_PORTADA,
+        w!("GUARDIANA"),
+        WS_POPUP,
+        0,
+        0,
+        0,
+        0,
+        Some(dueno),
+        None,
+        Some(instancia),
+        None,
+    ) else {
+        let _ = DestroyWindow(dueno);
         return;
     };
     PORTADA.store(h.0 as isize, Ordering::SeqCst);
@@ -654,7 +673,8 @@ extern "system" fn proc_portada(h: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LR
             unsafe { pinta_portada(h) };
             LRESULT(0)
         }
-        WM_DESTROY => {
+        // the window with the line, not its hidden owner, ends the thread
+        WM_DESTROY if h.0 as isize == PORTADA.load(Ordering::SeqCst) => {
             unsafe { PostQuitMessage(0) };
             LRESULT(0)
         }
