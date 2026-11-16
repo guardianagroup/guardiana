@@ -120,6 +120,13 @@ const GPC: &str = r#"(() => {
 /// pressed when it appears (never a jump: second review). Not in YouTube Studio. YouTube changes
 /// how it serves them: an advert can get through. Nothing is sent anywhere; the person turns it
 /// off in ZERO's settings.
+/// 1.0.60 (the owner, 16 Nov 2026, 09:47–09:52: «los anuncios salen al principio del vídeo»): the
+/// answers of the player, the watch page and a list are also cleaned when read as text (`fetch`'s
+/// `.text()` and the request's own reply, `XMLHttpRequest`): the names of their advertising change
+/// to one the player does not know. A new empty frame gets the page's own `fetch`, so a clean one
+/// taken from it does not skip this. The Shorts marked as adverts leave their list, and an advert
+/// stitched into the video by YouTube (its player says «SSAP, AD») ends through the player at the
+/// end of its own part, never of the video.
 const YOUTUBE: &str = r#"(() => {
   'use strict';
   // YouTube's own sites where its videos play; never YouTube Studio, where creators manage their adverts (second review)
@@ -131,16 +138,58 @@ const YOUTUBE: &str = r#"(() => {
     const m = x.auxiliaryUi && x.auxiliaryUi.messageRenderers;
     if (m && m.enforcementMessageViewModel) { try { delete m.enforcementMessageViewModel; } catch (_) {} }
   };
+  // 1.0.60: the adverts among the Shorts (a Short marked as an advert) leave the list
+  const cortos = (x) => {
+    if (!x || !Array.isArray(x.entries)) return;
+    try { x.entries = x.entries.filter((e) => !(e && e.command && e.command.reelWatchEndpoint && e.command.reelWatchEndpoint.adClientParams && e.command.reelWatchEndpoint.adClientParams.isAd)); } catch (_) {}
+  };
   const poda = (o) => {
     try {
       if (!o || typeof o !== 'object') return o;
-      const una = (x) => { if (!x || typeof x !== 'object') return; quita(x); quita(x.playerResponse); if (x.response) quita(x.response.playerResponse); };
+      const una = (x) => { if (!x || typeof x !== 'object') return; quita(x); quita(x.playerResponse); if (x.response) quita(x.response.playerResponse); cortos(x); };
       if (Array.isArray(o)) { for (const e of o) una(e); } else una(o);
     } catch (_) {}
     return o;
   };
   try { const p = JSON.parse; JSON.parse = new Proxy(p, { apply: (f, yo, a) => poda(Reflect.apply(f, yo, a)) }); } catch (_) {}
   try { const j = Response.prototype.json; Response.prototype.json = new Proxy(j, { apply: (f, yo, a) => Reflect.apply(f, yo, a).then(poda) }); } catch (_) {}
+  // 1.0.60 (the owner, 16 Nov 2026, 09:47–09:52: the adverts still came before the video). The answers of the player, of the
+  // watch page and of a list also arrive as plain text, read with a parser of another page or as the request's own reply: the
+  // names of their advertising change to one the player does not know, so it plays none (as the blockers did on 16 Nov 2026).
+  const RESPUESTA = /\/youtubei\/v1\/(player|get_watch|next)\b|\/watch\?|\/playlist\?list=/;
+  const limpia = (t) => (typeof t === 'string' ? t.replace(/"(adPlacements|adSlots|playerAds)"/g, '"no_ads"') : t);
+  try {
+    const t = Response.prototype.text;
+    Response.prototype.text = new Proxy(t, { apply: (f, yo, a) => Reflect.apply(f, yo, a).then((x) => { try { return RESPUESTA.test(String((yo && yo.url) || '')) ? limpia(x) : x; } catch (_) { return x; } }) });
+  } catch (_) {}
+  try {
+    if (typeof XMLHttpRequest === 'function') {
+      const X = XMLHttpRequest.prototype, donde = new WeakMap();
+      const abre = X.open;
+      X.open = new Proxy(abre, { apply: (f, yo, a) => { try { donde.set(yo, String(a[1] || '')); } catch (_) {} return Reflect.apply(f, yo, a); } });
+      for (const k of ['responseText', 'response']) {
+        const d = Object.getOwnPropertyDescriptor(X, k); if (!d || typeof d.get !== 'function') continue;
+        Object.defineProperty(X, k, { configurable: true, enumerable: d.enumerable, get: new Proxy(d.get, { apply: (f, yo, a) => {
+          const v = Reflect.apply(f, yo, a);
+          try { if (!RESPUESTA.test(donde.get(yo) || '')) return v; return typeof v === 'string' ? limpia(v) : poda(v); } catch (_) { return v; }
+        } }) });
+      }
+    }
+  } catch (_) {}
+  // 1.0.60: a page that takes a clean «fetch» from a new empty frame gets this page's own instead, so the above still applies
+  try {
+    if (typeof Node === 'function') {
+      const pega = Node.prototype.appendChild;
+      Node.prototype.appendChild = new Proxy(pega, { apply: (f, yo, a) => {
+        const r = Reflect.apply(f, yo, a);
+        try {
+          const e = a[0], w = e && e.tagName === 'IFRAME' ? e.contentWindow : null;
+          if (w && (w.location.href === 'about:blank' || w.location.href === location.href)) { w.fetch = window.fetch; w.Request = window.Request; }
+        } catch (_) {}
+        return r;
+      } });
+    }
+  } catch (_) {}
   for (const n of ['ytInitialPlayerResponse', 'playerResponse']) {
     try { let v; Object.defineProperty(window, n, { configurable: true, enumerable: true, get: () => v, set: (x) => { v = poda(x); } }); } catch (_) {}
   }
@@ -156,7 +205,9 @@ const YOUTUBE: &str = r#"(() => {
   };
   if (document.documentElement) pon(); else document.addEventListener('readystatechange', pon, { once: true });
   // an advert that still starts: muted and fast while it lasts, never a jump to its end (an advert stitched into the
-  // video would take the video with it), and «Saltar» when it appears; the sound and the speed come back after it
+  // video would take the video with it), and «Saltar» when it appears; the sound and the speed come back after it.
+  // 1.0.60: an advert YouTube stitches into the video itself (its player says «SSAP, AD») ends where its own part ends,
+  // through the player (only that part: the video goes on from where it was).
   let antes = null;
   setInterval(() => {
     const r = document.querySelector('.html5-video-player'); const v = r && r.querySelector('video'); if (!v) return;
@@ -168,6 +219,14 @@ const YOUTUBE: &str = r#"(() => {
       try { v.muted = antes.muted; v.playbackRate = antes.rate; } catch (_) {}
       antes = null;
     }
+    try {
+      const j = document.getElementById ? document.getElementById('movie_player') : null;
+      const e = j && typeof j.getStatsForNerds === 'function' ? j.getStatsForNerds() : null;
+      if (e && typeof e.debug_info === 'string' && e.debug_info.startsWith('SSAP, AD') && typeof j.getProgressState === 'function' && typeof j.seekTo === 'function') {
+        const p = j.getProgressState();
+        if (p && p.duration > 0 && p.duration - p.current > 0.5) j.seekTo(p.duration);
+      }
+    } catch (_) {}
   }, 400);
 })();"#;
 
@@ -1845,10 +1904,13 @@ console.log('bien');
 let fallos = 0; const ok = (c, t) => { if (!c) { fallos++; console.log('FALLO ' + t); } };
 function entorno(host) {
   let tic = null;
-  const g = { location: { hostname: host }, JSON: { parse: JSON.parse, stringify: JSON.stringify },
-    Response: class { constructor(b) { this.b = b; } json() { return Promise.resolve(JSON.parse(this.b)); } },
-    document: { documentElement: {}, adoptedStyleSheets: [], querySelector: () => null, createElement: () => ({}), addEventListener() {} },
-    CSSStyleSheet: class { replaceSync() {} }, setInterval: (f) => { tic = f; return 1; }, Object, Array, Number, Proxy, Reflect, Promise };
+  class Xhr { open(m, u) { this.u = u; } get responseText() { return this.texto; } get response() { return this.responseType === 'json' ? JSON.parse(this.texto) : this.texto; } }
+  class Nodo { appendChild(e) { return e; } }
+  const g = { location: { hostname: host, href: 'https://' + host + '/watch?v=x' }, JSON: { parse: JSON.parse, stringify: JSON.stringify },
+    Response: class { constructor(b, u) { this.b = b; this.url = u || ''; } json() { return Promise.resolve(JSON.parse(this.b)); } text() { return Promise.resolve(this.b); } },
+    XMLHttpRequest: Xhr, Node: Nodo, fetch: () => 'fetch de la página', Request: function Request() {}, WeakMap,
+    document: { documentElement: {}, adoptedStyleSheets: [], querySelector: () => null, getElementById: () => null, createElement: () => ({}), addEventListener() {} },
+    CSSStyleSheet: class { replaceSync() {} }, setInterval: (f) => { tic = f; return 1; }, Object, Array, Number, Proxy, Reflect, Promise, String, RegExp };
   g.window = g;
   new Function(...Object.keys(g), YT)(...Object.values(g));
   g.tic = () => tic && tic();
@@ -1875,6 +1937,39 @@ function entorno(host) {
   ok(v.muted === true && v.playbackRate === 16 && v.currentTime === 30 && saltar === 1, 'anuncio: mudo y rápido, sin saltar el vídeo');
   clases.delete('ad-showing'); y2.tic();
   ok(v.muted === false && v.playbackRate === 1.25, 'después: el sonido y la velocidad de antes');
+  // 1.0.60: the answers read as text, by fetch and by the request's own reply
+  const y3 = entorno('www.youtube.com');
+  const crudo = JSON.stringify({ adPlacements: [1], adSlots: [2], playerAds: [3], videoDetails: { title: 'v' } });
+  const tx = await new y3.Response(crudo, 'https://www.youtube.com/youtubei/v1/player?prettyPrint=false').text();
+  ok(!/adPlacements|adSlots|playerAds/.test(tx) && JSON.parse(tx).videoDetails.title === 'v', 'fetch text del reproductor');
+  ok((await new y3.Response(crudo, 'https://www.youtube.com/youtubei/v1/browse').text()) === crudo, 'fetch text de otra cosa: tal cual');
+  ok(!/adSlots/.test(await new y3.Response(crudo, 'https://www.youtube.com/youtubei/v1/get_watch?x=1').text()), 'fetch text de get_watch');
+  const x = new y3.XMLHttpRequest(); x.open('POST', '/youtubei/v1/player?key=1'); x.texto = crudo;
+  ok(!/adPlacements/.test(x.responseText) && JSON.parse(x.responseText).videoDetails.title === 'v', 'xhr texto');
+  x.responseType = 'json';
+  ok(!('adPlacements' in x.response) && x.response.videoDetails.title === 'v', 'xhr json');
+  const x2 = new y3.XMLHttpRequest(); x2.open('GET', '/api/stats/atr'); x2.texto = crudo;
+  ok(x2.responseText === crudo, 'xhr de otra cosa: tal cual');
+  // a new empty frame gets the page's own fetch
+  const marco = { tagName: 'IFRAME', contentWindow: { location: { href: 'about:blank' }, fetch: 'limpio', Request: 'limpio' } };
+  new y3.Node().appendChild(marco);
+  ok(marco.contentWindow.fetch === y3.fetch && marco.contentWindow.Request === y3.Request, 'marco vacío: el fetch de la página');
+  const otro = { tagName: 'IFRAME', contentWindow: { location: { href: 'https://www.ejemplo.com/' }, fetch: 'suyo' } };
+  new y3.Node().appendChild(otro);
+  ok(otro.contentWindow.fetch === 'suyo', 'marco de otra web: sin tocar');
+  // the Shorts marked as adverts
+  const sh = y3.JSON.parse(JSON.stringify({ entries: [{ command: { reelWatchEndpoint: { videoId: 'a' } } }, { command: { reelWatchEndpoint: { videoId: 'b', adClientParams: { isAd: true } } } }] }));
+  ok(sh.entries.length === 1 && sh.entries[0].command.reelWatchEndpoint.videoId === 'a', 'shorts sin anuncios');
+  // an advert stitched into the video: to the end of its own part, through the player
+  let fue = null, info = 'SSAP, AD (1 de 1)';
+  const mp = { getStatsForNerds: () => ({ debug_info: info }), getProgressState: () => ({ current: 3, duration: 15 }), seekTo: (t) => { fue = t; } };
+  const v4 = { muted: false, playbackRate: 1 };
+  const j4 = { classList: { contains: () => false }, querySelector: (s) => (s === 'video' ? v4 : null) };
+  const y4 = entorno('www.youtube.com'); y4.document.querySelector = (s) => (s === '.html5-video-player' ? j4 : null); y4.document.getElementById = (i) => (i === 'movie_player' ? mp : null);
+  y4.tic();
+  ok(fue === 15, 'anuncio cosido: al final de su parte', fue);
+  fue = null; info = 'SSAP, CONTENT'; y4.tic();
+  ok(fue === null, 'el vídeo: sin tocar');
   console.log(fallos ? 'fallos ' + fallos : 'bien');
 })();
 "#;
