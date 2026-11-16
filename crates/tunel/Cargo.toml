@@ -15,7 +15,7 @@ serde_json = { workspace = true }
 base64 = { workspace = true }
 getrandom = { workspace = true }
 zeroize = { workspace = true }
-# WireGuard's Curve25519 keys (x25519-dalek, already in the tree through vodozemac).
+# WireGuard's Curve25519 keys (x25519-dalek, the workspace's version).
 x25519-dalek = { workspace = true }
 # The post-quantum half of the tunnel's preshared key (ML-KEM-768, FIPS 203), as in guardiana-secure.
 ml-kem = { workspace = true }

@@ -21,7 +21,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.0.57"
+version = "1.0.58"
 edition = "2021"
 rust-version = "1.89" # rusqlite 0.41 and vodozemac 0.11 need 1.89
 license = "GPL-3.0-or-later"
@@ -118,15 +118,16 @@ qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 # 0.11.2 (15 Nov 2026): fixes RUSTSEC-2026-0451 (the Olm root key ratchet left root and chain keys in freed memory),
 # RUSTSEC-2026-0510 (a panic decoding malformed Ed25519 keys from Base64) and RUSTSEC-2026-0445 (0.11.0 and 0.11.1).
 vodozemac = "0.11.2"
-# XChaCha20-Poly1305 for SECURE's files in blocks (vodozemac 0.11 brings 0.11 of it; this one stays on 0.10 until
-# archivo.rs is moved to the new aead API).
+# XChaCha20-Poly1305 for SECURE's files in blocks, its media frames and the antivirus quarantine. Stays on 0.10 for now;
+# vodozemac 0.11 carries its own 0.11 inside, a second copy until this code moves to the new aead API.
 chacha20poly1305 = "0.10"
 # ML-KEM-768 (FIPS 203), RustCrypto: the post-quantum lock over Olm (16 Oct 2026).
 ml-kem = { version = "0.3.2", features = ["getrandom", "zeroize"] }
 # zeroize: overwrite keys with zeros when they are dropped (the delivery room, 18 Oct 2026);
 # already in the tree through ml-kem and vodozemac, same version.
 zeroize = "1"
-# x25519-dalek: the VPN's WireGuard keys (guardiana-tunel). Already in the tree through vodozemac, at this version;
+# x25519-dalek: the VPN's WireGuard keys (guardiana-tunel). vodozemac 0.11 carries its own 3.0 inside; this one stays
+# on 2.0.1 until the VPN is moved and tested on it;
 # `static_secrets` keeps the computer's key between runs, as WireGuard needs.
 x25519-dalek = { version = "2.0.1", features = ["static_secrets"] }
 
