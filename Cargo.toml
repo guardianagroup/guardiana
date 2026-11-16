@@ -23,7 +23,7 @@ members = [
 [workspace.package]
 version = "1.0.57"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.89" # rusqlite 0.41 and vodozemac 0.11 need 1.89
 license = "GPL-3.0-or-later"
 repository = "https://github.com/guardianagroup/guardiana"
 homepage = "https://guardianagroup.com"
@@ -66,7 +66,9 @@ ring = "0.17"
 base64 = "0.23"
 # SQLite for the ledger (brief §3). `bundled` compiles SQLite in so every
 # install carries the same, known version instead of whatever the OS ships.
-rusqlite = { version = "0.40", features = ["bundled"] }
+# 0.41 (15 Nov 2026): libsqlite3-sys 0.39 bundles SQLite 3.54, which fixes RUSTSEC-2026-0459 (CVE-2026-119375: a database
+# opened with a -wal file of another page size could return uninitialised page-cache memory).
+rusqlite = { version = "0.41", features = ["bundled"] }
 # SHA-256 for the hash chain: row_hash = sha256(prev_hash || fields) (brief §3).
 sha2 = "0.11"
 # JSON export, `signals_json` column and every on-disk/JSON structure (brief §3, §8).
@@ -113,8 +115,11 @@ qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 # Only guardiana-secure may depend on it. The DNS service must not.
 # SessionConfig::version_1 is the Olm that Matrix deploys. Version 2 is experimental
 # and is not enabled.
-vodozemac = "0.10"
-# XChaCha20-Poly1305 for SECURE's files in blocks; already in the tree via vodozemac.
+# 0.11.2 (15 Nov 2026): fixes RUSTSEC-2026-0451 (the Olm root key ratchet left root and chain keys in freed memory),
+# RUSTSEC-2026-0510 (a panic decoding malformed Ed25519 keys from Base64) and RUSTSEC-2026-0445 (0.11.0 and 0.11.1).
+vodozemac = "0.11.2"
+# XChaCha20-Poly1305 for SECURE's files in blocks (vodozemac 0.11 brings 0.11 of it; this one stays on 0.10 until
+# archivo.rs is moved to the new aead API).
 chacha20poly1305 = "0.10"
 # ML-KEM-768 (FIPS 203), RustCrypto: the post-quantum lock over Olm (16 Oct 2026).
 ml-kem = { version = "0.3.2", features = ["getrandom", "zeroize"] }
