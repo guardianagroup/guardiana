@@ -201,6 +201,8 @@
   "cookies_ajuste_explica": "On the notices of the most used cookie managers (OneTrust, Cookiebot, Didomi and others), GUARDIANA ZERO presses “Reject all”. If the notice has no such button, it hides it without accepting anything. The rest of the page is left alone.",
   "emergentes_ajuste": "Remove pop-ups",
   "emergentes_ajuste_explica": "Does not open the windows a page opens on its own or when you click anywhere on it, nor those that lead to advertising or tracking. Closes the boxes a page puts on top without you asking (newsletters, “turn on notifications”, “get the app”) and says “no” to pages that ask to send you notifications before you have pressed anything. If a window you wanted did not open, the shield lets you open it.",
+  "youtube_ajuste": "Remove YouTube ads",
+  "youtube_ajuste_explica": "Removes the ads from YouTube’s videos and pages. If YouTube changes how it shows them, one may get through until the next version of ZERO. Applies to the tabs you open from now on.",
   "cookies_rechazado": "Cookie notice rejected ({gestor})",
   "cookies_escondido": "Cookie notice hidden, nothing accepted ({gestor})",
   "emergentes_no_abiertas": "{n} pop-up windows not opened",

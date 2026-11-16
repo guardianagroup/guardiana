@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "よく使われる Cookie 管理ツール（OneTrust、Cookiebot、Didomi など）の通知では、GUARDIANA ZERO が «すべて拒否» を選びます。そのボタンがない場合は、何も承諾せずに通知を隠します。ページのほかの部分には手を加えません。",
   "emergentes_ajuste": "ポップアップウィンドウを除去",
   "emergentes_ajuste_explica": "ページが勝手に開くウィンドウや、どこかをクリックしたときに開くウィンドウ、広告や追跡につながるウィンドウは開きません。頼んでいないのにページが上に重ねるウィンドウ（ニュースレター、«通知をオンにする»、«アプリをダウンロード»）を閉じ、何もクリックしていないのに通知の送信を求めるページには «いいえ» と答えます。開きたかったウィンドウが開かなかった場合は、シールドから開けます。",
+  "youtube_ajuste": "YouTube の広告を消す",
+  "youtube_ajuste_explica": "YouTube の動画とページから広告を取り除きます。YouTube が表示方法を変えると、次の ZERO のバージョンまで広告が出ることがあります。これから開くタブに適用されます。",
   "cookies_rechazado": "Cookie 通知を拒否しました（{gestor}）",
   "cookies_escondido": "何も承諾せずに Cookie 通知を隠しました（{gestor}）",
   "emergentes_no_abiertas": "開かなかったポップアップウィンドウ {n} 件",

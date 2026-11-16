@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "V oznámeních nejpoužívanějších správců cookies (OneTrust, Cookiebot, Didomi a další) zvolí GUARDIANA ZERO «Odmítnout vše». Pokud oznámení takové tlačítko nemá, skryje ho, aniž by cokoli přijal. Zbytku stránky se nedotkne.",
   "emergentes_ajuste": "Odstraňovat vyskakovací okna",
   "emergentes_ajuste_explica": "Neotevírá okna, která stránka otevře sama nebo po kliknutí kamkoli, ani ta, která vedou k reklamě nebo sledování. Zavírá okna, která stránka bez vyžádání zobrazí navrch (newslettery, «zapni oznámení», «stáhni si aplikaci»), a říká «ne» stránkám, které chtějí posílat oznámení, aniž by došlo k jakémukoli kliknutí. Pokud se neotevřelo okno, o které stojíš, štít ti ho dovolí otevřít.",
+  "youtube_ajuste": "Odstranit reklamy na YouTube",
+  "youtube_ajuste_explica": "Odstraňuje reklamy z videí a stránek YouTube. Pokud YouTube změní způsob jejich zobrazování, může nějaká proklouznout až do další verze ZERO. Platí pro karty otevřené od teď.",
   "cookies_rechazado": "Oznámení o cookies odmítnuto ({gestor})",
   "cookies_escondido": "Oznámení o cookies skryto bez přijetí čehokoli ({gestor})",
   "emergentes_no_abiertas": "Neotevřená vyskakovací okna: {n}",

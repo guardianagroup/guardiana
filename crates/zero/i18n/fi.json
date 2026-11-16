@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "Yleisimpien evästeiden hallintatyökalujen (OneTrust, Cookiebot, Didomi ja muut) ilmoituksissa GUARDIANA ZERO valitsee «Hylkää kaikki». Jos ilmoituksessa ei ole tätä painiketta, se piilottaa ilmoituksen hyväksymättä mitään. Muuhun sivuun ei kosketa.",
   "emergentes_ajuste": "Poista ponnahdusikkunat",
   "emergentes_ajuste_explica": "Ei avaa ikkunoita, jotka sivu avaa itsestään tai kun napsautat mitä tahansa kohtaa, eikä ikkunoita, jotka vievät mainontaan tai seurantaan. Sulkee ikkunat, jotka sivu nostaa päälle pyytämättäsi (uutiskirjeet, «ota ilmoitukset käyttöön», «lataa sovellus»), ja vastaa «ei» sivuille, jotka pyytävät lupaa lähettää sinulle ilmoituksia, vaikka et ole napsauttanut mitään. Jos haluamasi ikkuna ei avautunut, voit avata sen suojakilvestä.",
+  "youtube_ajuste": "Poista YouTuben mainokset",
+  "youtube_ajuste_explica": "Poistaa mainokset YouTuben videoista ja sivuilta. Jos YouTube muuttaa tapaa, jolla se näyttää ne, jokin voi päästä läpi ZERO-selaimen seuraavaan versioon asti. Koskee välilehtiä, jotka avaat tästä eteenpäin.",
   "cookies_rechazado": "Evästeilmoitus hylätty ({gestor})",
   "cookies_escondido": "Evästeilmoitus piilotettu hyväksymättä mitään ({gestor})",
   "emergentes_no_abiertas": "{n} ponnahdusikkunaa jätetty avaamatta",

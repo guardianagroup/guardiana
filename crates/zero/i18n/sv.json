@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "I meddelandena från de vanligaste cookiehanterarna (OneTrust, Cookiebot, Didomi med flera) väljer GUARDIANA ZERO «Avvisa alla». Om meddelandet inte har den knappen döljs det utan att något godkänns. Resten av sidan rörs inte.",
   "emergentes_ajuste": "Ta bort popup-fönster",
   "emergentes_ajuste_explica": "Öppnar inte fönster som en sida öppnar av sig själv eller när du klickar var som helst, och inte heller sådana som leder till reklam eller spårning. Stänger fönster som sidan lägger ovanpå utan att du har bett om dem (nyhetsbrev, «aktivera aviseringar», «ladda ned appen») och säger «nej» till sidor som vill skicka aviseringar till dig utan att du har klickat på något. Om ett fönster som du ville ha inte öppnades kan du öppna det via skölden.",
+  "youtube_ajuste": "Ta bort reklam på YouTube",
+  "youtube_ajuste_explica": "Tar bort reklamen från YouTubes videor och sidor. Om YouTube ändrar hur de visas kan någon slinka igenom fram till nästa version av ZERO. Gäller flikar som du öppnar från och med nu.",
   "cookies_rechazado": "Cookie-meddelande avvisat ({gestor})",
   "cookies_escondido": "Cookie-meddelande dolt utan att något godkändes ({gestor})",
   "emergentes_no_abiertas": "{n} popup-fönster som inte öppnades",

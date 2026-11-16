@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "En çok kullanılan çerez yöneticilerinin uyarılarında (OneTrust, Cookiebot, Didomi ve diğerleri) GUARDIANA ZERO «Tümünü reddet» seçeneğini seçer. Uyarıda bu düğme yoksa hiçbir şey kabul etmeden onu gizler. Sayfanın geri kalanına dokunulmaz.",
   "emergentes_ajuste": "Açılır pencereleri kaldır",
   "emergentes_ajuste_explica": "Bir sayfanın kendiliğinden ya da herhangi bir yere tıkladığında açtığı pencereleri ve reklama veya takibe götürenleri açmaz. Sayfanın sen istemeden üste koyduğu pencereleri (bültenler, «bildirimleri aç», «uygulamayı indir») kapatır ve sen hiçbir şeye tıklamadan sana bildirim göndermeyi isteyen sayfalara «hayır» der. İstediğin bir pencere açılmadıysa kalkan onu açmana izin verir.",
+  "youtube_ajuste": "YouTube reklamlarını kaldır",
+  "youtube_ajuste_explica": "YouTube videolarındaki ve sayfalarındaki reklamları kaldırır. YouTube bunları gösterme biçimini değiştirirse ZERO’nun bir sonraki sürümüne kadar bazıları görünebilir. Bundan sonra açtığınız sekmeler için geçerlidir.",
   "cookies_rechazado": "Çerez uyarısı reddedildi ({gestor})",
   "cookies_escondido": "Çerez uyarısı hiçbir şey kabul edilmeden gizlendi ({gestor})",
   "emergentes_no_abiertas": "{n} açılır pencere açılmadı",

@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "Negli avvisi dei gestori di cookie più usati (OneTrust, Cookiebot, Didomi e altri), GUARDIANA ZERO sceglie «Rifiuta tutto». Se l’avviso non ha quel pulsante, lo nasconde senza accettare nulla. Il resto della pagina non viene toccato.",
   "emergentes_ajuste": "Elimina le finestre pop-up",
   "emergentes_ajuste_explica": "Non apre le finestre che una pagina apre da sola o quando fai clic in un punto qualsiasi, né quelle che portano a pubblicità o tracciamento. Chiude le finestre che la pagina mette sopra senza che tu le chieda (newsletter, «attiva le notifiche», «scarica l’app») e dice «no» alle pagine che chiedono di inviarti notifiche senza che tu abbia fatto clic su nulla. Se una finestra che volevi non si è aperta, lo scudo ti permette di aprirla.",
+  "youtube_ajuste": "Rimuovi la pubblicità di YouTube",
+  "youtube_ajuste_explica": "Rimuove gli annunci dai video e dalle pagine di YouTube. Se YouTube cambia il modo in cui li mostra, qualche annuncio può passare fino alla prossima versione di ZERO. Vale per le schede che apri da ora in poi.",
   "cookies_rechazado": "Avviso sui cookie rifiutato ({gestor})",
   "cookies_escondido": "Avviso sui cookie nascosto senza accettare nulla ({gestor})",
   "emergentes_no_abiertas": "{n} finestre pop-up non aperte",

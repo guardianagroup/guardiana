@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "W komunikatach najpopularniejszych menedżerów plików cookie (OneTrust, Cookiebot, Didomi i inne) GUARDIANA ZERO wybiera «Odrzuć wszystkie». Jeśli komunikat nie ma takiego przycisku, ukrywa go, niczego nie akceptując. Reszta strony pozostaje nietknięta.",
   "emergentes_ajuste": "Usuwaj wyskakujące okna",
   "emergentes_ajuste_explica": "Nie otwiera okien, które strona otwiera sama lub po kliknięciu w dowolnym miejscu, ani tych prowadzących do reklam lub śledzenia. Zamyka okna, które strona nakłada bez twojej prośby (newslettery, «włącz powiadomienia», «pobierz aplikację»), i mówi «nie» stronom, które proszą o wysyłanie ci powiadomień, zanim cokolwiek klikniesz. Jeśli potrzebne okno się nie otworzyło, tarcza pozwoli ci je otworzyć.",
+  "youtube_ajuste": "Usuwaj reklamy z YouTube",
+  "youtube_ajuste_explica": "Usuwa reklamy z filmów i stron YouTube. Jeśli YouTube zmieni sposób ich wyświetlania, jakaś może się przedostać do następnej wersji ZERO. Dotyczy kart otwieranych od teraz.",
   "cookies_rechazado": "Komunikat o plikach cookie odrzucony ({gestor})",
   "cookies_escondido": "Komunikat o plikach cookie ukryty bez akceptowania czegokolwiek ({gestor})",
   "emergentes_no_abiertas": "nieotwarte wyskakujące okna: {n}",

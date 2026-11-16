@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "Bei den Hinweisen der meistgenutzten Cookie-Verwaltungen (OneTrust, Cookiebot, Didomi und andere) wählt GUARDIANA ZERO „Alle ablehnen“. Wenn der Hinweis diese Schaltfläche nicht hat, blendet es ihn aus, ohne etwas zu akzeptieren. Der Rest der Seite bleibt unberührt.",
   "emergentes_ajuste": "Pop-ups entfernen",
   "emergentes_ajuste_explica": "Öffnet keine Fenster, die eine Seite von selbst öffnet oder wenn Sie irgendwohin klicken, und auch keine, die zu Werbung oder Tracking führen. Schließt die Fenster, die die Seite ungefragt darüberlegt (Newsletter, „Benachrichtigungen aktivieren“, „App herunterladen“), und sagt „Nein“ zu Seiten, die Ihnen Benachrichtigungen senden wollen, ohne dass Sie irgendwo geklickt haben. Wenn sich ein Fenster, das Sie wollten, nicht geöffnet hat, können Sie es über den Schutzschild öffnen.",
+  "youtube_ajuste": "YouTube-Werbung entfernen",
+  "youtube_ajuste_explica": "Entfernt die Werbung aus den Videos und Seiten von YouTube. Wenn YouTube die Art der Anzeige ändert, kann bis zur nächsten Version von ZERO eine Anzeige durchkommen. Gilt für Tabs, die Sie ab jetzt öffnen.",
   "cookies_rechazado": "Cookie-Hinweis abgelehnt ({gestor})",
   "cookies_escondido": "Cookie-Hinweis ausgeblendet, ohne etwas zu akzeptieren ({gestor})",
   "emergentes_no_abiertas": "{n} Pop-ups nicht geöffnet",

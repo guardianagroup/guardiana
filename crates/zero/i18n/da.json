@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "I meddelelserne fra de mest brugte cookieadministratorer (OneTrust, Cookiebot, Didomi og andre) vælger GUARDIANA ZERO «Afvis alle». Hvis meddelelsen ikke har den knap, skjuler den den uden at acceptere noget. Resten af siden røres ikke.",
   "emergentes_ajuste": "Fjern pop op-vinduer",
   "emergentes_ajuste_explica": "Den åbner ikke de vinduer, en side åbner af sig selv eller når du klikker et vilkårligt sted, eller dem, der fører til reklame eller sporing. Den lukker de vinduer, siden lægger ovenpå, uden at du har bedt om dem (nyhedsbreve, «slå notifikationer til», «download appen»), og siger «nej» til sider, der beder om at sende dig notifikationer, uden at du har klikket på noget. Hvis et vindue, du ville have, ikke blev åbnet, lader skjoldet dig åbne det.",
+  "youtube_ajuste": "Fjern reklamer på YouTube",
+  "youtube_ajuste_explica": "Fjerner reklamerne fra YouTubes videoer og sider. Hvis YouTube ændrer måden, de vises på, kan en enkelt slippe igennem indtil næste version af ZERO. Gælder for faner, du åbner fra nu af.",
   "cookies_rechazado": "Cookiemeddelelse afvist ({gestor})",
   "cookies_escondido": "Cookiemeddelelse skjult uden at acceptere noget ({gestor})",
   "emergentes_no_abiertas": "{n} pop op-vinduer ikke åbnet",

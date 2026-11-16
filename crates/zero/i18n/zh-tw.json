@@ -1,1 +1,4 @@
-{}
+{
+  "youtube_ajuste": "移除 YouTube 廣告",
+  "youtube_ajuste_explica": "移除 YouTube 影片和頁面中的廣告。如果 YouTube 改變廣告的呈現方式，在 ZERO 下一個版本之前可能會漏掉個別廣告。適用於從現在起開啟的分頁。"
+}

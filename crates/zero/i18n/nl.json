@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "Bij de meldingen van de meest gebruikte cookiebeheerders (OneTrust, Cookiebot, Didomi en andere) kiest GUARDIANA ZERO «Alles weigeren». Heeft de melding die knop niet, dan verbergt het de melding zonder iets te accepteren. De rest van de pagina blijft onaangeroerd.",
   "emergentes_ajuste": "Pop-upvensters verwijderen",
   "emergentes_ajuste_explica": "Opent geen vensters die een pagina vanzelf opent of als je ergens klikt, en ook geen vensters die naar reclame of tracking leiden. Sluit de vensters die de pagina er ongevraagd overheen zet (nieuwsbrieven, «schakel meldingen in», «download de app») en zegt «nee» tegen pagina's die vragen je meldingen te sturen zonder dat je ergens op hebt geklikt. Ging een venster dat je wilde niet open, dan kun je het via het schild openen.",
+  "youtube_ajuste": "YouTube-advertenties verwijderen",
+  "youtube_ajuste_explica": "Verwijdert de advertenties uit de video’s en pagina’s van YouTube. Als YouTube verandert hoe het ze toont, kan er tot de volgende versie van ZERO een doorheen komen. Geldt voor tabbladen die je vanaf nu opent.",
   "cookies_rechazado": "Cookiemelding geweigerd ({gestor})",
   "cookies_escondido": "Cookiemelding verborgen zonder iets te accepteren ({gestor})",
   "emergentes_no_abiertas": "{n} pop-upvensters niet geopend",

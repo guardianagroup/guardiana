@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "La avizele celor mai folosite instrumente de gestionare a cookie-urilor (OneTrust, Cookiebot, Didomi și altele), GUARDIANA ZERO alege «Respinge tot». Dacă avizul nu are acest buton, îl ascunde fără să accepte nimic. Restul paginii rămâne neatins.",
   "emergentes_ajuste": "Elimină ferestrele pop-up",
   "emergentes_ajuste_explica": "Nu deschide ferestrele pe care o pagină le deschide singură sau când faci clic oriunde, nici pe cele care duc la publicitate sau urmărire. Închide ferestrele pe care pagina le pune deasupra fără să le ceri (newslettere, «activează notificările», «descarcă aplicația») și spune «nu» paginilor care cer să-ți trimită notificări fără să fi făcut clic pe ceva. Dacă o fereastră pe care o voiai nu s-a deschis, scutul te lasă s-o deschizi.",
+  "youtube_ajuste": "Elimină reclamele de pe YouTube",
+  "youtube_ajuste_explica": "Elimină reclamele din videoclipurile și paginile YouTube. Dacă YouTube schimbă modul în care le afișează, poate trece câte una până la următoarea versiune ZERO. Se aplică filelor deschise de acum înainte.",
   "cookies_rechazado": "Aviz de cookie-uri respins ({gestor})",
   "cookies_escondido": "Aviz de cookie-uri ascuns fără a accepta nimic ({gestor})",
   "emergentes_no_abiertas": "{n} ferestre pop-up nedeschise",

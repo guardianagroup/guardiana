@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "Dans les bandeaux des gestionnaires de cookies les plus utilisés (OneTrust, Cookiebot, Didomi et d’autres), GUARDIANA ZERO choisit « Tout refuser ». Si le bandeau n’a pas ce bouton, il le masque sans rien accepter. Le reste de la page n’est pas touché.",
   "emergentes_ajuste": "Supprimer les fenêtres pop-up",
   "emergentes_ajuste_explica": "N’ouvre pas les fenêtres qu’une page ouvre d’elle-même ou quand vous cliquez n’importe où, ni celles qui mènent à de la publicité ou à du pistage. Ferme les fenêtres que la page affiche par-dessus sans que vous les demandiez (newsletters, « activez les notifications », « téléchargez l’appli ») et répond « non » aux pages qui demandent à vous envoyer des notifications sans que vous ayez cliqué sur quoi que ce soit. Si une fenêtre que vous vouliez ne s’est pas ouverte, le bouclier vous permet de l’ouvrir.",
+  "youtube_ajuste": "Supprimer la publicité de YouTube",
+  "youtube_ajuste_explica": "Supprime les publicités des vidéos et des pages de YouTube. Si YouTube change sa façon de les afficher, une publicité peut passer jusqu’à la prochaine version de ZERO. S’applique aux onglets que vous ouvrez à partir de maintenant.",
   "cookies_rechazado": "Bandeau de cookies refusé ({gestor})",
   "cookies_escondido": "Bandeau de cookies masqué sans rien accepter ({gestor})",
   "emergentes_no_abiertas": "{n} fenêtres pop-up non ouvertes",

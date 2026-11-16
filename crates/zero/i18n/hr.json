@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "Na obavijestima najčešće korištenih upravitelja kolačića (OneTrust, Cookiebot, Didomi i drugi) GUARDIANA ZERO odabire «Odbij sve». Ako obavijest nema taj gumb, skriva je bez prihvaćanja ičega. Ostatak stranice ostaje netaknut.",
   "emergentes_ajuste": "Ukloni skočne prozore",
   "emergentes_ajuste_explica": "Ne otvara prozore koje stranica otvara sama ili kad klikneš bilo gdje, ni one koji vode na oglašavanje ili praćenje. Zatvara prozore koje stranica postavlja preko sadržaja bez tvog zahtjeva (bilteni, «uključi obavijesti», «preuzmi aplikaciju») i kaže «ne» stranicama koje traže da ti šalju obavijesti bez ijednog tvog klika. Ako se prozor koji ti je trebao nije otvorio, štit ti omogućuje da ga otvoriš.",
+  "youtube_ajuste": "Ukloni oglase na YouTubeu",
+  "youtube_ajuste_explica": "Uklanja oglase iz videozapisa i stranica YouTubea. Ako YouTube promijeni način prikazivanja, neki oglas može proći do sljedeće verzije ZERO-a. Vrijedi za kartice koje otvorite od sada.",
   "cookies_rechazado": "Obavijest o kolačićima odbijena ({gestor})",
   "cookies_escondido": "Obavijest o kolačićima skrivena bez prihvaćanja ičega ({gestor})",
   "emergentes_no_abiertas": "Neotvoreni skočni prozori: {n}",

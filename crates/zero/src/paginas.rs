@@ -110,12 +110,65 @@ const GPC: &str = r#"(() => {
   } catch (_) {}
 })();"#;
 
+/// YouTube without its advertising (1.0.59; the owner, 15 Nov 2026, 23:18 and 23:23: «quitarle la
+/// publicidad, tal y como hace Brave»). Only on YouTube's own sites; elsewhere it returns at
+/// once. Before YouTube's code reads them, the advertising fields leave the data of each video
+/// (`adPlacements`, `playerAds`, `adSlots` and the heartbeat of its breaks) wherever they come:
+/// the page's first data, `JSON.parse` and the answers of `fetch` read with `.json()`; the
+/// notice YouTube puts up against blockers leaves the same way. The spaces of the advertising
+/// in the pages are hidden, and an advert that still starts is taken to its end. YouTube changes
+/// how it serves them: an advert can get through until the next version brings the rules up to
+/// date. Nothing is sent anywhere; the person turns it off in ZERO's settings.
+const YOUTUBE: &str = r#"(() => {
+  'use strict';
+  if (!/(^|\.)(youtube\.com|youtube-nocookie\.com|youtubekids\.com)$/.test(location.hostname)) return;
+  const CLAVES = ['adPlacements', 'playerAds', 'adSlots', 'adBreakHeartbeatParams'];
+  const quita = (x) => {
+    if (!x || typeof x !== 'object') return;
+    for (const k of CLAVES) if (Object.prototype.hasOwnProperty.call(x, k)) { try { delete x[k]; } catch (_) {} }
+    const m = x.auxiliaryUi && x.auxiliaryUi.messageRenderers;
+    if (m && m.enforcementMessageViewModel) { try { delete m.enforcementMessageViewModel; } catch (_) {} }
+  };
+  const poda = (o) => {
+    try {
+      if (!o || typeof o !== 'object') return o;
+      const una = (x) => { if (!x || typeof x !== 'object') return; quita(x); quita(x.playerResponse); if (x.response) quita(x.response.playerResponse); };
+      if (Array.isArray(o)) { for (const e of o) una(e); } else una(o);
+    } catch (_) {}
+    return o;
+  };
+  try { const p = JSON.parse; JSON.parse = new Proxy(p, { apply: (f, yo, a) => poda(Reflect.apply(f, yo, a)) }); } catch (_) {}
+  try { const j = Response.prototype.json; Response.prototype.json = new Proxy(j, { apply: (f, yo, a) => Reflect.apply(f, yo, a).then(poda) }); } catch (_) {}
+  for (const n of ['ytInitialPlayerResponse', 'playerResponse']) {
+    try { let v; Object.defineProperty(window, n, { configurable: true, enumerable: true, get: () => v, set: (x) => { v = poda(x); } }); } catch (_) {}
+  }
+  const CSS = 'ytd-ad-slot-renderer,ytd-in-feed-ad-layout-renderer,ytd-banner-promo-renderer,ytd-statement-banner-renderer,' +
+    'ytd-display-ad-renderer,ytd-companion-slot-renderer,ytd-promoted-sparkles-web-renderer,ytd-promoted-video-renderer,' +
+    'ytd-search-pyv-renderer,ytd-player-legacy-desktop-watch-ads-renderer,ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"],' +
+    '#player-ads,#masthead-ad,.ytp-ad-module,.ytp-ad-overlay-container,.ytp-ad-image-overlay,ytm-promoted-sparkles-web-renderer,' +
+    'ytm-companion-ad-renderer,ad-slot-renderer,ytd-rich-item-renderer:has(ytd-ad-slot-renderer),' +
+    'tp-yt-paper-dialog:has(ytd-enforcement-message-view-model){display:none!important}';
+  const pon = () => {
+    try { const h = new CSSStyleSheet(); h.replaceSync(CSS); document.adoptedStyleSheets = [...document.adoptedStyleSheets, h]; return; } catch (_) {}
+    try { const s = document.createElement('style'); s.textContent = CSS; (document.head || document.documentElement).appendChild(s); } catch (_) {}
+  };
+  if (document.documentElement) pon(); else document.addEventListener('readystatechange', pon, { once: true });
+  // an advert that still starts: to its end, and «Saltar» if it is there
+  setInterval(() => {
+    const r = document.querySelector('.html5-video-player.ad-showing'); if (!r) return;
+    const v = r.querySelector('video'); if (v && Number.isFinite(v.duration) && v.duration > 0) { try { v.muted = true; v.currentTime = v.duration; } catch (_) {} }
+    const b = r.querySelector('.ytp-ad-skip-button,.ytp-ad-skip-button-modern,.ytp-skip-ad-button'); if (b) { try { b.click(); } catch (_) {} }
+  }, 400);
+})();"#;
+
 /// What the script of a tab carries, decided when the tab opens (a page never sees a value
 /// change under it).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Opciones {
     /// Global Privacy Control.
     pub gpc: bool,
+    /// YouTube without its advertising (1.0.59; on unless the person turns it off).
+    pub youtube: bool,
     /// «Huella uniforme» (1.0.46, strict mode): the same generic values for every site.
     pub uniforme: bool,
     /// 1.0.50: one of the program's own fixed tabs (GUARDIANA's web as the program's window).
@@ -126,6 +179,7 @@ impl Default for Opciones {
     fn default() -> Self {
         Self {
             gpc: true,
+            youtube: true,
             uniforme: false,
             programa: false,
         }
@@ -140,6 +194,11 @@ pub fn guion(o: Opciones) -> String {
     let mut s = String::new();
     if o.gpc {
         s.push_str(GPC);
+        s.push('\n');
+    }
+    // the program's own tabs are GUARDIANA's web: never YouTube
+    if o.youtube && !o.programa {
+        s.push_str(YOUTUBE);
         s.push('\n');
     }
     let mut g = GUION.to_owned();
@@ -1605,6 +1664,23 @@ mod tests {
             assert!(web.contains(parte), "{parte}");
         }
         assert!(!web.contains("/*<") && !web.contains("/*</"));
+    }
+
+    #[test]
+    fn youtube_without_its_ads_unless_the_person_says_so() {
+        // 1.0.59: on by default, only on YouTube's own sites, never in the program's own tabs
+        let de_serie = guion(Opciones::default());
+        assert!(de_serie.contains("adPlacements") && de_serie.contains("youtube-nocookie"));
+        let con_anuncios = guion(Opciones {
+            youtube: false,
+            ..Opciones::default()
+        });
+        assert!(!con_anuncios.contains("adPlacements"));
+        let programa = guion(Opciones {
+            programa: true,
+            ..Opciones::default()
+        });
+        assert!(!programa.contains("adPlacements"));
     }
 
     #[test]

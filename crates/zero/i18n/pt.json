@@ -201,6 +201,8 @@
   "cookies_ajuste_explica": "Nos avisos dos gerenciadores de cookies mais usados (OneTrust, Cookiebot, Didomi e outros), o GUARDIANA ZERO escolhe «Recusar tudo». Se o aviso não tiver esse botão, ele o esconde sem aceitar nada. O resto da página não é tocado.",
   "emergentes_ajuste": "Remover os pop-ups",
   "emergentes_ajuste_explica": "Não abre as janelas que uma página abre sozinha ou quando você clica em qualquer lugar, nem as que levam a publicidade ou rastreamento. Fecha as caixas que a página coloca por cima sem você pedir (newsletters, «ative as notificações», «baixe o app») e diz «não» às páginas que pedem para enviar notificações antes de você pressionar qualquer coisa. Se uma janela que você queria não abriu, o escudo deixa você abri-la.",
+  "youtube_ajuste": "Remover a publicidade do YouTube",
+  "youtube_ajuste_explica": "Remove os anúncios dos vídeos e das páginas do YouTube. Se o YouTube mudar a forma de exibi-los, algum pode passar até a próxima versão do ZERO. Vale para as abas que você abrir a partir de agora.",
   "cookies_rechazado": "Aviso de cookies recusado ({gestor})",
   "cookies_escondido": "Aviso de cookies escondido sem aceitar nada ({gestor})",
   "emergentes_no_abiertas": "{n} janelas pop-up não abertas",

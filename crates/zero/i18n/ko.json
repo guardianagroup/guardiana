@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "가장 많이 쓰이는 쿠키 관리 도구(OneTrust, Cookiebot, Didomi 등)의 알림에서 GUARDIANA ZERO가 «모두 거부»를 선택해요. 그런 버튼이 없으면 아무것도 수락하지 않고 알림을 숨겨요. 페이지의 나머지 부분은 건드리지 않아요.",
   "emergentes_ajuste": "팝업 창 제거",
   "emergentes_ajuste_explica": "페이지가 스스로 열거나 아무 곳이나 클릭할 때 여는 창, 광고나 추적으로 이어지는 창을 열지 않아요. 요청하지 않았는데 페이지 위에 띄우는 창(뉴스레터, «알림 켜기», «앱 다운로드»)을 닫고, 아무것도 클릭하지 않았는데 알림을 보내겠다고 요청하는 페이지에 «아니요»라고 답해요. 원하던 창이 열리지 않았다면 실드에서 열 수 있어요.",
+  "youtube_ajuste": "YouTube 광고 제거",
+  "youtube_ajuste_explica": "YouTube 동영상과 페이지에서 광고를 없앱니다. YouTube가 광고 방식을 바꾸면 다음 ZERO 버전까지 일부 광고가 나올 수 있습니다. 지금부터 여는 탭에 적용됩니다.",
   "cookies_rechazado": "쿠키 알림 거부됨({gestor})",
   "cookies_escondido": "아무것도 수락하지 않고 쿠키 알림 숨김({gestor})",
   "emergentes_no_abiertas": "열지 않은 팝업 창 {n}개",

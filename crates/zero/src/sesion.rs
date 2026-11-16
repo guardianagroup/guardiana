@@ -395,6 +395,9 @@ struct Preferencias {
     // --- 1.0.46 «Tus datos, sin valor» (subastas-1.0.46) ---------------------------------------
     /// Global Privacy Control turned off by the person (on unless they do).
     gpc_apagado: bool,
+    /// YouTube with its advertising, because the person asked for it (1.0.59: without it unless
+    /// they do; see `paginas::YOUTUBE`).
+    youtube_con_anuncios: bool,
     /// The fingerprint noise for other companies' scripts turned off by the person (on with the
     /// protection unless they do; before 1.0.46 only with maximum protection).
     huella_sin_ruido: bool,
@@ -1229,9 +1232,17 @@ impl Sesion {
     pub fn guion_pestana(&self, id: u32) -> String {
         paginas::guion(paginas::Opciones {
             gpc: self.gpc(),
+            youtube: self.youtube_sin_anuncios(),
             uniforme: self.huella_uniforme(),
             programa: self.pestana(id).is_some_and(|p| p.fija),
         })
+    }
+
+    /// YouTube without its advertising in the tabs opened from now on (1.0.59; on unless the person
+    /// turns it off).
+    #[must_use]
+    pub const fn youtube_sin_anuncios(&self) -> bool {
+        !self.prefs.youtube_con_anuncios
     }
 
     /// Global Privacy Control goes with every request and in every page (on unless the person
@@ -1935,6 +1946,7 @@ impl Sesion {
             "huella_clave": self.huella_clave(),
             // --- 1.0.46 (subastas-1.0.46) ---
             "gpc": self.gpc(),
+            "youtube": self.youtube_sin_anuncios(),
             "subastas": !self.prefs.reglas.subastas_sin_cortar,
             "huella_ruido": !self.prefs.huella_sin_ruido || self.prefs.reglas.maxima,
             "huella_uniforme": self.prefs.huella_uniforme,
@@ -3369,11 +3381,12 @@ impl Sesion {
                 o
             }
             // --- 1.0.46 «No me subastes» y «Tus datos, sin valor» (subastas-1.0.46) ----------
-            "subastas" | "gpc" | "huella_ruido" | "huella_uniforme" => {
+            "subastas" | "gpc" | "huella_ruido" | "huella_uniforme" | "youtube" => {
                 let v = valor.as_bool().unwrap_or(clave != "huella_uniforme");
                 match clave {
                     "subastas" => self.prefs.reglas.subastas_sin_cortar = !v,
                     "gpc" => self.prefs.gpc_apagado = !v,
+                    "youtube" => self.prefs.youtube_con_anuncios = !v,
                     "huella_ruido" => self.prefs.huella_sin_ruido = !v,
                     _ => self.prefs.huella_uniforme = v,
                 }

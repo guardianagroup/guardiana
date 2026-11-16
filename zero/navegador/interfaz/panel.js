@@ -514,6 +514,7 @@
     $('a-proteccion').checked = !!m.cortar_seguimiento;
     $('a-cookies').checked = m.rechazar_cookies !== false;
     $('a-emergentes').checked = m.quitar_emergentes !== false;
+    $('a-youtube').checked = m.youtube !== false;
     const imp = m.importar || [];
     $('a-importar-caja').classList.toggle('oculto', !imp.length);
     $('a-importar').innerHTML = imp.map((x) => `<button class="boton chico" data-de="${esc(x)}">${esc(x)}</button>`).join(' ');
@@ -555,6 +556,7 @@
   });
   $('a-cookies').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'rechazar_cookies', valor: e.target.checked }));
   $('a-emergentes').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'quitar_emergentes', valor: e.target.checked }));
+  $('a-youtube').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'youtube', valor: e.target.checked }));
   $('a-buscador').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'buscador', valor: e.target.value }));
   document.querySelector('.temas [data-tema="dia"]').innerHTML = Z.ICONO.sol;
   document.querySelector('.temas [data-tema="noche"]').innerHTML = Z.ICONO.luna;

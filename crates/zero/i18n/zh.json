@@ -200,6 +200,8 @@
   "cookies_ajuste_explica": "对于最常用的 Cookie 管理工具（OneTrust、Cookiebot、Didomi 等）的提示，GUARDIANA ZERO 会选择“全部拒绝”。如果提示中没有该按钮，则会将其隐藏，而不接受任何内容。网页的其余部分不受影响。",
   "emergentes_ajuste": "移除弹出窗口",
   "emergentes_ajuste_explica": "不打开网页自行弹出的窗口、你随处点击时弹出的窗口，以及通向广告或跟踪的窗口。关闭网页未经请求就覆盖在上面的窗口（订阅简报、“开启通知”、“下载应用”），并对你未点击任何内容就请求向你发送通知的网页说“不”。如果你想要的窗口没有打开，可以通过护盾打开。",
+  "youtube_ajuste": "去除 YouTube 广告",
+  "youtube_ajuste_explica": "去除 YouTube 视频和页面中的广告。如果 YouTube 改变广告的投放方式，在 ZERO 下一个版本之前可能会漏掉个别广告。适用于从现在起打开的标签页。",
   "cookies_rechazado": "已拒绝 Cookie 提示（{gestor}）",
   "cookies_escondido": "已隐藏 Cookie 提示，未接受任何内容（{gestor}）",
   "emergentes_no_abiertas": "{n} 个弹出窗口未打开",
