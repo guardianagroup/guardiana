@@ -5,10 +5,12 @@
 fn imprime_identidad_1057() {
     let clave = [7u8; 32];
     let i = guardiana_secure::Identity::new();
-    let bloque = i.lock(&clave);
-    panic!(
-        "FIXTURE-1057 bloque={bloque} curve={} ed={}",
+    let linea = format!(
+        "FIXTURE-1057 bloque={} curve={} ed={}",
+        i.lock(&clave),
         i.public_key().to_base64(),
         i.signing_key().to_base64()
     );
+    // fails on purpose: the assertion prints the line in the log
+    assert_eq!(linea, "");
 }
