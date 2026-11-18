@@ -578,8 +578,9 @@ function pantalla(nombre) {
   fs.writeFileSync(path.join(base, 'marca', 'prueba-empezada'), String(Date.now() - 8 * 86400000));
   registro.length = 0;
   salio = null;
+  // (1.0.63: this run keeps «Comprobando esta página», checked below)
   const proceso2 = spawn(exe, [], {
-    env: { ...process.env, GUARDIANA_ZERO_DATOS: base, GUARDIANA_ZERO_DEPURA: '1', GUARDIANA_ZERO_SIN_DIALOGO: '1', GUARDIANA_ZERO_SIN_COMPROBAR: '1', GUARDIANA_ZERO_ARGS: `--remote-debugging-port=9222 --host-resolver-rules="${reglas}"` },
+    env: { ...process.env, GUARDIANA_ZERO_DATOS: base, GUARDIANA_ZERO_DEPURA: '1', GUARDIANA_ZERO_SIN_DIALOGO: '1', GUARDIANA_ZERO_ARGS: `--remote-debugging-port=9222 --host-resolver-rules="${reglas}"` },
     stdio: 'ignore',
   });
   proceso2.on('exit', (c) => { salio = c; });
@@ -593,6 +594,12 @@ function pantalla(nombre) {
   const rechazosAntes = registro.filter((r) => r.ruta === '/cookies-rechazadas').length;
   await barra2.fill('#campo-dir', `${SITIO}/prueba?utm_source=boletin&id=7`);
   await barra2.press('#campo-dir', 'Enter');
+  // 1.0.63 (the owner, 17 Nov 2026, 22:48): «Comprobando esta página» covers a site entered for the first time in this
+  // run for five seconds, with what ZERO checked; then the page, which loaded behind it, is in sight
+  const cubre = () => barra2.evaluate(() => { const c = document.getElementById('comprueba'); return !!c && !c.hidden && c.querySelector('.cp-host').textContent.includes('sitio-prueba.test'); });
+  comprueba(await hasta(cubre, 8000), '«Comprobando esta página» cubre una web que se abre por primera vez');
+  pantalla('05b-comprobando.png');
+  comprueba(await hasta(() => barra2.evaluate(() => document.getElementById('comprueba').hidden), 12000), 'y a los 5 segundos deja ver la página');
   const web2 = await paginaQue(nav2, (u) => u.startsWith(SITIO));
   await web2.waitForLoadState('load').catch(() => {});
   await espera(1500);
