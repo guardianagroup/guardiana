@@ -545,7 +545,13 @@ const GUION: &str = r#"(() => {
           const n = (x) => (typeof x === 'number' && isFinite(x) ? x : 0);
           const t = (x, k) => (typeof x === 'string' ? x.slice(0, k) : '');
           const g = (x) => (typeof x === 'number' && isFinite(x) ? Math.round(x * 100) / 100 : null);
-          const destinos = j.destinos.slice(0, 150).map((d) => {
+          // «Tu antivirus» (17 Nov 2026): which programs are an antivirus, and their connections first, so the cut to 150
+          // never leaves them out
+          const av = Array.isArray(j.programas) ? j.programas.filter((p) => p && p.tipo === 'antivirus').slice(0, 8).map((p) => ({ id: t(p.id, 60) })).filter((p) => p.id) : [];
+          const esAv = new Set(av.map((p) => p.id));
+          const todos = j.destinos.filter((d) => d && typeof d === 'object');
+          const orden = todos.filter((d) => esAv.has(d.programa)).concat(todos.filter((d) => !esAv.has(d.programa)));
+          const destinos = orden.slice(0, 150).map((d) => {
             const l = d && d.lugar && typeof d.lugar === 'object' ? d.lugar : null;
             return {
               e: t(d.empresa, 80) || t(d.red, 80), d: t(d.destino, 120), p: t((l && l.pais) || d.pais, 2).toUpperCase(),
@@ -553,7 +559,7 @@ const GUION: &str = r#"(() => {
               x: n(d.paradas) > 0 || d.regla != null ? 1 : 0, n: Math.max(1, n(d.consultas)), g: t(d.programa, 60),
             };
           });
-          const datos = { v: 1, ahora: n(j.ahora), maxima: !!j.maxima, vigilando: !!j.vigilando, programas: Array.isArray(j.programas) ? j.programas.length : 0, destinos };
+          const datos = { v: 1, ahora: n(j.ahora), maxima: !!j.maxima, vigilando: !!j.vigilando, programas: Array.isArray(j.programas) ? j.programas.length : 0, av, destinos };
           manda({ tipo: 'zg_pc_datos', para, datos: JSON.stringify(datos) });
         })
         .catch(() => {});
