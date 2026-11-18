@@ -4184,7 +4184,6 @@ impl Sesion {
         }
     }
 
-    /// The engine finished (or failed) saving a PDF the session asked for.
     /// The person closed Windows' «Guardar como» without saving (17 Nov 2026): nothing was made and nothing is said; the
     /// page only puts its button back.
     #[must_use]
@@ -4194,6 +4193,7 @@ impl Sesion {
             .collect()
     }
 
+    /// The engine finished (or failed) saving a PDF the session asked for.
     pub fn pdf_hecho(&mut self, id: u32, ruta: &Path, ok: bool) -> Vec<Orden> {
         let ruta = ruta.display().to_string();
         let v = if ok {
