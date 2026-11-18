@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "Kapat",
   "sala_e_mirando": "İlk kontrol henüz yapılmadı",
   "sala_in_alcance": "İmza, bu raporun mühürlendikten sonra değiştirilmediğini kanıtlar. Sistemdeki her olayın algılandığını garanti etmez.",
-  "abriendo": "GUARDIANA açılıyor…"
+  "abriendo": "GUARDIANA açılıyor…",
+  "barra_navegador": "Tarayıcı",
+  "sub_nada_aqui": "Bu sayfada yok",
+  "guardado_archivo": "Kaydedildi: {nombre}"
 }

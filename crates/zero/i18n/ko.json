@@ -1661,5 +1661,8 @@
   "sala_ent_cerrar": "닫기",
   "sala_e_mirando": "아직 첫 번째 확인을 하지 않았어요",
   "sala_in_alcance": "서명은 이 보고서가 봉인된 후 변경되지 않았음을 증명해요. 시스템의 모든 이벤트가 감지되었음을 보장하지는 않아요.",
-  "abriendo": "GUARDIANA를 여는 중…"
+  "abriendo": "GUARDIANA를 여는 중…",
+  "barra_navegador": "브라우저",
+  "sub_nada_aqui": "이 페이지에는 없음",
+  "guardado_archivo": "저장됨: {nombre}"
 }

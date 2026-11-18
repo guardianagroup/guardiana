@@ -1661,5 +1661,8 @@
   "sala_ent_cerrar": "Fechar",
   "sala_e_mirando": "Ainda não foi feita a primeira verificação",
   "sala_in_alcance": "A assinatura demonstra que este relatório não foi alterado depois de ser selado. Não garante que tenha sido detetado cada evento do sistema.",
-  "abriendo": "A abrir o GUARDIANA…"
+  "abriendo": "A abrir o GUARDIANA…",
+  "barra_navegador": "Navegador",
+  "sub_nada_aqui": "Nenhuma nesta página",
+  "guardado_archivo": "Guardado: {nombre}"
 }

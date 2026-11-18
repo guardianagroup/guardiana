@@ -807,7 +807,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-apps"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "ferrisetw",
  "guardiana-core",
@@ -822,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-classify"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "guardiana-core",
  "guardiana-lists",
@@ -832,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-cli"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "axum",
  "getrandom 0.4.3",
@@ -857,7 +857,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-core"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "rusqlite",
  "serde",
@@ -867,14 +867,14 @@ dependencies = [
 
 [[package]]
 name = "guardiana-devices"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "guardiana-core",
 ]
 
 [[package]]
 name = "guardiana-dns"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "async-trait",
  "guardiana-core",
@@ -887,7 +887,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-escudo"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "chacha20poly1305 0.10.1",
  "getrandom 0.4.3",
@@ -898,7 +898,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-license"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "getrandom 0.4.3",
  "guardiana-core",
@@ -911,7 +911,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-lists"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "flate2",
  "guardiana-core",
@@ -922,7 +922,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-panel"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "axum",
  "getrandom 0.4.3",
@@ -944,7 +944,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-rele"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "base64 0.23.1",
  "ring",
@@ -955,7 +955,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-secure"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "base64 0.23.1",
  "chacha20poly1305 0.10.1",
@@ -972,7 +972,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-service"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "guardiana-core",
  "serde",
@@ -983,7 +983,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-tunel"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "base64 0.23.1",
  "getrandom 0.4.3",
@@ -998,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-tunel-servidor"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -1008,7 +1008,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-verify"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "guardiana-core",
  "guardiana-lists",
@@ -1021,7 +1021,7 @@ dependencies = [
 
 [[package]]
 name = "guardiana-zero"
-version = "1.0.61"
+version = "1.0.62"
 dependencies = [
  "base64 0.23.1",
  "guardiana-core",

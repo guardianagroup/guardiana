@@ -66,3 +66,5 @@
 /* Settings rows of «Subastas y huella» (panel.html, v-ajustes). */
 .sub-ajustes-cab { margin: var(--e5) 0 var(--e2); }
 .sub-ajuste-nota { margin: var(--e2) 0 0; font: var(--t-12); color: var(--muted); }
+#zero-subasta .sub-nada { margin: 0 0 var(--e2); font: var(--t-13); color: var(--muted); }
+#zero-subasta .sub-dia.sub-dia-sola { margin-top: var(--e2); padding-top: 0; border-top: 0; }

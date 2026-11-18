@@ -1661,5 +1661,8 @@
   "sala_ent_cerrar": "Fermer",
   "sala_e_mirando": "La première vérification n’a pas encore eu lieu",
   "sala_in_alcance": "La signature démontre que ce rapport n’a pas été modifié depuis qu’il a été scellé. Elle ne garantit pas que chaque événement du système a été détecté.",
-  "abriendo": "Ouverture de GUARDIANA…"
+  "abriendo": "Ouverture de GUARDIANA…",
+  "barra_navegador": "Navigateur",
+  "sub_nada_aqui": "Aucune sur cette page",
+  "guardado_archivo": "Enregistré : {nombre}"
 }

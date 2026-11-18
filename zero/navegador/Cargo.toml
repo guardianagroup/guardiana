@@ -1,7 +1,7 @@
 [package]
 name = "guardiana-zero-navegador"
 description = "GUARDIANA ZERO for Windows: the window, the tabs and the hooks into Microsoft Edge WebView2"
-version = "1.0.61"
+version = "1.0.62"
 edition = "2021"
 rust-version = "1.89" # rusqlite 0.41 and vodozemac 0.11 need 1.89
 license = "GPL-3.0-or-later"
@@ -53,6 +53,10 @@ windows = { version = "0.62", features = [
     "Win32_UI_HiDpi",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_Shell",
+    # Windows' «Guardar como» (17 Nov 2026): its file types
+    "Win32_UI_Shell_Common",
+    # the window's title bar without the small icon (17 Nov 2026): SetWindowThemeAttribute
+    "Win32_UI_Controls",
     "Win32_UI_WindowsAndMessaging",
 ] }
 

@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "Sluiten",
   "sala_e_mirando": "De eerste controle is nog niet gedaan",
   "sala_in_alcance": "De handtekening bewijst dat dit rapport niet is gewijzigd nadat het werd verzegeld. Het garandeert niet dat elke gebeurtenis in het systeem is gedetecteerd.",
-  "abriendo": "GUARDIANA wordt geopend…"
+  "abriendo": "GUARDIANA wordt geopend…",
+  "barra_navegador": "Browser",
+  "sub_nada_aqui": "Geen op deze pagina",
+  "guardado_archivo": "Opgeslagen: {nombre}"
 }

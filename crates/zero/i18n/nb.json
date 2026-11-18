@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "Lukk",
   "sala_e_mirando": "Den første kontrollen er ikke gjort ennå",
   "sala_in_alcance": "Signaturen viser at denne rapporten ikke er endret etter at den ble forseglet. Den garanterer ikke at alle hendelser i systemet er oppdaget.",
-  "abriendo": "Åpner GUARDIANA…"
+  "abriendo": "Åpner GUARDIANA…",
+  "barra_navegador": "Nettleser",
+  "sub_nada_aqui": "Ingen på denne siden",
+  "guardado_archivo": "Lagret: {nombre}"
 }

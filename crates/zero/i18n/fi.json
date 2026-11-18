@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "Sulje",
   "sala_e_mirando": "Ensimmäistä tarkistusta ei ole vielä tehty",
   "sala_in_alcance": "Allekirjoitus osoittaa, ettei tätä raporttia ole muutettu sinetöinnin jälkeen. Se ei takaa, että jokainen järjestelmän tapahtuma on havaittu.",
-  "abriendo": "Avataan GUARDIANA…"
+  "abriendo": "Avataan GUARDIANA…",
+  "barra_navegador": "Selain",
+  "sub_nada_aqui": "Ei yhtään tällä sivulla",
+  "guardado_archivo": "Tallennettu: {nombre}"
 }

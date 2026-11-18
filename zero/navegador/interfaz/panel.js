@@ -63,7 +63,6 @@
       caja.querySelector('.interruptor-estado').textContent = t(quiere ? 'interruptor_cortando' : 'interruptor_permitiendo');
     }
     manda({ tipo: b.dataset.accion, sitio: x.datos.sitio });
-    $('e-recarga').classList.remove('oculto');
     // If no answer changes it, the button is free again (never stuck waiting).
     setTimeout(() => {
       if (pendiente && pendiente.sitio === x.datos.sitio && Date.now() > pendiente.hasta) {
@@ -337,6 +336,17 @@
       G.engancha($('z1-permitir-sw'), (b, quiereCortar) => { manda({ tipo: 'permitir_web', valor: !quiereCortar }); return Promise.resolve(); });
     }
     $('z1-recibo').disabled = !m.sitio;
+    // «Tu visita, a subasta», always in sight on a web: how many auction companies this page called, or that it called none
+    {
+      const fila = $('z3-subasta'), sb = m.subasta || null;
+      fila.classList.toggle('oculto', !m.sitio);
+      if (m.sitio) {
+        const k = sb ? Math.max((sb.ofrecida || []).length, (sb.empresas || []).length) : 0;
+        const cifra = $('z3-subasta-n');
+        cifra.textContent = k ? `${n(k)} ${tn('sub_n_empresas', k)}` : t('sub_nada_aqui');
+        cifra.classList.toggle('hay', k > 0);
+      }
+    }
     // «Tu visita, a subasta» (agent 4): mounted here, given what this page is.
     const sub = $('zero-subasta');
     if (window.ZeroSubasta && typeof window.ZeroSubasta.montar === 'function') {
@@ -367,7 +377,7 @@
     pintaCifra(m);
     // On the browser's own pages there is no page to speak of: only the day.
     $('e-pagina-cab').classList.toggle('oculto', !m.sitio);
-    if (m.sitio !== sitioEscudo) { sitioEscudo = m.sitio; $('e-recarga').classList.add('oculto'); }
+    sitioEscudo = m.sitio;
     $('e-sitio').textContent = m.sitio || '';
     const r = m.resumen || {};
     $('e-resumen').textContent = r.empresas ? `${tn('escudo_resumen', r.empresas, { empresas: n(r.empresas) })} ${tn('escudo_resumen_cortadas', r.cortadas, { cortadas: n(r.cortadas) })}` : '';
@@ -494,7 +504,9 @@
   $('e-tarjeta-guardar').addEventListener('click', async () => {
     if (!fraseTarjeta) return;
     await dibujaTarjeta(fraseTarjeta);
-    manda({ tipo: 'guardar_imagen', que: 'chivatos', datos: $('e-tarjeta-lienzo').toDataURL('image/png') });
+    // 17 Nov 2026: Windows' «Guardar como» (puente.js); the program's old way only if it cannot be shown
+    const d = new Date(), dia = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    Z.guardaImagen($('e-tarjeta-lienzo'), 'guardiana-zero-chivatos-' + dia + '.png', 'chivatos', (texto) => { $('e-tarjeta-guardada').textContent = texto; });
   });
   $('e-tarjeta-copiar').addEventListener('click', () => {
     if (!fraseTarjeta) return;
@@ -502,11 +514,19 @@
   });
   // Where the card was saved, said under it.
   en('guardado', (m) => { if (m.que === 'chivatos') $('e-tarjeta-guardada').textContent = m.texto || m.ruta || ''; });
-  $('e-recargar').addEventListener('click', () => { manda({ tipo: 'recargar' }); $('e-recarga').classList.add('oculto'); });
   $('e-ver-todo').addEventListener('click', () => manda({ tipo: 'abrir_cortes' }));
   $('e-ajustes').addEventListener('click', () => manda({ tipo: 'panel', vista: 'ajustes' }));
   $('e-proteccion').addEventListener('change', (e) => manda({ tipo: 'ajuste', clave: 'cortar_seguimiento', valor: e.target.checked }));
-  $('e-maxima-activar').addEventListener('click', () => { manda({ tipo: 'ajuste', clave: 'maxima', valor: true }); $('e-recarga').classList.remove('oculto'); });
+  $('e-maxima-activar').addEventListener('click', () => manda({ tipo: 'ajuste', clave: 'maxima', valor: true }));
+  // 17 Nov 2026: the controls sit together above the list; each long explanation opens from its ⓘ
+  for (const b of document.querySelectorAll('.z3-info')) {
+    b.addEventListener('click', () => {
+      const ex = $(b.getAttribute('aria-controls')); if (!ex) return;
+      const abre = ex.hidden; ex.hidden = !abre; b.setAttribute('aria-expanded', String(abre));
+    });
+  }
+  // «Tu visita, a subasta» at a glance: its whole section is further down
+  $('z3-subasta-ver').addEventListener('click', () => { const sub = $('zero-subasta'); if (sub && !sub.hidden) sub.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   $('e-maxima-quitar').addEventListener('click', () => manda({ tipo: 'ajuste', clave: 'maxima', valor: false }));
 
   // --- settings ---------------------------------------------------------------------------------

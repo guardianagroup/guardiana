@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "Zavřít",
   "sala_e_mirando": "První kontrola zatím neproběhla",
   "sala_in_alcance": "Podpis dokazuje, že tato zpráva nebyla po zapečetění pozměněna. Nezaručuje, že byla zjištěna každá událost systému.",
-  "abriendo": "Otevírání GUARDIANA…"
+  "abriendo": "Otevírání GUARDIANA…",
+  "barra_navegador": "Prohlížeč",
+  "sub_nada_aqui": "Na této stránce žádná",
+  "guardado_archivo": "Uloženo: {nombre}"
 }

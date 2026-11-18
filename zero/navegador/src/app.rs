@@ -1165,7 +1165,87 @@ fn envia(a: Origen, json: &str) {
 }
 
 /// Print one of the browser's own pages to a PDF in the person's Downloads.
+/// Windows' own «Guardar como» for a file the browser makes (17 Nov 2026, the owner, 21:54–21:55: «tiene que abrir ahí y
+/// darme la opción de dónde lo guardo en mi ordenador… si en el escritorio, si en todas las carpetas»). The name the session
+/// chose is offered; the first time it opens on the desktop, and then where the person saved last (Windows remembers it).
+/// `None`: the person cancelled, or the dialog could not be shown (then `Err`).
+fn elige_destino(sugerida: &Path) -> windows::core::Result<Option<PathBuf>> {
+    use windows::Win32::Foundation::ERROR_CANCELLED;
+    use windows::Win32::System::Com::{CoCreateInstance, IBindCtx, CLSCTX_INPROC_SERVER};
+    use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
+    use windows::Win32::UI::Shell::{
+        FOLDERID_Desktop, FileSaveDialog, IFileSaveDialog, IShellItem, SHCreateItemFromParsingName,
+        FOS_FORCEFILESYSTEM, FOS_OVERWRITEPROMPT, FOS_PATHMUSTEXIST, SIGDN_FILESYSPATH,
+    };
+    unsafe {
+        let d: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_INPROC_SERVER)?;
+        let op = d.GetOptions()?;
+        d.SetOptions(op | FOS_FORCEFILESYSTEM | FOS_OVERWRITEPROMPT | FOS_PATHMUSTEXIST)?;
+        let nombre = sugerida
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let ext = sugerida
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let (tipo, patron) = match ext.as_str() {
+            "pdf" => ("PDF", "*.pdf"),
+            "png" => ("PNG", "*.png"),
+            "json" => ("JSON", "*.json"),
+            "txt" => ("TXT", "*.txt"),
+            _ => ("", ""),
+        };
+        let tipo_w = Ancho::de(tipo);
+        let patron_w = Ancho::de(patron);
+        if !tipo.is_empty() {
+            d.SetFileTypes(&[COMDLG_FILTERSPEC {
+                pszName: tipo_w.p(),
+                pszSpec: patron_w.p(),
+            }])?;
+            let e = Ancho::de(&ext);
+            d.SetDefaultExtension(e.p())?;
+        }
+        let n = Ancho::de(&nombre);
+        d.SetFileName(n.p())?;
+        if let Ok(p) = SHGetKnownFolderPath(&FOLDERID_Desktop, KF_FLAG_DEFAULT, None) {
+            let escritorio = p.to_string().unwrap_or_default();
+            CoTaskMemFree(Some(p.0 as *const c_void));
+            if !escritorio.is_empty() {
+                let e = Ancho::de(&escritorio);
+                let item: windows::core::Result<IShellItem> =
+                    SHCreateItemFromParsingName(e.p(), None::<&IBindCtx>);
+                if let Ok(item) = item {
+                    let _ = d.SetDefaultFolder(&item);
+                }
+            }
+        }
+        match d.Show(Some(hwnd())) {
+            Ok(()) => {}
+            Err(e) if e.code() == ERROR_CANCELLED.to_hresult() => return Ok(None),
+            Err(e) => return Err(e),
+        }
+        let item = d.GetResult()?;
+        let p = item.GetDisplayName(SIGDN_FILESYSPATH)?;
+        let ruta = p.to_string().unwrap_or_default();
+        CoTaskMemFree(Some(p.0 as *const c_void));
+        Ok((!ruta.is_empty()).then(|| PathBuf::from(ruta)))
+    }
+}
+
 fn guarda_pdf(id: u32, ruta: PathBuf) {
+    // where it goes, asked first; cancelled: nothing is made and the page goes back to how it was
+    let ruta = match elige_destino(&ruta) {
+        Ok(Some(r)) => r,
+        Ok(None) => {
+            encola(con_sesion(|s| s.guardado_cancelado(id)).unwrap_or_default());
+            return;
+        }
+        Err(e) => {
+            registra("guardar como", &e);
+            ruta
+        }
+    };
     let (Some(v), Some(entorno)) = (
         vista_de(Origen::Pestana(id)),
         con_vistas(|v| v.entorno.clone()).flatten(),
@@ -3752,6 +3832,23 @@ fn pinta_marco_ventana(hwnd: HWND, col: &Colores) {
             DWMWA_TEXT_COLOR,
             (&texto as *const COLORREF).cast::<c_void>(),
             std::mem::size_of::<COLORREF>() as u32,
+        );
+        // 17 Nov 2026 (the owner, 21:15 and 21:30: «el candado sale a la izquierda, arriba, pero sale muy pequeño… quita el
+        // pequeñito y pon el de guardiana real a color»): the title bar draws neither the small icon nor the name; GUARDIANA's
+        // symbol, in its colours and at its size, is in each section's own head. The taskbar keeps the icon and the name.
+        use windows::Win32::UI::Controls::{
+            SetWindowThemeAttribute, WTA_NONCLIENT, WTA_OPTIONS, WTNCA_NODRAWCAPTION,
+            WTNCA_NODRAWICON,
+        };
+        let sin = WTA_OPTIONS {
+            dwFlags: WTNCA_NODRAWICON | WTNCA_NODRAWCAPTION,
+            dwMask: WTNCA_NODRAWICON | WTNCA_NODRAWCAPTION,
+        };
+        let _ = SetWindowThemeAttribute(
+            hwnd,
+            WTA_NONCLIENT,
+            (&sin as *const WTA_OPTIONS).cast::<c_void>(),
+            std::mem::size_of::<WTA_OPTIONS>() as u32,
         );
     }
 }

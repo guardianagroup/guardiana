@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "Închide",
   "sala_e_mirando": "Prima verificare nu a fost încă făcută",
   "sala_in_alcance": "Semnătura dovedește că acest raport nu a fost modificat după sigilare. Nu garantează că a fost detectat fiecare eveniment al sistemului.",
-  "abriendo": "Se deschide GUARDIANA…"
+  "abriendo": "Se deschide GUARDIANA…",
+  "barra_navegador": "Browser",
+  "sub_nada_aqui": "Niciuna pe această pagină",
+  "guardado_archivo": "Salvat: {nombre}"
 }

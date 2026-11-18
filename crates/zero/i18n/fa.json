@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "بستن",
   "sala_e_mirando": "هنوز نخستین بررسی انجام نشده است",
   "sala_in_alcance": "امضا نشان می‌دهد که این گزارش پس از مهر شدن دست‌کاری نشده است. تضمین نمی‌کند که هر رویداد سیستم شناسایی شده باشد.",
-  "abriendo": "در حال باز کردن GUARDIANA…"
+  "abriendo": "در حال باز کردن GUARDIANA…",
+  "barra_navegador": "مرورگر",
+  "sub_nada_aqui": "هیچ موردی در این صفحه نیست",
+  "guardado_archivo": "ذخیره شد: {nombre}"
 }

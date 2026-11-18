@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "Zamknij",
   "sala_e_mirando": "Pierwsze sprawdzenie jeszcze się nie odbyło",
   "sala_in_alcance": "Podpis dowodzi, że ten raport nie został zmieniony po zapieczętowaniu. Nie gwarantuje, że wykryto każde zdarzenie w systemie.",
-  "abriendo": "Otwieranie GUARDIANA…"
+  "abriendo": "Otwieranie GUARDIANA…",
+  "barra_navegador": "Przeglądarka",
+  "sub_nada_aqui": "Brak na tej stronie",
+  "guardado_archivo": "Zapisano: {nombre}"
 }

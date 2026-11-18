@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "关闭",
   "sala_e_mirando": "尚未进行首次检查",
   "sala_in_alcance": "签名证明此报告在加封后未被篡改。它不保证系统中的每个事件都已被检测到。",
-  "abriendo": "正在打开 GUARDIANA…"
+  "abriendo": "正在打开 GUARDIANA…",
+  "barra_navegador": "浏览器",
+  "sub_nada_aqui": "此页面没有",
+  "guardado_archivo": "已保存：{nombre}"
 }

@@ -1661,5 +1661,8 @@
   "sala_ent_cerrar": "Chiudi",
   "sala_e_mirando": "Il primo controllo non è ancora stato fatto",
   "sala_in_alcance": "La firma dimostra che questo rapporto non è stato alterato dopo la sigillatura. Non garantisce che sia stato rilevato ogni evento del sistema.",
-  "abriendo": "Apertura di GUARDIANA…"
+  "abriendo": "Apertura di GUARDIANA…",
+  "barra_navegador": "Browser",
+  "sub_nada_aqui": "Nessuna in questa pagina",
+  "guardado_archivo": "Salvato: {nombre}"
 }

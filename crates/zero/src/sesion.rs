@@ -2549,6 +2549,22 @@ impl Sesion {
     }
 
     /// «Permitir en esta web» (Z1-b): the lists cut nothing on the web in front, or again.
+    /// 17 Nov 2026 (the owner, 21:26 and 21:29: «cada cambio vale desde ya para lo que la página pida, recarga para verla
+    /// entera… eso fuera»; «los avisos de cookies… al tocarlo parece que no hace nada»): a change of the protections reloads
+    /// the web in front, so the whole page is seen with it at once and the shield's figures are those of the page as it is
+    /// now (with the switch turned on after the page loaded, the shield said 0 cut while the list said «a 46 se les corta»).
+    /// Only a web of the browser: never GUARDIANA's own sections (a call must not be cut) nor the browser's own pages.
+    fn recarga_web_activa(&self) -> Option<Orden> {
+        self.pestana(self.activa)
+            .filter(|p| {
+                !p.fija
+                    && Self::producto_de(p) == "zero"
+                    && !es_interna(&p.url)
+                    && (p.url.starts_with("https://") || p.url.starts_with("http://"))
+            })
+            .map(|p| Orden::Recarga { id: p.id })
+    }
+
     fn permitir_web(&mut self, si: bool) -> Vec<Orden> {
         let Some(sitio_web) = self
             .pestana(self.activa)
@@ -2566,7 +2582,11 @@ impl Sesion {
         if cambia {
             self.guarda_prefs();
         }
-        self.escudo_activa(true)
+        let mut o = self.escudo_activa(true);
+        if cambia {
+            o.extend(self.recarga_web_activa());
+        }
+        o
     }
 
     /// «Recibo firmado de esta página» (Z1-b): the cuts of today on the web in front, signed
@@ -3426,6 +3446,7 @@ impl Sesion {
                 ];
                 o.extend(self.escudo_activa(false));
                 o.extend(self.hoy_a_todos());
+                o.extend(self.recarga_web_activa());
                 o
             }
             // --- 1.0.46 «No me subastes» y «Tus datos, sin valor» (subastas-1.0.46) ----------
@@ -3477,6 +3498,7 @@ impl Sesion {
                 self.guarda_prefs();
                 let mut o = vec![envia(Origen::Panel, &self.msg_ajustes()), self.estado()];
                 o.extend(self.escudo_activa(false));
+                o.extend(self.recarga_web_activa());
                 o
             }
             "quitar_emergentes" => {
@@ -3488,6 +3510,7 @@ impl Sesion {
                 self.guarda_prefs();
                 let mut o = vec![envia(Origen::Panel, &self.msg_ajustes()), self.estado()];
                 o.extend(self.escudo_activa(false));
+                o.extend(self.recarga_web_activa());
                 o
             }
             "tema" => {
@@ -4162,6 +4185,15 @@ impl Sesion {
     }
 
     /// The engine finished (or failed) saving a PDF the session asked for.
+    /// The person closed Windows' «Guardar como» without saving (17 Nov 2026): nothing was made and nothing is said; the
+    /// page only puts its button back.
+    #[must_use]
+    pub fn guardado_cancelado(&self, id: u32) -> Vec<Orden> {
+        self.a_pestana(id, &json!({ "tipo": "guardado", "ruta": "", "texto": "" }))
+            .into_iter()
+            .collect()
+    }
+
     pub fn pdf_hecho(&mut self, id: u32, ruta: &Path, ok: bool) -> Vec<Orden> {
         let ruta = ruta.display().to_string();
         let v = if ok {

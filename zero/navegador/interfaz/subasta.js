@@ -191,7 +191,16 @@
   function dibuja() {
     if (!caja) return;
     const d = datos;
-    if (!hayAlgo(d)) { caja.hidden = true; caja.innerHTML = ''; return; }
+    if (!hayAlgo(d)) {
+      // 17 Nov 2026 (the owner, 21:26: «lo que no veo por ningún sitio es las subastas»): on a web, the section is always in
+      // its place; when this page called no auction company it says so, with the day's and the week's figures
+      if (!d || !d.sitio) { caja.hidden = true; caja.innerHTML = ''; return; }
+      const hoy0 = d.hoy || {}, semana0 = d.semana || {};
+      caja.innerHTML = '<h2 class="sub-titulo"><span>' + esc(t('sub_titulo')) + '</span></h2><p class="sub-nada">' + esc(t('sub_nada_aqui')) + '</p>'
+        + '<div class="sub-dia sub-dia-sola"><p>' + esc(tn('sub_hoy', hoy0.subastas, { s: n(hoy0.subastas), e: n(hoy0.empresas) })) + '</p><p>' + esc(tn('sub_semana', semana0.subastas, { s: n(semana0.subastas), e: n(semana0.empresas) })) + '</p></div>';
+      caja.hidden = false; sitioVisto = d.sitio;
+      return;
+    }
     if (d.sitio !== sitioVisto) { sitioVisto = d.sitio; carta = null; recibo = ''; abierto = false; }
     const p = d.programas || {};
     const otros = [p.apstag ? 'Amazon (apstag)' : '', p.gpt ? 'Google Ad Manager' : ''].filter(Boolean);

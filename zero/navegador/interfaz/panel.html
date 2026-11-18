@@ -264,6 +264,36 @@ body.vidrio .lista-resumen { margin: var(--e3) 0 0; font: var(--t-12); color: va
 .z1-mas { margin: var(--e6) 0 var(--e3); padding-top: var(--e4); border-top: 1px solid var(--linea); }
 #zero-subasta:not([hidden]) { margin-top: var(--e5); }
 body.vidrio #e-pagina-cab, body.vidrio #e-sitio, body.vidrio #e-resumen, body.vidrio .tercero .quien small { display: none; }
+/* 17 Nov 2026: the shield's controls together under the figure (see the markup) */
+.z3-mandos { margin-top: var(--e4); border: 1px solid var(--linea); border-radius: var(--r-burbuja); background: var(--bg); overflow: hidden; }
+.z3-fila { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: var(--e3); min-height: 48px; padding: 6px var(--e3) 6px var(--e4); border-top: 1px solid var(--linea); }
+.z3-fila:first-child { border-top: 0; }
+.z3-fila label, .z3-fila > b { grid-column: 2; font: 500 13.5px/1.3 var(--texto); color: var(--tinta); }
+.z3-fila > b { grid-column: 1 / 3; }
+.z3-info { all: unset; box-sizing: border-box; cursor: pointer; grid-column: 3; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--muted-2); }
+.z3-info:hover, .z3-info[aria-expanded="true"] { color: var(--tinta); background: var(--campo); }
+.z3-info:focus-visible { outline: 2px solid var(--azul); outline-offset: 1px; }
+.z3-ex { grid-column: 1 / -1; margin: 2px 0 6px; font-size: 12.5px; line-height: 1.5; }
+.z3-ex[hidden] { display: none; }
+.z3-fila.maxima { margin: 0; border-radius: 0; border-width: 1px 0 0; background: none; row-gap: 6px; padding-bottom: 10px; }
+.z3-fila.maxima .boton { grid-column: 1 / -1; width: 100%; min-height: 38px; }
+.z3-fila.maxima .maxima-activa { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 38px; margin: 0; }
+.z3-fila.maxima .maxima-activa.oculto { display: none; }
+/* 21:29 (the owner: «cuando le doy a rastreadores y anuncios… cambia el tamaño… mejor que se mantenga correcto y en orden»):
+   what changes with a switch keeps its place: the figure's words take two lines' room in every state */
+.z2-cifra-txt { min-height: 56px; display: flex; flex-direction: column; justify-content: flex-end; }
+.z3-fila.maxima.encendida { background: var(--verde-suave); }
+.z3-fila.z1-permitir { display: flex; justify-content: space-between; min-height: 48px; padding: 0 var(--e3) 0 var(--e4); border-width: 1px 0 0; border-radius: 0; }
+.z3-fila.z1-permitir.oculto, .z3-subasta.oculto { display: none; }
+.z3-subasta { grid-template-columns: minmax(0, 1fr) auto; row-gap: 1px; padding-top: 8px; padding-bottom: 8px; }
+.z3-subasta .z3-sub-t { grid-column: 1; grid-row: 1; font: 500 13.5px/1.3 var(--texto); }
+.z3-subasta .z3-sub-n { grid-column: 1; grid-row: 2; font: 400 12.5px/1.35 var(--texto); color: var(--gris); font-variant-numeric: tabular-nums; }
+.z3-subasta .z3-sub-n.hay { color: var(--alerta); font-weight: 500; }
+.z3-subasta .enlace { grid-column: 2; grid-row: 1 / 3; font-size: 12.5px; white-space: nowrap; }
+.z3-botones { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e2); padding: var(--e3); border-top: 1px solid var(--linea); }
+.z3-botones .boton { display: inline-flex; align-items: center; justify-content: flex-start; gap: 9px; min-width: 0; min-height: 46px; padding: 6px 12px; font: 500 12.5px/1.25 var(--texto); text-align: start; white-space: normal; }
+.z3-botones .boton svg { flex: none; }
+.z3-botones .boton:disabled { opacity: .45; }
 </style>
 </head>
 <body>
@@ -309,14 +339,37 @@ body.vidrio #e-pagina-cab, body.vidrio #e-sitio, body.vidrio #e-resumen, body.vi
     <div class="z2-latido-pie" aria-hidden="true"><span data-t="z2_hace_minuto"></span><span data-t="z2_ahora"></span></div>
     <div class="z2-reparto" id="z2-reparto"><div class="z2-reparto-barra" id="z2-reparto-barra" aria-hidden="true"></div><p class="lista-resumen" id="e-lista-resumen" role="status"></p></div>
   </div>
+  <!-- 17 Nov 2026 (the owner, 21:26: «el botón de activar protección máxima está demasiado abajo… también el de cortar
+       rastreadores… y ver el resumen de todo lo cortado»; and no «recarga» note or button: the page reloads by itself when
+       one of these changes). Every control of the shield together, right under the figure and above the list, which can be
+       long: the switch that cuts, maximum protection, «permitir en esta web», the auctions of this page at a glance, and
+       the receipt and the summary. The long explanations open from their ⓘ. -->
+  <div class="z3-mandos" id="z3-mandos">
+    <div class="z3-fila">
+      <input type="checkbox" class="interruptor" id="e-proteccion">
+      <label for="e-proteccion" data-t="proteccion"></label>
+      <button type="button" class="z3-info" aria-expanded="false" aria-controls="z3-ex-proteccion" data-t-title="sec_ver_detalles"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.3v3.6M8 5.1v.1"/></svg></button>
+      <p class="explica z3-ex" id="z3-ex-proteccion" data-t="proteccion_explica" hidden></p>
+    </div>
+    <div class="z3-fila maxima" id="e-maxima">
+      <b id="e-maxima-titulo" data-t="maxima_titulo"></b>
+      <button type="button" class="z3-info" aria-expanded="false" aria-controls="z3-ex-maxima" data-t-title="sec_ver_detalles"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.3v3.6M8 5.1v.1"/></svg></button>
+      <p class="explica z3-ex" id="z3-ex-maxima" data-t="maxima_explica" hidden></p>
+      <button class="boton principal" id="e-maxima-activar" data-t="maxima_activar"></button>
+      <p class="maxima-activa oculto" id="e-maxima-activa"><span data-t="maxima_activa"></span> <button class="enlace" id="e-maxima-quitar" data-t="maxima_quitar"></button></p>
+    </div>
+    <div class="z3-fila z1-permitir" id="z1-permitir"><label data-t="z1_permitir"></label><span id="z1-permitir-sw"></span></div>
+    <!-- «Tu visita, a subasta», always in sight (21:26: «lo que no veo por ningún sitio es las subastas»): how many auction
+         companies this page called, or that it called none; its whole section is below the list -->
+    <div class="z3-fila z3-subasta oculto" id="z3-subasta"><span class="z3-sub-t" data-t="sub_titulo"></span><span class="z3-sub-n" id="z3-subasta-n"></span><button type="button" class="enlace" id="z3-subasta-ver" data-t="sec_ver_detalles"></button></div>
+    <div class="z3-botones">
+      <button class="boton" id="z1-recibo" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg><span data-t="z1_recibo"></span></button>
+      <button class="boton" id="e-ver-todo" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14M5 12h14M5 18h9"/></svg><span data-t="escudo_ver_todo"></span></button>
+    </div>
+  </div>
   <div class="z1-columnas"><span data-t="z2_quien"></span><span id="z2-cuantas"></span></div>
   <div id="e-lista-caja" class="oculto"><ul class="terceros" id="e-terceros"></ul></div>
   <p class="vacio oculto" id="e-vacio" data-t="escudo_vacio"></p>
-  <div class="recarga oculto" id="e-recarga"><span data-t="escudo_recarga"></span><button class="boton chico" id="e-recargar" data-t="recargar"></button></div>
-  <div class="z1-acciones">
-    <button class="boton principal" id="z1-recibo" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg><span data-t="z1_recibo"></span></button>
-    <div class="z1-permitir" id="z1-permitir"><label data-t="z1_permitir"></label><span id="z1-permitir-sw"></span></div>
-  </div>
   <!-- 1.0.46 · «Tu visita, a subasta» (agent 4, branch subastas-1.0.46): its own script fills this
        section through window.ZeroSubasta.montar(el, pagina), called on every update of the page
        (panel.js, «escudo»). Hidden until it says something. -->
@@ -346,15 +399,6 @@ body.vidrio #e-pagina-cab, body.vidrio #e-sitio, body.vidrio #e-resumen, body.vi
   <p class="pagina-cab" id="e-pagina-cab" data-t="escudo_esta_pagina"></p>
   <div class="sitio" id="e-sitio"></div>
   <p class="resumen" id="e-resumen"></p>
-  <div class="ajuste">
-    <input type="checkbox" class="interruptor" id="e-proteccion">
-    <div><label for="e-proteccion" data-t="proteccion"></label><p class="explica" data-t="proteccion_explica"></p></div>
-  </div>
-  <div class="maxima" id="e-maxima">
-    <div class="maxima-txt"><b id="e-maxima-titulo" data-t="maxima_titulo"></b><p class="explica" data-t="maxima_explica"></p></div>
-    <button class="boton principal" id="e-maxima-activar" data-t="maxima_activar"></button>
-    <p class="maxima-activa oculto" id="e-maxima-activa"><span data-t="maxima_activa"></span> <button class="enlace" id="e-maxima-quitar" data-t="maxima_quitar"></button></p>
-  </div>
   <div class="hechos" id="e-hechos"></div>
   <div class="chivatos oculto" id="e-chivatos-caja">
     <h2 id="e-chivatos-titulo"></h2>
@@ -378,7 +422,6 @@ body.vidrio #e-pagina-cab, body.vidrio #e-sitio, body.vidrio #e-resumen, body.vi
     <ul class="chivatos-lista" id="e-medidas"></ul>
     <div id="e-medidas-notas"></div>
   </div>
-  <p class="ver-todo"><button class="enlace" id="e-ver-todo" data-t="escudo_ver_todo"></button></p>
   <!-- 15 Nov 2026: with no «Ajustes» in the bar, the settings are here and on the new tab -->
   <p class="ver-todo"><button class="enlace" id="e-ajustes" data-t="z1_atajo_ajustes"></button></p>
 </section>

@@ -2,5 +2,8 @@
   "youtube_ajuste": "Fjarlægja auglýsingar á YouTube",
   "youtube_ajuste_explica": "Fjarlægir auglýsingar úr myndböndum og síðum YouTube. Ef YouTube breytir því hvernig þær birtast getur ein og ein sloppið í gegn. Gildir um flipa sem þú opnar héðan í frá.",
   "sub_abierta": "Opið uppboð: ZERO hleypir tilboðsbeiðnum þessarar síðu í gegn, með gögnunum sem þær bera, svo þú sjáir hvað fyrirtæki bjóða í heimsókn þína. Kveiktu á “Don’t auction me” í Settings til að stöðva þær.",
-  "abriendo": "Opnar GUARDIANA…"
+  "abriendo": "Opnar GUARDIANA…",
+  "barra_navegador": "Vafri",
+  "sub_nada_aqui": "Engin á þessari síðu",
+  "guardado_archivo": "Vistað: {nombre}"
 }

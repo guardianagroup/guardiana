@@ -1702,5 +1702,8 @@
   "sala_ent_cerrar": "Close",
   "sala_e_mirando": "The first check hasn't run yet",
   "sala_in_alcance": "The signature proves this report hasn't been altered since it was sealed. It doesn't guarantee that every system event was detected.",
-  "abriendo": "Opening GUARDIANA…"
+  "abriendo": "Opening GUARDIANA…",
+  "barra_navegador": "Browser",
+  "sub_nada_aqui": "None on this page",
+  "guardado_archivo": "Saved: {nombre}"
 }

@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "Bezárás",
   "sala_e_mirando": "Az első ellenőrzés még nem történt meg",
   "sala_in_alcance": "Az aláírás azt bizonyítja, hogy ezt a jelentést a lepecsételése óta nem módosították. Azt nem garantálja, hogy a rendszer minden eseményét észlelték.",
-  "abriendo": "A GUARDIANA megnyitása…"
+  "abriendo": "A GUARDIANA megnyitása…",
+  "barra_navegador": "Böngésző",
+  "sub_nada_aqui": "Ezen az oldalon nincs",
+  "guardado_archivo": "Mentve: {nombre}"
 }

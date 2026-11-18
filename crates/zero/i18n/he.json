@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "סגירה",
   "sala_e_mirando": "הבדיקה הראשונה עדיין לא נעשתה",
   "sala_in_alcance": "החתימה מוכיחה שהדוח הזה לא שונה אחרי שנחתם. היא לא מבטיחה שכל אירוע במערכת זוהה.",
-  "abriendo": "פותח את GUARDIANA…"
+  "abriendo": "פותח את GUARDIANA…",
+  "barra_navegador": "דפדפן",
+  "sub_nada_aqui": "אין בדף הזה",
+  "guardado_archivo": "נשמר: {nombre}"
 }

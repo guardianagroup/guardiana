@@ -23,6 +23,8 @@ const MAX_AVISOS: usize = 500;
 const MAX_PENDIENTES: usize = 1_000;
 /// How long a query waits for that check.
 const ESPERA_FIRMA_MS: u64 = 60_000;
+/// How long after the start the «credenciales» warnings of an earlier version wait for their files' signatures.
+const ESPERA_VIEJOS_MS: u64 = 10 * 60_000;
 /// How often the memory is written down when it changed.
 const GUARDAR_CADA_MS: u64 = 5 * 60_000;
 /// The same program touching the same kind of secret of the same app warns once a day.
@@ -239,6 +241,12 @@ pub(crate) struct EscudoVivo {
     medios_pend: Vec<DesdeMedio>,
     /// Openings of LSASS whose program's signature was not checked yet.
     accesos_pend: Vec<Acceso>,
+    /// The «credenciales» warnings an earlier version wrote without who signs the file (until the 1.0.57), as their
+    /// program's (path, file name), read once at the start: each file's signature is checked again and those the rule
+    /// now exempts leave the panel's list (1.0.62: OneDrive's stayed in red until OneDrive opened LSASS again). Until
+    /// when they are waited for.
+    viejos_credenciales: Vec<(String, String)>,
+    viejos_hasta_ms: u64,
     /// Connections without a name whose program's signature was not checked yet, and program path → when it was
     /// last judged.
     sin_nombre_pend: Vec<SinNombre>,
@@ -274,12 +282,16 @@ impl EscudoVivo {
             .ok()
             .and_then(|j| Memoria::desde_json(&j).ok())
             .unwrap_or_else(|| Memoria::nueva(ahora_ms));
+        let ruta_avisos = db.with_file_name("escudo-avisos.jsonl");
+        let viejos_credenciales = std::fs::read_to_string(&ruta_avisos)
+            .map(|t| credenciales_sin_firma(&t))
+            .unwrap_or_default();
         Self {
             memoria,
             listas: Vec::new(),
             pendientes: Vec::new(),
             ruta_memoria,
-            ruta_avisos: db.with_file_name("escudo-avisos.jsonl"),
+            ruta_avisos,
             guardada_ms: ahora_ms,
             cambios: false,
             marcas: HashMap::new(),
@@ -302,6 +314,8 @@ impl EscudoVivo {
             secuestros_vistos: HashMap::new(),
             medios_pend: Vec::new(),
             accesos_pend: Vec::new(),
+            viejos_credenciales,
+            viejos_hasta_ms: ahora_ms.saturating_add(ESPERA_VIEJOS_MS),
             hosts,
             ruta_hosts,
             hosts_leido_ms: 0,
@@ -371,6 +385,7 @@ impl EscudoVivo {
         self.ladrones(obs, ahora_ms);
         self.cadenas();
         self.credenciales(obs, ahora_ms);
+        self.credenciales_viejas(obs, ahora_ms);
         self.medios(obs, ahora_ms);
         self.arranques_pendientes(obs, ahora_ms);
         if self.pendientes.is_empty() {
@@ -672,6 +687,31 @@ impl EscudoVivo {
             };
             extra.insert("firma".to_owned(), serde_json::Value::String(quien));
             self.anota_con(&aviso, grave, extra);
+        }
+    }
+
+    /// The «credenciales» warnings of an earlier version (`viejos_credenciales`), once Windows has checked each file's
+    /// signature: those the rule now exempts (signed by Microsoft and not one of the tools) leave the panel's list, the
+    /// rest stay. A file not checked within [`ESPERA_VIEJOS_MS`] of the start keeps its warnings.
+    fn credenciales_viejas(&mut self, obs: &Observador, ahora_ms: u64) {
+        if self.viejos_credenciales.is_empty() {
+            return;
+        }
+        let espera = ahora_ms < self.viejos_hasta_ms;
+        for (ruta, programa) in std::mem::take(&mut self.viejos_credenciales) {
+            let firma = match obs.firma(&ruta) {
+                Some(f) if f.is_empty() => Firma::SinFirma,
+                Some(f) => Firma::Firmado(f),
+                None if espera => {
+                    self.viejos_credenciales.push((ruta, programa));
+                    continue;
+                }
+                None => continue,
+            };
+            let original = obs.original(&ruta).unwrap_or_default();
+            if guardiana_escudo::credenciales::exento_por_firma(&programa, &firma, &original) {
+                self.retira_credenciales(&ruta);
+            }
         }
     }
 
@@ -1313,6 +1353,32 @@ fn sin_credenciales_de(texto: &str, ruta: &str) -> Option<String> {
     Some(salida)
 }
 
+/// The programs of the «credenciales» warnings in the warnings file `texto` written without who signs the file (until
+/// the 1.0.57), as (path, file name): each path once, at most [`MAX_PENDIENTES`].
+fn credenciales_sin_firma(texto: &str) -> Vec<(String, String)> {
+    let mut vistos = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for linea in texto.lines().filter(|l| !l.is_empty()) {
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(linea) else {
+            continue;
+        };
+        if v["regla"].as_str() != Some("credenciales") || v.get("firma").is_some() {
+            continue;
+        }
+        let (Some(ruta), Some(programa)) = (v["ruta"].as_str(), v["programa"].as_str()) else {
+            continue;
+        };
+        if ruta.is_empty() || !vistos.insert(ruta.to_lowercase()) {
+            continue;
+        }
+        out.push((ruta.to_owned(), programa.to_owned()));
+        if out.len() >= MAX_PENDIENTES {
+            break;
+        }
+    }
+    out
+}
+
 /// Writes a whole file through a temporary name, so that it is either all there or not at all.
 fn escribe(ruta: &Path, datos: &[u8]) -> std::io::Result<()> {
     let tmp = ruta.with_extension("tmp");
@@ -1410,7 +1476,47 @@ fn escribe_senuelo(ruta: &Path) -> Option<std::time::SystemTime> {
 
 #[cfg(test)]
 mod tests {
-    use super::sin_credenciales_de;
+    use super::{credenciales_sin_firma, sin_credenciales_de};
+
+    #[test]
+    fn los_avisos_viejos_de_credenciales_se_vuelven_a_mirar_al_arrancar() {
+        let onedrive = r"C:\Users\ana\AppData\Local\Microsoft\OneDrive\OneDrive.exe";
+        let otro = r"C:\Users\ana\Downloads\x.exe";
+        let linea = |regla: &str, ruta: &str, programa: &str, firma: Option<&str>| {
+            let mut v = serde_json::json!({
+                "regla": regla, "programa": programa, "ruta": ruta, "sitio": "",
+                "nombre": ruta.to_lowercase(), "cuando_ms": 1, "texto": "…", "grave": true
+            });
+            if let Some(f) = firma {
+                v["firma"] = serde_json::Value::from(f);
+            }
+            v.to_string()
+        };
+        // OneDrive dos veces (de la 1.0.57, sin «firma»), otro programa, uno con «firma» (1.0.58) y otra regla
+        let texto = [
+            linea("credenciales", onedrive, "OneDrive.exe", None),
+            linea(
+                "credenciales",
+                &onedrive.to_uppercase(),
+                "OneDrive.exe",
+                None,
+            ),
+            linea("credenciales", otro, "x.exe", None),
+            linea("credenciales", r"C:\y.exe", "y.exe", Some("sin firma")),
+            linea("secuestro", r"C:\z.exe", "z.exe", None),
+            "no es json".to_owned(),
+        ]
+        .join("\n");
+        let viejos = credenciales_sin_firma(&texto);
+        assert_eq!(
+            viejos,
+            vec![
+                (onedrive.to_owned(), "OneDrive.exe".to_owned()),
+                (otro.to_owned(), "x.exe".to_owned())
+            ]
+        );
+        assert!(credenciales_sin_firma("").is_empty());
+    }
 
     #[test]
     fn los_avisos_de_credenciales_de_un_programa_firmado_se_retiran() {

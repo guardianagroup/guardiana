@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "إغلاق",
   "sala_e_mirando": "لم يُجرَ التحقق الأول بعد",
   "sala_in_alcance": "يثبت التوقيع أن هذا التقرير لم يُعدَّل بعد ختمه. ولا يضمن أنه قد اكتُشف كل حدث في النظام.",
-  "abriendo": "جارٍ فتح GUARDIANA…"
+  "abriendo": "جارٍ فتح GUARDIANA…",
+  "barra_navegador": "المتصفح",
+  "sub_nada_aqui": "لا شيء في هذه الصفحة",
+  "guardado_archivo": "تم الحفظ: {nombre}"
 }

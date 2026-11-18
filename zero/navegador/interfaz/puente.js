@@ -182,5 +182,30 @@ const Z = (() => {
     e.stopPropagation();
     manda({ tipo: 'abrir_ficha', empresa: b.dataset.empresa });
   }, true);
-  return { manda, en, t, tn, esc, $, n, pintaTextos, recibe, oscuro, ICONO, rastro };
+  // 17 Nov 2026 (the owner, 21:54–21:55: «guardar la imagen… me dice guardado en C:\Users… tiene que abrir y darme la opción
+  // de dónde lo guardo en mi ordenador… para hacerlo de calidad profesional»): Windows' own «Guardar como», opening on the
+  // desktop the first time and then wherever the person saved last. Returns the name chosen, null if the person cancelled,
+  // or false when the dialog cannot be shown (the caller then saves the old way, in Downloads).
+  const TIPOS_ARCHIVO = { png: ['image/png', 'PNG'], pdf: ['application/pdf', 'PDF'], json: ['application/json', 'JSON'], txt: ['text/plain', 'TXT'] };
+  async function guardaComo(blob, nombre) {
+    if (typeof window.showSaveFilePicker !== 'function') return false;
+    const ext = String(nombre).slice(String(nombre).lastIndexOf('.') + 1).toLowerCase(), tp = TIPOS_ARCHIVO[ext];
+    try {
+      const op = { id: 'guardiana-zero', startIn: 'desktop', suggestedName: nombre };
+      if (tp) op.types = [{ description: tp[1], accept: { [tp[0]]: ['.' + ext] } }];
+      const h = await window.showSaveFilePicker(op);
+      const w = await h.createWritable(); await w.write(blob); await w.close();
+      return h.name || nombre;
+    } catch (e) { return e && e.name === 'AbortError' ? null : false; }
+  }
+  // An image drawn on a canvas, saved where the person chooses; the old way (the program writes it in Downloads) only when
+  // the dialog cannot be shown. `pinta(texto)` says how it went, in the page's own line.
+  async function guardaImagen(lienzo, nombre, que, pinta) {
+    const blob = await new Promise((ok) => { try { lienzo.toBlob((b) => ok(b), 'image/png'); } catch (_) { ok(null); } });
+    const r = blob ? await guardaComo(blob, nombre) : false;
+    if (r === null) return;
+    if (r) { if (pinta) pinta(t('guardado_archivo', { nombre: r })); return; }
+    manda({ tipo: 'guardar_imagen', que, datos: lienzo.toDataURL('image/png') });
+  }
+  return { manda, en, t, tn, esc, $, n, pintaTextos, recibe, oscuro, ICONO, rastro, guardaComo, guardaImagen };
 })();

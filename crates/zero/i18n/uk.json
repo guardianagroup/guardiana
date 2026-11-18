@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "Закрити",
   "sala_e_mirando": "Першої перевірки ще не виконано",
   "sala_in_alcance": "Підпис доводить, що цей звіт не змінювали після запечатування. Він не гарантує, що виявлено кожну подію системи.",
-  "abriendo": "Відкриваємо GUARDIANA…"
+  "abriendo": "Відкриваємо GUARDIANA…",
+  "barra_navegador": "Браузер",
+  "sub_nada_aqui": "На цій сторінці немає",
+  "guardado_archivo": "Збережено: {nombre}"
 }

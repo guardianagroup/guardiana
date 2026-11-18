@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "بند کریں",
   "sala_e_mirando": "پہلی جانچ ابھی نہیں ہوئی",
   "sala_in_alcance": "دستخط ثابت کرتا ہے کہ مہر لگنے کے بعد یہ رپورٹ بدلی نہیں گئی۔ یہ ضمانت نہیں دیتا کہ سسٹم کا ہر واقعہ پکڑا گیا ہو۔",
-  "abriendo": "GUARDIANA کھل رہا ہے…"
+  "abriendo": "GUARDIANA کھل رہا ہے…",
+  "barra_navegador": "براؤزر",
+  "sub_nada_aqui": "اس صفحے پر کوئی نہیں",
+  "guardado_archivo": "محفوظ ہو گیا: {nombre}"
 }

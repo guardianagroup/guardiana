@@ -269,7 +269,9 @@
     x.fillText(linea, 72, y);
     x.fillStyle = '#9CC3E4'; x.font = '500 20px "Hanken Grotesk"'; x.fillText('guardianagroup.com', 72, 570);
     x.fillStyle = '#A9B3BE'; x.font = '400 18px "Hanken Grotesk"'; x.fillText(t('lema'), 72, 540);
-    manda({ tipo: 'guardar_imagen', nombre: 'guardiana-zero-mes.png', datos: c.toDataURL('image/png') });
+    // 17 Nov 2026: Windows' «Guardar como» (puente.js); the program's old way only if it cannot be shown
+    const hoyMes = new Date(), archivoMes = 'guardiana-zero-' + hoyMes.getFullYear() + '-' + String(hoyMes.getMonth() + 1).padStart(2, '0') + '.png';
+    Z.guardaImagen(c, archivoMes, 'mes', (texto) => { const g = $('guardada'); g.textContent = texto; g.classList.remove('oculto'); });
   });
 
   // --- 30 Oct 2026: la Lente de actividad (lente.js) en lugar del escudo -------------------------------

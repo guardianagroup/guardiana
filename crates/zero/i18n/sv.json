@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "Stäng",
   "sala_e_mirando": "Den första kontrollen har inte gjorts ännu",
   "sala_in_alcance": "Signaturen visar att den här rapporten inte har ändrats efter att den förseglades. Den garanterar inte att varje händelse i systemet har upptäckts.",
-  "abriendo": "Öppnar GUARDIANA…"
+  "abriendo": "Öppnar GUARDIANA…",
+  "barra_navegador": "Webbläsare",
+  "sub_nada_aqui": "Ingen på den här sidan",
+  "guardado_archivo": "Sparad: {nombre}"
 }

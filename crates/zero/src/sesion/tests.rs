@@ -5127,3 +5127,38 @@ fn only_comunicaciones_gets_the_window_of_a_call_and_only_by_its_name() {
         assert!(!es_ventana_llamada(nombre, pide), "{nombre} desde {pide}");
     }
 }
+
+#[test]
+fn a_change_of_the_protections_reloads_the_web_in_front() {
+    // 17 Nov 2026 (the owner: «cada cambio vale desde ya para lo que la página pida, recarga para verla entera… eso fuera»;
+    // «los avisos de cookies… al tocarlo parece que no hace nada»): the switches of the bar, the shield's and «Permitir en esta
+    // web» reload the web in front, so the page is seen with the change at once and the shield counts it as it is now.
+    let (mut s, _d, id) = con_pagina(true);
+    for (clave, valor) in [
+        ("cortar_seguimiento", "false"),
+        ("cortar_seguimiento", "true"),
+        ("rechazar_cookies", "false"),
+        ("quitar_emergentes", "false"),
+        ("maxima", "true"),
+    ] {
+        let o = s.mensaje(
+            Origen::Barra,
+            BARRA,
+            &format!(r#"{{"tipo":"ajuste","clave":"{clave}","valor":{valor}}}"#),
+        );
+        assert!(o.contains(&Orden::Recarga { id }), "{clave} = {valor}");
+    }
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"permitir_web","valor":true}"#,
+    );
+    assert!(o.contains(&Orden::Recarga { id }), "permitir en esta web");
+    // nothing that is not a protection reloads it
+    let o = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        r#"{"tipo":"ajuste","clave":"tema","valor":"noche"}"#,
+    );
+    assert!(!o.contains(&Orden::Recarga { id }), "el tema");
+}

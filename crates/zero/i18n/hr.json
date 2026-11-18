@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "Zatvori",
   "sala_e_mirando": "Prva provjera još nije obavljena",
   "sala_in_alcance": "Potpis dokazuje da ovo izvješće nije izmijenjeno nakon pečaćenja. Ne jamči da je otkriven svaki događaj u sustavu.",
-  "abriendo": "Otvaranje GUARDIANA…"
+  "abriendo": "Otvaranje GUARDIANA…",
+  "barra_navegador": "Preglednik",
+  "sub_nada_aqui": "Nema na ovoj stranici",
+  "guardado_archivo": "Spremljeno: {nombre}"
 }

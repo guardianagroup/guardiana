@@ -2,5 +2,8 @@
   "youtube_ajuste": "Xóa quảng cáo trên YouTube",
   "youtube_ajuste_explica": "Xóa quảng cáo khỏi video và trang của YouTube. Nếu YouTube thay đổi cách hiển thị, có thể lọt một vài quảng cáo. Áp dụng cho các thẻ bạn mở từ bây giờ.",
   "sub_abierta": "Đấu giá đang mở: ZERO cho các yêu cầu đặt giá của trang này đi qua, kèm dữ liệu chúng mang theo, để bạn thấy các công ty trả giá bao nhiêu cho lượt truy cập của bạn. Để cắt chúng, hãy bật “Don’t auction me” trong Settings.",
-  "abriendo": "Đang mở GUARDIANA…"
+  "abriendo": "Đang mở GUARDIANA…",
+  "barra_navegador": "Trình duyệt",
+  "sub_nada_aqui": "Không có trên trang này",
+  "guardado_archivo": "Đã lưu: {nombre}"
 }

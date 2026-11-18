@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "閉じる",
   "sala_e_mirando": "最初の確認はまだ行われていません",
   "sala_in_alcance": "署名は、このレポートが封印後に改変されていないことを証明します。システムのすべてのイベントが検出されたことを保証するものではありません。",
-  "abriendo": "GUARDIANA を開いています…"
+  "abriendo": "GUARDIANA を開いています…",
+  "barra_navegador": "ブラウザ",
+  "sub_nada_aqui": "このページにはありません",
+  "guardado_archivo": "保存しました: {nombre}"
 }

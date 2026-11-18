@@ -1636,5 +1636,8 @@
   "sala_ent_cerrar": "बंद करें",
   "sala_e_mirando": "पहली जाँच अभी नहीं हुई है",
   "sala_in_alcance": "हस्ताक्षर साबित करता है कि सील किए जाने के बाद इस रिपोर्ट में कोई बदलाव नहीं हुआ है। यह गारंटी नहीं देता कि सिस्टम की हर घटना पकड़ी गई है।",
-  "abriendo": "GUARDIANA खुल रहा है…"
+  "abriendo": "GUARDIANA खुल रहा है…",
+  "barra_navegador": "ब्राउज़र",
+  "sub_nada_aqui": "इस पेज पर कोई नहीं",
+  "guardado_archivo": "सहेजा गया: {nombre}"
 }
