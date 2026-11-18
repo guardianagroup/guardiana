@@ -375,5 +375,77 @@
     anima();
   });
   en('foco_direccion', () => { campo.focus(); });
+
+  // --- 1.0.63 «Comprobando esta página» ----------------------------------------------------------
+  // The session says what ZERO checked on a site entered for the first time (each line, a real check: the lists of
+  // malware and scams, the connection, the other companies the page tried to reach and the shield cut, the cookie
+  // notice) and how much is left of its five seconds. Each line gives its answer in turn, the bar fills, and the session
+  // ends it («fin»): then the page, which kept loading behind, is shown. On a list of danger it stays, with the way out.
+  const CP_PASO = { lista: 600, conexion: 1500, empresas: 2500, cookies: 3400 }; // ms after the start
+  let cp = null, cpN = 0, cpT0 = 0, cpReloj = 0;
+  function cpLinea(nombre, clase, texto) {
+    const li = document.querySelector('#comprueba li[data-paso="' + nombre + '"]');
+    if (!li) return;
+    li.className = clase || '';
+    const v = li.querySelector('.cp-v'), tx = texto == null ? t('cp_comprobando') : texto;
+    if (v.textContent !== tx) v.textContent = tx;
+  }
+  function cpPinta() {
+    const sec = $('comprueba');
+    if (!cp || sec.hidden) return;
+    const e = performance.now() - cpT0, pasa = (k) => e >= CP_PASO[k];
+    cpLinea('lista', pasa('lista') ? (cp.peligro ? 'mal' : 'ok') : '', pasa('lista') ? t(cp.peligro ? 'cp_lista_mal' : 'cp_lista_ok') : null);
+    for (const k of ['conexion', 'empresas', 'cookies']) document.querySelector('#comprueba li[data-paso="' + k + '"]').hidden = !!cp.peligro;
+    if (!cp.peligro) {
+      if (!pasa('conexion')) cpLinea('conexion', '', null);
+      else if (!cp.llego) cpLinea('conexion', '', t('cp_conexion_espera'));
+      else cpLinea('conexion', cp.https ? 'ok' : 'aviso', t(cp.https ? 'cp_conexion_https' : 'cp_conexion_http'));
+      cpLinea('empresas', pasa('empresas') ? (cp.empresas > 0 ? 'ok' : 'neutro') : '', pasa('empresas') ? (cp.empresas > 0 ? tn('inicio_barra_cortadas', cp.empresas, { n: Number(cp.empresas).toLocaleString(document.documentElement.lang || undefined) }) : t('cp_ninguna')) : null);
+      cpLinea('cookies', pasa('cookies') ? (cp.cookies ? 'ok' : 'neutro') : '', pasa('cookies') ? t(cp.cookies ? 'cp_cookies_si' : 'cp_cookies_no') : null);
+      const pr = document.querySelector('#comprueba .cp-barra');
+      pr.setAttribute('aria-valuenow', String(Math.min(100, Math.round(e / (cp.total || 5000) * 100))));
+    }
+  }
+  function cpCierra(suave) {
+    const sec = $('comprueba');
+    clearInterval(cpReloj); cpReloj = 0;
+    if (sec.hidden) return;
+    if (!suave) { sec.hidden = true; return; }
+    sec.classList.add('sale');
+    setTimeout(() => { if (sec.classList.contains('sale')) { sec.hidden = true; sec.classList.remove('sale'); } }, 280);
+  }
+  function cpMuestra(m) {
+    if (m.fin) { cp = null; cpCierra(true); return; }
+    cp = m;
+    const sec = $('comprueba');
+    if (!m.visible) { cpCierra(false); return; }
+    const nueva = m.n !== cpN || sec.hidden;
+    if (m.n !== cpN) { cpN = m.n; cpT0 = performance.now() - Math.max(0, (m.total || 5000) - (m.quedan || 0)); }
+    // under the rows of the bar, whatever their height
+    const abajo = $('herramientas').getBoundingClientRect().bottom || 144;
+    sec.style.setProperty('--cp-top', Math.round(abajo) + 'px');
+    sec.classList.remove('sale');
+    sec.classList.toggle('peligro', !!m.peligro);
+    sec.querySelector('.cp-t').textContent = t(m.peligro ? 'cp_peligro_titulo' : 'cp_titulo');
+    sec.querySelector('.cp-host').textContent = m.host || '';
+    sec.querySelector('.cp-peligro').hidden = !m.peligro;
+    sec.querySelector('.cp-pie').hidden = !!m.peligro;
+    sec.querySelector('.cp-inicio').hidden = !m.peligro;
+    const pr = sec.querySelector('.cp-barra'), b = pr.querySelector('b');
+    pr.hidden = !!m.peligro;
+    sec.hidden = false;
+    if (nueva && !m.peligro) {
+      const hecho = Math.min(1, (performance.now() - cpT0) / (m.total || 5000)), queda = Math.max(0, (m.total || 5000) * (1 - hecho));
+      b.style.transition = 'none'; b.style.width = (hecho * 100).toFixed(2) + '%';
+      void b.offsetWidth;
+      b.style.transition = 'width ' + Math.round(queda) + 'ms linear'; b.style.width = '100%';
+    }
+    if (!cpReloj) cpReloj = setInterval(cpPinta, 150);
+    cpPinta();
+    if (m.peligro) setTimeout(() => { const x = sec.querySelector('.cp-inicio'); if (x && !x.hidden) x.focus({ preventScroll: true }); }, 60);
+  }
+  en('comprobacion', cpMuestra);
+  en('textos', () => { if (cp && cp.visible) cpMuestra(cp); });
+  document.querySelector('#comprueba .cp-inicio').addEventListener('click', () => manda({ tipo: 'comprobacion_inicio' }));
   manda({ tipo: 'listo', vista: 'barra' });
 })();

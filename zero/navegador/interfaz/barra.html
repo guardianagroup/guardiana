@@ -178,6 +178,53 @@ body.solo-arriba #protecciones, body.solo-arriba #estado-z { display: none; }
 @media (max-width: 1240px) { body.con-vpn .marca .marca-sep, body.con-vpn .marca .marca-sub { display: none; } }
 @media (max-width: 1040px) { .marca .marca-sep, .marca .marca-sub { display: none; } }
 @media (max-width: 720px) { .marca .marca-n { display: none; } }
+
+/* 1.0.63 «Comprobando esta página»: the bar grown to the whole window draws it under its rows. */
+#comprueba { position: fixed; left: 0; right: 0; bottom: 0; top: var(--cp-top, 144px); z-index: 30; display: grid; place-items: center; padding: var(--e6, 32px) var(--s-margen); background: radial-gradient(1200px 600px at 50% 40%, rgba(156,195,228,.07), transparent 70%), var(--bg); overflow: auto; user-select: none; animation: cp-entra .32s cubic-bezier(.2,.7,.2,1); }
+#comprueba[hidden] { display: none; }
+#comprueba.sale { animation: cp-sale .28s ease forwards; }
+@keyframes cp-entra { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cp-sale { to { opacity: 0; } }
+.cp-caja { width: min(520px, 100%); display: flex; flex-direction: column; align-items: center; text-align: center; }
+.cp-sello { position: relative; width: 92px; height: 92px; display: grid; place-items: center; margin-bottom: 22px; color: rgba(156,195,228,.55); }
+.cp-anillo { position: absolute; inset: 0; width: 100%; height: 100%; animation: cp-gira 6s linear infinite; }
+.cp-g { width: 46px; height: 46px; filter: drop-shadow(0 0 18px rgba(156,195,228,.35)); }
+@keyframes cp-gira { to { transform: rotate(360deg); } }
+.cp-k { margin: 0 0 10px; font: 500 10.5px/1.2 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--gris); }
+.cp-t { margin: 0; font: 300 26px/1.2 var(--texto); letter-spacing: -.01em; color: var(--tinta); text-wrap: balance; }
+.cp-host { margin: 10px 0 0; max-width: 100%; padding: 5px 12px; border: 1px solid var(--linea); border-radius: var(--r-pill); font: 500 13px/1.3 var(--mono); color: #CFE0EF; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-peligro { margin: 14px 0 0; font: 400 14px/1.55 var(--texto); color: #F2B8AF; }
+.cp-peligro[hidden] { display: none; }
+.cp-pasos { list-style: none; width: 100%; margin: 26px 0 0; padding: 4px 0; border-top: 1px solid var(--linea); border-bottom: 1px solid var(--linea); text-align: left; }
+.cp-pasos li { display: flex; align-items: center; gap: 12px; padding: 11px 2px; border-top: 1px solid rgba(156,195,228,.07); font: 400 14px/1.35 var(--texto); color: #C6D0DA; }
+.cp-pasos li:first-child { border-top: 0; }
+.cp-pasos li[hidden] { display: none; }
+.cp-pasos i { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(156,195,228,.28); border-top-color: #9CC3E4; animation: cp-gira .9s linear infinite; }
+.cp-pasos li.ok i, .cp-pasos li.aviso i, .cp-pasos li.mal i, .cp-pasos li.neutro i { animation: none; border: 0; background: no-repeat center / 18px 18px; }
+.cp-pasos li.ok i { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Ccircle cx='9' cy='9' r='9' fill='%235CC98A' fill-opacity='.16'/%3E%3Cpath d='M5.2 9.3l2.4 2.4 5-5.2' fill='none' stroke='%235CC98A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+.cp-pasos li.neutro i { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Ccircle cx='9' cy='9' r='9' fill='%239CC3E4' fill-opacity='.14'/%3E%3Ccircle cx='9' cy='9' r='2.2' fill='%239CC3E4'/%3E%3C/svg%3E"); }
+.cp-pasos li.aviso i { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Ccircle cx='9' cy='9' r='9' fill='%23F0C77F' fill-opacity='.16'/%3E%3Cpath d='M9 5v5' stroke='%23F0C77F' stroke-width='1.8' stroke-linecap='round'/%3E%3Ccircle cx='9' cy='12.8' r='1.1' fill='%23F0C77F'/%3E%3C/svg%3E"); }
+.cp-pasos li.mal i { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Ccircle cx='9' cy='9' r='9' fill='%23E07A6C' fill-opacity='.18'/%3E%3Cpath d='M6.2 6.2l5.6 5.6M11.8 6.2l-5.6 5.6' stroke='%23E07A6C' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.cp-n { flex: 1; min-width: 0; }
+.cp-v { flex: none; font: 500 12.5px/1.2 var(--mono); color: var(--gris); text-align: right; }
+.cp-pasos li.ok .cp-v { color: #8FDDB0; }
+.cp-pasos li.aviso .cp-v { color: #F0C77F; }
+.cp-pasos li.mal .cp-v { color: #EE9D92; }
+.cp-pasos li.neutro .cp-v { color: #B4C8DA; }
+.cp-barra { width: 100%; height: 4px; margin-top: 22px; border-radius: 4px; background: rgba(156,195,228,.12); overflow: hidden; }
+.cp-barra b { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #6FA3CF, #9CC3E4 60%, #CFE3F3); box-shadow: 0 0 12px rgba(156,195,228,.55); }
+.cp-barra[hidden] { display: none; }
+.cp-pie { margin: 14px 0 0; font: 400 12px/1.5 var(--texto); color: var(--gris); }
+.cp-pie[hidden] { display: none; }
+.cp-inicio { margin-top: 22px; height: 40px; padding: 0 22px; border: 0; border-radius: var(--r-pill); background: #9CC3E4; color: #06080C; font: 600 14px/1 var(--texto); cursor: pointer; }
+.cp-inicio:hover { background: #B4D3EC; }
+.cp-inicio:focus-visible { outline: 2px solid var(--tinta); outline-offset: 3px; }
+.cp-inicio[hidden] { display: none; }
+#comprueba.peligro .cp-g { filter: drop-shadow(0 0 18px rgba(224,122,108,.45)); }
+#comprueba.peligro .cp-sello { color: rgba(224,122,108,.6); }
+#comprueba.peligro .cp-anillo { animation: none; }
+@media (max-height: 640px) { .cp-sello { width: 64px; height: 64px; margin-bottom: 14px; } .cp-g { width: 34px; height: 34px; } .cp-t { font-size: 22px; } .cp-pasos { margin-top: 16px; } .cp-pasos li { padding: 8px 2px; } }
+@media (prefers-reduced-motion: reduce) { #comprueba, .cp-anillo, .cp-pasos i { animation: none !important; } }
 </style>
 </head>
 <body>
@@ -237,6 +284,30 @@ body.solo-arriba #protecciones, body.solo-arriba #estado-z { display: none; }
   <button id="b-escudo" data-t-title="escudo_boton_titulo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3l7.5 2.8v5.6c0 4.6-3.1 8.2-7.5 9.6-4.4-1.4-7.5-5-7.5-9.6V5.8z"/></svg><span id="b-escudo-n">0</span><span id="b-escudo-que"></span></button>
   <canvas id="guardia" data-t-title="linea_guardia_titulo"></canvas>
 </div>
+<!-- 1.0.63 (the owner, 17 Nov 2026, 22:48): «Comprobando esta página», over a site entered for the first time since
+     ZERO opened. The bar grows to the whole window (sesion: ALTO_COMPRUEBA) and this fills what is under it; the page
+     loads behind. Each line is something ZERO really checks; the session fills it in (barra.js, «comprobacion»). -->
+<section id="comprueba" hidden aria-labelledby="cp-t">
+  <div class="cp-caja">
+    <div class="cp-sello" aria-hidden="true">
+      <svg class="cp-anillo" viewBox="0 0 120 120"><circle cx="60" cy="60" r="56" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 10" /></svg>
+      <svg class="cp-g" viewBox="0 0 100 100"><defs><mask id="cp-g-m"><rect width="100" height="100" fill="#fff"/><path d="M63 58.29 V55.07 Q63 54 58.71 54 H44.15 Q37 54 37 61.15 V72.85 Q37 80 44.15 80 H58.71 Q63 80 63 75.71 V67 H51" fill="none" stroke="#000" stroke-width="7.5"/></mask></defs><path d="M31 44 V31 A19 19 0 0 1 69 31 V44" fill="none" stroke="#E8ECF1" stroke-width="9"/><rect x="17" y="42" width="66" height="50" rx="13" fill="#9CC3E4" mask="url(#cp-g-m)"/></svg>
+    </div>
+    <p class="cp-k" data-t="cp_kicker"></p>
+    <h1 class="cp-t" id="cp-t"></h1>
+    <p class="cp-host" translate="no"></p>
+    <p class="cp-peligro" hidden data-t="cp_peligro_texto"></p>
+    <ol class="cp-pasos">
+      <li data-paso="lista"><i aria-hidden="true"></i><span class="cp-n" data-t="cp_lista"></span><span class="cp-v"></span></li>
+      <li data-paso="conexion"><i aria-hidden="true"></i><span class="cp-n" data-t="cp_conexion"></span><span class="cp-v"></span></li>
+      <li data-paso="empresas"><i aria-hidden="true"></i><span class="cp-n" data-t="cp_empresas"></span><span class="cp-v"></span></li>
+      <li data-paso="cookies"><i aria-hidden="true"></i><span class="cp-n" data-t="cp_cookies"></span><span class="cp-v"></span></li>
+    </ol>
+    <div class="cp-barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-labelledby="cp-t"><b></b></div>
+    <p class="cp-pie" data-t="cp_pie"></p>
+    <button type="button" class="cp-inicio" hidden data-t="cp_volver"></button>
+  </div>
+</section>
 <script src="interruptor.js"></script>
 <script src="puente.js"></script>
 <script src="barra.js"></script>

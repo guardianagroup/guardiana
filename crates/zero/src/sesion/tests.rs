@@ -5162,3 +5162,127 @@ fn a_change_of_the_protections_reloads_the_web_in_front() {
     );
     assert!(!o.contains(&Orden::Recarga { id }), "el tema");
 }
+
+/// 1.0.63 (the owner, 17 Nov 2026, 22:48: «chequeábamos la web… quiero que aparezca en pantalla… un mensaje… y una
+/// barra… 5 segundos»): «Comprobando esta página» covers a site entered for the first time since ZERO opened, with what
+/// ZERO really checked, for five seconds; the page loads behind it; the same site again opens at once.
+#[test]
+fn a_site_entered_for_the_first_time_is_checked_for_five_seconds() {
+    static AHORA: AtomicU64 = AtomicU64::new(1_791_553_171_000);
+    fn reloj_movil() -> i64 {
+        i64::try_from(AHORA.load(Ordering::SeqCst)).unwrap_or(0)
+    }
+    let d = carpeta();
+    let (mut s, _) = Sesion::abre(Arranque {
+        datos: d.join("datos"),
+        descargas: d.join("descargas"),
+        idioma_sistema: "es-CO".into(),
+        version: "0.1.0".into(),
+        reloj: reloj_movil,
+    });
+    s.comprueba_sitios = true;
+    let _ = s.mensaje(
+        Origen::Panel,
+        PANEL,
+        &json!({ "tipo": "bienvenida", "cortar": true }).to_string(),
+    );
+    let id = s.activa();
+    let (cancela, o) = s.navegacion_empieza(id, "https://www.eltiempo.com/", false);
+    assert!(!cancela);
+    // the screen covers the page and the side view
+    assert_eq!(s.marco(), (ALTO_COMPRUEBA, 0));
+    let c = del_tipo(&o, Origen::Barra, "comprobacion").unwrap_or_default();
+    assert_eq!(c["host"], "www.eltiempo.com");
+    assert_eq!(c["peligro"], false);
+    assert_eq!(c["visible"], true);
+    assert_eq!(c["llego"], false);
+    assert_eq!(c["https"], true);
+    assert_eq!(c["quedan"], COMPRUEBA_MS);
+    // the page arrives behind it: said once
+    let _ = s.peticion(id, "https://www.eltiempo.com/", "GET", b"", 1);
+    let _ = s.pagina_nueva(id, "https://www.eltiempo.com/");
+    let c = del_tipo(&s.tic(), Origen::Barra, "comprobacion").unwrap_or_default();
+    assert_eq!(c["llego"], true);
+    assert!(del_tipo(&s.tic(), Origen::Barra, "comprobacion").is_none());
+    // a company the page calls, cut by the shield, counts on the screen
+    let r = s.peticion(
+        id,
+        "https://stats.g.doubleclick.net/g/collect",
+        "GET",
+        b"",
+        3,
+    );
+    assert!(r.cortar);
+    let c = del_tipo(&s.tic(), Origen::Barra, "comprobacion").unwrap_or_default();
+    assert_eq!(c["empresas"], 1);
+    // not yet: still covered
+    AHORA.fetch_add(4_000, Ordering::SeqCst);
+    let _ = s.tic();
+    assert_eq!(s.marco().0, ALTO_COMPRUEBA);
+    // five seconds: the OK, and the page in sight
+    AHORA.fetch_add(1_000, Ordering::SeqCst);
+    let o = s.tic();
+    assert_eq!(
+        del_tipo(&o, Origen::Barra, "comprobacion").unwrap_or_default()["fin"],
+        true
+    );
+    assert_eq!(s.marco().0, ALTO_ZERO);
+    // the same site again: no screen
+    let (_, o) = s.navegacion_empieza(id, "https://www.eltiempo.com/deportes", false);
+    assert!(del_tipo(&o, Origen::Barra, "comprobacion").is_none());
+    assert_eq!(s.marco().0, ALTO_ZERO);
+    // the browser's own pages and GUARDIANA's are never checked
+    let (_, o) = s.navegacion_empieza(id, INICIO, false);
+    assert!(del_tipo(&o, Origen::Barra, "comprobacion").is_none());
+    let (_, o) = s.navegacion_empieza(id, "https://guardianagroup.com/verificar/", false);
+    assert!(del_tipo(&o, Origen::Barra, "comprobacion").is_none());
+    // another new site: another check, with its own number
+    let (_, o) = s.navegacion_empieza(id, "http://ejemplo-sin-tls.co/", false);
+    let c = del_tipo(&o, Origen::Barra, "comprobacion").unwrap_or_default();
+    assert_eq!(c["host"], "ejemplo-sin-tls.co");
+    assert_eq!(c["https"], false);
+    assert_eq!(c["n"], 2);
+    // in another tab, the screen steps aside (and comes back with its tab)
+    let otra = s.pestanas.iter().map(|p| p.id).find(|x| *x != id);
+    if let Some(otra) = otra.filter(|x| s.pestana(*x).is_some_and(|p| !p.fija)) {
+        s.activa = otra;
+        assert_ne!(s.marco().0, ALTO_COMPRUEBA);
+        s.activa = id;
+    }
+    assert_eq!(s.marco().0, ALTO_COMPRUEBA);
+}
+
+/// 1.0.63: an address on a list of danger keeps the screen («Esta página no se abre») until the person leaves, and the
+/// way out goes to the start page; the site is never counted as checked.
+#[test]
+fn a_dangerous_address_keeps_the_screen_until_the_person_leaves() {
+    let (mut s, _, _) = abre();
+    s.comprueba_sitios = true;
+    let id = s.activa();
+    let _ = s.navegacion_empieza(id, "https://descarga-falsa.example/", false);
+    if let Some(c) = s.comprobacion.as_mut() {
+        c.peligro = true;
+        c.enviado = None;
+    }
+    let c = del_tipo(&s.tic(), Origen::Barra, "comprobacion").unwrap_or_default();
+    assert_eq!(c["peligro"], true);
+    // its five seconds do not open it (the clock of these tests is fixed: the check is judged by its flag)
+    if let Some(c) = s.comprobacion.as_mut() {
+        c.desde -= COMPRUEBA_MS * 10;
+    }
+    let o = s.tic();
+    assert!(del_tipo(&o, Origen::Barra, "comprobacion").is_none_or(|m| m["fin"] != true));
+    assert_eq!(s.marco().0, ALTO_COMPRUEBA);
+    // «Volver al inicio»
+    let o = s.mensaje(Origen::Barra, BARRA, r#"{"tipo":"comprobacion_inicio"}"#);
+    assert_eq!(
+        del_tipo(&o, Origen::Barra, "comprobacion").unwrap_or_default()["fin"],
+        true
+    );
+    assert!(o.contains(&Orden::Navega {
+        id,
+        url: INICIO.to_string()
+    }));
+    assert!(!s.comprobados.contains("descarga-falsa.example"));
+    assert_ne!(s.marco().0, ALTO_COMPRUEBA);
+}

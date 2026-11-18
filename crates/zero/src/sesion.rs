@@ -126,6 +126,11 @@ pub const EMPRESA: &str = "https://zero.guardiana/empresa.html";
 pub const ALTO_ARRIBA: i32 = 56;
 /// See [`ALTO_ARRIBA`].
 pub const ALTO_ZERO: i32 = 144;
+/// 1.0.63: how long «Comprobando esta página» stays over a site entered for the first time (the owner, 17 Nov 2026:
+/// «que tarde… 5 segundos y a los 5 segundos ya le damos paso»).
+pub const COMPRUEBA_MS: i64 = 5_000;
+/// 1.0.63: the bar's height while it covers the page with that screen; the shell keeps it within the window.
+pub const ALTO_COMPRUEBA: i32 = 100_000;
 /// See [`ALTO_ARRIBA`].
 pub const ANCHO_CARRIL: i32 = 152;
 /// See [`ALTO_ARRIBA`].
@@ -146,6 +151,28 @@ pub enum Origen {
     Panel,
     /// A tab, by id.
     Pestana(u32),
+}
+
+/// 1.0.63 (the owner, 17 Nov 2026, 22:48: «primero entrábamos nosotros, chequeábamos la web en busca de… malware… ni
+/// espionaje… y entonces dábamos el OK. Este paso quiero que aparezca en pantalla… un mensaje… y una barra… 5 segundos»):
+/// the screen «Comprobando esta página» over a site the person enters for the first time since ZERO opened. The page
+/// loads behind it, and what it lists is only what ZERO really checks: the address against the lists of malware and
+/// scams, the connection, the other companies the page tries to reach (cut by the shield) and the cookie notice.
+#[derive(Debug, Clone)]
+struct Comprobacion {
+    pestana: u32,
+    sitio: String,
+    host: String,
+    https: bool,
+    /// The address is on a list of danger (uBlock Origin's badware, URLhaus): the page is cut and the screen stays.
+    peligro: bool,
+    desde: i64,
+    /// The page's first content arrived (over HTTPS, the engine accepted its certificate).
+    llego: bool,
+    /// Which check this is (a new site in the same tab starts another), so the bar starts its bar again.
+    n: u32,
+    /// What the bar was last told, so the tick sends only what changed.
+    enviado: Option<Value>,
 }
 
 /// Where a tab keeps its cookies and sessions.
@@ -701,6 +728,12 @@ pub struct Sesion {
     ultima_zero: u32,
     /// 1.0.46: the layout last given to the shell ([`Orden::Marco`]).
     marco_dado: Option<(i32, i32)>,
+    /// 1.0.63: «Comprobando esta página» while it is on screen, the sites already checked since ZERO opened, how many
+    /// checks there were, and whether ZERO checks at all (the tests of everything else turn it off).
+    comprobacion: Option<Comprobacion>,
+    comprobados: std::collections::HashSet<String>,
+    comprobaciones: u32,
+    comprueba_sitios: bool,
     /// «Tu visita, a subasta» (1.0.46): auctions and distinct companies by day (`subastas.json`).
     subastas: subasta::Diario,
     subastas_sucio: bool,
@@ -1085,6 +1118,11 @@ impl Sesion {
             secreto: [0; 32],
             ultima_zero: 0,
             marco_dado: None,
+            comprobacion: None,
+            comprobados: std::collections::HashSet::new(),
+            comprobaciones: 0,
+            // the tests of everything else run without it (its own tests turn it on)
+            comprueba_sitios: !cfg!(test),
             subastas: subastas_dia,
             subastas_sucio: false,
             vpn: Vpn::default(),
@@ -2088,6 +2126,14 @@ impl Sesion {
         let Some(p) = self.pestana(self.activa) else {
             return (ALTO_ZERO, 0);
         };
+        // 1.0.63: «Comprobando esta página» covers the page (and the side view) for its five seconds
+        if self
+            .comprobacion
+            .as_ref()
+            .is_some_and(|c| c.pestana == self.activa)
+        {
+            return (ALTO_COMPRUEBA, 0);
+        }
         let producto = Self::producto_de(p);
         // 1.0.50 (dueño, 30 Oct 2026, 22:29: «la versión web que teníamos, que ya estaba
         // terminada, quiero que la metas en el programa»): GUARDIANA's web (Órbita, and
@@ -3180,6 +3226,15 @@ impl Sesion {
                 ]
             }
             "atras" => vec![Orden::Atras { id: activa }],
+            // 1.0.63: «Esta página no se abre» (an address on a list of danger): the way out, to the start page
+            "comprobacion_inicio" => {
+                let mut o = self.comprobacion_fin_de(activa);
+                o.push(Orden::Navega {
+                    id: activa,
+                    url: INICIO.to_string(),
+                });
+                o
+            }
             "adelante" => vec![Orden::Adelante { id: activa }],
             "recargar" => vec![Orden::Recarga { id: activa }],
             "detener" => vec![Orden::Detiene { id: activa }],
@@ -5039,7 +5094,137 @@ impl Sesion {
         }
         p.navegando = Some(sin_fragmento(url).to_string());
         p.cargando = true;
-        (false, vec![self.estado()])
+        let mut o = self.comprobacion_empieza(id, url, es_web);
+        o.push(self.estado());
+        (false, o)
+    }
+
+    /// 1.0.63: a page starts in tab `id`. In the tab in front, a web of ZERO on a site not yet checked since ZERO
+    /// opened gets «Comprobando esta página» (`Comprobacion`); a page of a site already checked ends a check that was
+    /// running in that tab.
+    fn comprobacion_empieza(&mut self, id: u32, url: &str, es_web: bool) -> Vec<Orden> {
+        if !self.comprueba_sitios || !es_web || id != self.activa {
+            return Vec::new();
+        }
+        let Some(p) = self.pestana(id) else {
+            return Vec::new();
+        };
+        let host = host_de(url).unwrap_or_default();
+        let s = sitio(&host);
+        // GUARDIANA's own pages and the computer itself are never checked
+        let propio = s == "guardianagroup.com"
+            || host == "localhost"
+            || host.starts_with("127.")
+            || host == "[::1]";
+        if p.fija || url.starts_with(SECURE) || es_orbita(url) || s.is_empty() || propio {
+            return Vec::new();
+        }
+        if self.comprobados.contains(&s) {
+            return self.comprobacion_fin_de(id);
+        }
+        let peligro = crate::filtros::motor().peligroso(url, Recurso::Documento, false, &s);
+        let ahora = (self.reloj)();
+        let sigue = self
+            .comprobacion
+            .as_ref()
+            .filter(|c| c.pestana == id && c.sitio == s)
+            .map(|c| (c.desde, c.n));
+        let n = sigue.map_or_else(
+            || {
+                self.comprobaciones = self.comprobaciones.wrapping_add(1);
+                self.comprobaciones
+            },
+            |x| x.1,
+        );
+        self.comprobacion = Some(Comprobacion {
+            pestana: id,
+            sitio: s,
+            host,
+            https: url.starts_with("https://"),
+            peligro,
+            desde: sigue.map_or(ahora, |x| x.0),
+            llego: false,
+            n,
+            enviado: None,
+        });
+        self.msg_comprobacion(ahora).into_iter().collect()
+    }
+
+    /// 1.0.63: no «Comprobando esta página» in this run (the browser's own end-to-end test, which measures each page as
+    /// it opens).
+    pub fn sin_comprobacion(&mut self) {
+        self.comprueba_sitios = false;
+        self.comprobacion = None;
+    }
+
+    /// 1.0.63: the check of tab `id` ends without the page being given the OK (another page, the tab closed).
+    fn comprobacion_fin_de(&mut self, id: u32) -> Vec<Orden> {
+        if self.comprobacion.as_ref().is_some_and(|c| c.pestana == id) {
+            self.comprobacion = None;
+            return vec![envia(
+                Origen::Barra,
+                &json!({ "tipo": "comprobacion", "fin": true }),
+            )];
+        }
+        Vec::new()
+    }
+
+    /// 1.0.63: what «Comprobando esta página» shows now, when it changed since the bar was last told.
+    fn msg_comprobacion(&mut self, ahora: i64) -> Option<Orden> {
+        let activa = self.activa;
+        let c = self.comprobacion.as_ref()?;
+        let p = self.pestana(c.pestana)?;
+        let empresas = p
+            .escudo
+            .terceros
+            .values()
+            .filter(|t| t.cortadas > 0)
+            .count();
+        let v = json!({
+            "tipo": "comprobacion",
+            "n": c.n,
+            "visible": c.pestana == activa,
+            "host": c.host,
+            "peligro": c.peligro,
+            "https": c.https,
+            "llego": c.llego,
+            "empresas": empresas,
+            "cookies": p.escudo.cookies.is_some(),
+            "quedan": (COMPRUEBA_MS - (ahora - c.desde)).clamp(0, COMPRUEBA_MS),
+            "total": COMPRUEBA_MS,
+        });
+        // the time left is for the bar's first drawing: a change of it alone is not news
+        let mut igual = v.clone();
+        igual["quedan"] = Value::Null;
+        let c = self.comprobacion.as_mut()?;
+        if c.enviado.as_ref() == Some(&igual) {
+            return None;
+        }
+        c.enviado = Some(igual);
+        Some(envia(Origen::Barra, &v))
+    }
+
+    /// 1.0.63: the tick of «Comprobando esta página»: its five seconds end with the OK (the site joins the checked
+    /// ones), unless the address is on a list of danger, where the screen stays until the person leaves; meanwhile
+    /// what changed is sent.
+    fn comprobacion_tic(&mut self, ahora: i64) -> Vec<Orden> {
+        let Some(c) = self.comprobacion.as_ref() else {
+            return Vec::new();
+        };
+        if self.pestana(c.pestana).is_none() {
+            let id = c.pestana;
+            return self.comprobacion_fin_de(id);
+        }
+        if !c.peligro && ahora - c.desde >= COMPRUEBA_MS {
+            let sitio = c.sitio.clone();
+            self.comprobados.insert(sitio);
+            self.comprobacion = None;
+            return vec![envia(
+                Origen::Barra,
+                &json!({ "tipo": "comprobacion", "fin": true }),
+            )];
+        }
+        self.msg_comprobacion(ahora).into_iter().collect()
     }
 
     /// The new page is there (the engine's ContentLoading, with the address it really loaded).
@@ -5072,6 +5257,10 @@ impl Sesion {
         }
         p.url = url.to_string();
         p.al_libro.clear();
+        if let Some(c) = self.comprobacion.as_mut().filter(|c| c.pestana == id) {
+            c.llego = true;
+            c.https = url.starts_with("https://");
+        }
         p.escudo = escudo::Pestana::nueva(&s);
         p.subasta = subasta::Pagina::nueva(&s);
         p.carga = p.carga.wrapping_add(1);
@@ -5793,6 +5982,7 @@ impl Sesion {
             o.push(Orden::ComprobarLicencia);
         }
         o.extend(self.vpn_tic(ahora));
+        o.extend(self.comprobacion_tic(ahora));
         if !self.pulsos.is_empty() {
             let lista: Vec<Value> = std::mem::take(&mut self.pulsos)
                 .into_iter()
