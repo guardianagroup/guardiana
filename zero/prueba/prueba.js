@@ -135,7 +135,7 @@ function pantalla(nombre) {
   fs.writeFileSync(path.join(base, 'datos', 'tinta.json'), JSON.stringify([{ tipo: 'correo', valor: 'ana@correo.co' }]));
   const reglas = ['sitio-prueba.test', '*.doubleclick.net', 'www.google-analytics.com', 'collect.otra-empresa.io', 'www.facebook.com', 'connect.facebook.net', 'www.google.com', 'analytics.tiktok.com', 'scripts.medidor-prueba.io', 'static.hotjar.com', 'marco-prueba.io'].map((h) => `MAP ${h} 127.0.0.1`).join(',');
   const proceso = spawn(exe, [], {
-    env: { ...process.env, GUARDIANA_ZERO_DATOS: base, GUARDIANA_ZERO_DEPURA: '1', GUARDIANA_ZERO_ARGS: `--remote-debugging-port=9222 --host-resolver-rules="${reglas}"` },
+    env: { ...process.env, GUARDIANA_ZERO_DATOS: base, GUARDIANA_ZERO_DEPURA: '1', GUARDIANA_ZERO_SIN_DIALOGO: '1', GUARDIANA_ZERO_ARGS: `--remote-debugging-port=9222 --host-resolver-rules="${reglas}"` },
     stdio: 'ignore',
   });
   let salio = null;
@@ -576,7 +576,7 @@ function pantalla(nombre) {
   registro.length = 0;
   salio = null;
   const proceso2 = spawn(exe, [], {
-    env: { ...process.env, GUARDIANA_ZERO_DATOS: base, GUARDIANA_ZERO_DEPURA: '1', GUARDIANA_ZERO_ARGS: `--remote-debugging-port=9222 --host-resolver-rules="${reglas}"` },
+    env: { ...process.env, GUARDIANA_ZERO_DATOS: base, GUARDIANA_ZERO_DEPURA: '1', GUARDIANA_ZERO_SIN_DIALOGO: '1', GUARDIANA_ZERO_ARGS: `--remote-debugging-port=9222 --host-resolver-rules="${reglas}"` },
     stdio: 'ignore',
   });
   proceso2.on('exit', (c) => { salio = c; });

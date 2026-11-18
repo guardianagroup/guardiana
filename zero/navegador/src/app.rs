@@ -1177,6 +1177,10 @@ fn elige_destino(sugerida: &Path) -> windows::core::Result<Option<PathBuf>> {
         FOLDERID_Desktop, FileSaveDialog, IFileSaveDialog, IShellItem, SHCreateItemFromParsingName,
         FOS_FORCEFILESYSTEM, FOS_OVERWRITEPROMPT, FOS_PATHMUSTEXIST, SIGDN_FILESYSPATH,
     };
+    // The browser's own test (zero/prueba) runs with nobody to answer a dialog: there the file goes where it always went.
+    if std::env::var_os("GUARDIANA_ZERO_SIN_DIALOGO").is_some() {
+        return Ok(Some(sugerida.to_path_buf()));
+    }
     unsafe {
         let d: IFileSaveDialog = CoCreateInstance(&FileSaveDialog, None, CLSCTX_INPROC_SERVER)?;
         let op = d.GetOptions()?;
