@@ -208,15 +208,18 @@ function pantalla(nombre) {
   comprueba(await web.evaluate(() => !(window.chrome && window.chrome.webview)), 'la página no ve el canal con el navegador');
   comprueba(await hasta(async () => vio('sitio-prueba.test', '/cookies-rechazadas')), 'el aviso de cookies se rechaza solo («Rechazar todo»)');
   comprueba(!vio('sitio-prueba.test', '/cookies-aceptadas'), 'y no se acepta nada');
+  // 1.0.62 (the owner, 17 Nov 2026: the shield's count must match its list): a change of the protections reloads the web
+  // in front; what the test asks the page next waits for that new load.
+  const conRecarga = async (accion) => { const carga = web.waitForEvent('load', { timeout: 15000 }).catch(() => null); await accion(); await carga; await espera(600); };
   // 2 Nov 2026 (the owner, 16:50: «que aparezca ya en la pantalla del navegador»): the three protections beside «Protegido»,
   // as switches with their names, the same settings as «Ajustes».
   for (const nombre of ['Rastreadores y anuncios', 'Avisos de cookies', 'Ventanas emergentes']) {
     const sw = barra.getByRole('switch', { name: nombre, exact: true });
     comprueba((await sw.isVisible()) && (await sw.isChecked()), `en la barra, «${nombre}» a la vista y encendido`);
   }
-  await barra.getByRole('switch', { name: 'Avisos de cookies', exact: true }).click();
+  await conRecarga(() => barra.getByRole('switch', { name: 'Avisos de cookies', exact: true }).click());
   comprueba(await hasta(() => panel.evaluate(() => document.getElementById('a-cookies').checked === false)), 'apagar «Avisos de cookies» en la barra lo apaga en «Ajustes»');
-  await barra.getByRole('switch', { name: 'Avisos de cookies', exact: true }).click();
+  await conRecarga(() => barra.getByRole('switch', { name: 'Avisos de cookies', exact: true }).click());
   comprueba(await hasta(() => panel.evaluate(() => document.getElementById('a-cookies').checked === true)), 'y encenderlo en la barra lo enciende');
   pantalla('z2-interruptores.png');
   // The VPN (2 Nov 2026, the VPN review): no chip while there is none; given a VPN whose server does not answer (as the
@@ -300,7 +303,7 @@ function pantalla(nombre) {
   const baliza = async (ruta) => { await web.evaluate(([p, r]) => navigator.sendBeacon(`http://collect.otra-empresa.io:${p}${r}`, 'x'), [PUERTO, ruta]); await espera(800); };
   await baliza('/baliza-1');
   comprueba(vio('collect.otra-empresa.io', '/baliza-1'), 'sin protección máxima, el aviso a otra empresa sale');
-  await panel.click('#e-maxima-activar');
+  await conRecarga(() => panel.click('#e-maxima-activar'));
   comprueba(await hasta(() => panel.evaluate(() => !document.querySelector('#e-maxima-activa').classList.contains('oculto'))), '«Activar protección máxima» se enciende');
   await baliza('/baliza-2');
   comprueba(!vio('collect.otra-empresa.io', '/baliza-2'), 'con protección máxima, ese aviso ya no sale');
@@ -310,7 +313,7 @@ function pantalla(nombre) {
   await baliza('/baliza-3');
   comprueba(vio('collect.otra-empresa.io', '/baliza-3'), 'desbloqueado, ese aviso vuelve a salir');
   await pulsa('otra-empresa.io', false, 'protección máxima, volver a bloquear');
-  await panel.click('#e-maxima-quitar');
+  await conRecarga(() => panel.click('#e-maxima-quitar'));
   comprueba(await hasta(() => panel.evaluate(() => document.querySelector('#e-maxima-activa').classList.contains('oculto'))), 'y se puede desactivar');
   await espera(600);
   pantalla('02-escudo.png');
@@ -409,7 +412,7 @@ function pantalla(nombre) {
   // Decision 206, approved: with maximum protection, another company's script gets a slightly
   // different canvas (the same on every read), the page's own reads are untouched, and frames
   // are measured too. Picked up by a page opened anew.
-  await panel.click('#e-maxima-activar');
+  await conRecarga(() => panel.click('#e-maxima-activar'));
   await hasta(() => panel.evaluate(() => !document.querySelector('#e-maxima-activa').classList.contains('oculto')));
   await barra.fill('#campo-dir', `${SITIO}/prueba?id=8`);
   await barra.press('#campo-dir', 'Enter');
@@ -437,7 +440,7 @@ function pantalla(nombre) {
   comprueba(await hasta(async () => (await textoMedidas()).includes('marco-prueba.io (canvas')), `y mide dentro de un marco de otra empresa (${await textoMedidas()})`);
   await espera(500);
   pantalla('03d-maxima-huella.png');
-  await panel.click('#e-maxima-quitar');
+  await conRecarga(() => panel.click('#e-maxima-quitar'));
   await hasta(() => panel.evaluate(() => document.querySelector('#e-maxima-activa').classList.contains('oculto')));
 
   // A new tab and a new window.
